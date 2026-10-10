@@ -25,19 +25,29 @@ class Button(ct.Structure):
 class Config(ct.Structure):
     _fields_ = [("abi_version", ct.c_uint32), ("backend", ct.c_uint32),
                 ("tick_hz", ct.c_uint32), ("stale_timeout_ms", ct.c_uint32),
-                ("pointer_x", Axis), ("pointer_y", Axis), ("scroll", Axis), ("buttons", Button * 4)]
+                ("pointer_x", Axis), ("pointer_y", Axis), ("scroll", Axis), ("buttons", Button * 4),
+                ("target_max_speed", ct.c_double)]
 
 
 class Frame(ct.Structure):
     _fields_ = [(name, ct.c_double) for name in
                 ("pointer_x", "pointer_y", "scroll", "left_click", "right_click", "delete_key", "insert_key")]
+    _fields_ += [("pointer_mode", ct.c_uint32), ("target_x", ct.c_double),
+                 ("target_y", ct.c_double), ("target_speed", ct.c_double),
+                 ("keys_down", ct.c_uint32)]
 
 
 class Status(ct.Structure):
     _fields_ = [(name, ct.c_uint32) for name in
                 ("enabled", "awaiting_neutral", "timed_out", "last_error", "capabilities", "backend")] + [
                 (name, ct.c_uint64) for name in
-                ("accepted_frames", "rejected_frames", "emitted_events", "dropped_log_events")]
+                ("accepted_frames", "rejected_frames", "emitted_events", "dropped_log_events")] + [
+                (name, ct.c_uint32) for name in
+                ("pointer_mode", "pointer_position_valid", "target_reached", "reserved")] + [
+                (name, ct.c_double) for name in
+                ("pointer_position_x", "pointer_position_y", "target_x", "target_y", "target_speed",
+                 "pointer_velocity_x", "pointer_velocity_y")] + [
+                ("held_key_mask", ct.c_uint32)]
 
 
 class Event(ct.Structure):
@@ -105,23 +115,32 @@ def error_message(lib, code, system=None):
                 "An administrator can load it with sudo modprobe uinput; containers need host device access.\n"
                 "Use dry-run without --native until the device is available.")
     if code == 2:
+        if system == "Linux":
+            return (f"{detail}. Build live Linux output with FID_NATIVE_BACKEND=ON. "
+                    "Linux target movement also requires X11 and XRandR primary-display geometry; "
+                    "pure Wayland sessions are unsupported for target mode. Use `velocity X Y` for "
+                    "relative motion, or test targets in dry-run.")
         return (f"{detail}. For live output, build the native backend on Linux or macOS.\n"
                 "From Drivers/: cmake -S . -B build -DFID_NATIVE_BACKEND=ON\n"
                 "Then: cmake --build build -j 4")
     return f"{detail}. Output remains paused after a failed trial; check status and testing/README.md."
 
 
-HELP = """Commands (axis values are normalized between 0 and 1):
-  move X Y        Example: move 0.65 0.5 (right); 0.5 0.5 is neutral
+HELP = """Axis and button values are normalized between 0 and 1; held keys are discrete:
+  move SPEED X Y  Move toward target X,Y at SPEED of configured maximum; e.g. move 0.6 0.8 0.5
+                  Target coordinates use the primary display; (0.5,0.5) is its center.
+  velocity X Y    Continuous direction/speed axes; 0.5 is neutral, lower/greater move left/right
   scroll VALUE    Example: scroll 0.8 (down); scroll 0.2 (up)
   click left      One left click; click right for a right click
   key delete      One forward Delete; key insert for Insert (limited on macOS)
+  hold w a s d space shift  Hold the listed keys for the trial duration, then release them
   status          Mode, trial state, output state, counters, and capabilities
   stop            Cancel the current trial/focus delay and pause output
   help            Show these commands
   quit            Stop output and exit (Ctrl-C also exits)
 Advanced: frame X Y SCROLL LEFT RIGHT DELETE INSERT, or seven bare numbers.
-Each trial runs for the configured duration, then pauses; trials are not queued."""
+Target trials stop on arrival (up to 30 seconds); velocity/action trials run for the configured
+duration. Each trial then pauses; trials are not queued."""
 
 
 @dataclass
@@ -155,12 +174,19 @@ def parse_command(line):
             raise ValueError("Axis/frame values must be finite and between 0 and 1.")
         return value
 
-    frame = Frame(0.5, 0.5, 0.5, 0, 0, 0, 0)
+    frame = Frame(0.5, 0.5, 0.5, 0, 0, 0, 0, 0, 0.5, 0.5, 0, 0)
     if name == "move":
+        if len(parts) != 4:
+            raise ValueError("Usage: move SPEED TARGET_X TARGET_Y (example: move 0.6 0.8 0.5)")
+        frame.pointer_mode = 1
+        frame.target_speed, frame.target_x, frame.target_y = map(number, parts[1:])
+        label = (f"Target move (speed={frame.target_speed:g}, "
+                 f"x={frame.target_x:g}, y={frame.target_y:g})")
+    elif name == "velocity":
         if len(parts) != 3:
-            raise ValueError("Usage: move X Y (example: move 0.65 0.5)")
+            raise ValueError("Usage: velocity X Y (example: velocity 0.65 0.5)")
         frame.pointer_x, frame.pointer_y = map(number, parts[1:])
-        label = f"Move (X={frame.pointer_x:g}, Y={frame.pointer_y:g})"
+        label = f"Velocity (X={frame.pointer_x:g}, Y={frame.pointer_y:g})"
     elif name == "scroll":
         if len(parts) != 2:
             raise ValueError("Usage: scroll VALUE (example: scroll 0.8)")
@@ -178,6 +204,14 @@ def parse_command(line):
         key = parts[1].lower()
         setattr(frame, f"{key}_key", 1)
         label = "Forward Delete" if key == "delete" else "Insert"
+    elif name in ("hold", "keys"):
+        key_bits = {"w": 1 << 0, "a": 1 << 1, "s": 1 << 2, "d": 1 << 3,
+                    "space": 1 << 4, "shift": 1 << 5}
+        selected = [item.lower() for item in parts[1:]]
+        if not selected or any(item not in key_bits for item in selected) or len(set(selected)) != len(selected):
+            raise ValueError("Usage: hold w a s d space shift (choose one or more distinct keys)")
+        frame.keys_down = sum(key_bits[item] for item in selected)
+        label = "Hold " + "+".join(item.upper() for item in selected)
     else:
         values = parts[1:] if name == "frame" else parts
         if name != "frame" and len(parts) != 7:
@@ -191,7 +225,7 @@ def parse_command(line):
 
 def capability_names(bits):
     names = [label for bit, label in ((1, "pointer"), (2, "scroll"), (4, "left click"),
-             (8, "right click"), (16, "forward Delete"), (32, "Insert")) if bits & bit]
+             (8, "right click"), (16, "forward Delete"), (32, "Insert"), (128, "held keys")) if bits & bit]
     if bits & 64:
         names = ["Insert (limited: Help/Insert-position key)" if n == "Insert" else n for n in names]
     return ", ".join(names) or "none"
@@ -207,6 +241,9 @@ def summarize(totals):
         value = totals["scroll"]
         results.append(f"scroll {'down' if value > 0 else 'up'}: {abs(value)} detents")
     for kind, label in ((3, "left click"), (4, "right click"), (5, "forward Delete"), (6, "Insert")):
+        if totals["counts"].get(kind):
+            results.append(f"{label}: {totals['counts'][kind]}")
+    for kind, label in ((7, "key-down transitions"), (8, "key-up transitions")):
         if totals["counts"].get(kind):
             results.append(f"{label}: {totals['counts'][kind]}")
     return "; ".join(results) or "no actions emitted (neutral/dead-zone input)"
@@ -230,12 +267,20 @@ class TestSession:
             self.check(self.lib.fid_get_status(self.handle, ct.byref(status)))
             mode = "LIVE OS INPUT" if self.args.native else "DRY-RUN (no OS input)"
             error = self.lib.fid_result_string(status.last_error).decode()
+            position = (f"Pointer: ({status.pointer_position_x:.3f}, {status.pointer_position_y:.3f}) | "
+                        f"target: ({status.target_x:.3f}, {status.target_y:.3f}) at "
+                        f"{status.target_speed:.3f} max speed | velocity: "
+                        f"({status.pointer_velocity_x:.1f}, {status.pointer_velocity_y:.1f}) units/s | "
+                        f"arrived: {'yes' if status.target_reached else 'no'}\n"
+                        if status.pointer_mode == 1 and status.pointer_position_valid else "")
             return (f"Mode: {mode} | Trial: {self.phase} | Output: {'enabled' if status.enabled else 'paused'}\n"
                     f"Capabilities: {capability_names(status.capabilities)}\n"
                     f"Accepted frames: {status.accepted_frames} | Rejected frames: {status.rejected_frames} | "
                     f"Emitted actions: {status.emitted_events}\n"
+                    f"Held keys: {status.held_key_mask:#04x} | "
                     f"Awaiting neutral: {'yes' if status.awaiting_neutral else 'no'} | "
                     f"Timed out: {'yes' if status.timed_out else 'no'} | Driver error: {error}\n"
+                    + position +
                     f"Last trial error: {self.last_error}")
 
     def start(self, command):
@@ -247,7 +292,8 @@ class TestSession:
             self.last_error = "none"
             self.last_totals = None
             self.phase = "focus delay" if self.args.native and self.args.delay else "arming"
-            self.output(f"Trial: {command.label}. Duration: {self.args.duration:g} seconds.")
+            trial_time = "until target arrival (30 second limit)" if command.frame.pointer_mode == 1 else f"{self.args.duration:g} seconds"
+            self.output(f"Trial: {command.label}. Duration: {trial_time}.")
             if self.args.native and self.args.delay:
                 self.output(f"Focus your target app; starting in {self.args.delay:g} seconds. stop cancels.")
             self.thread = threading.Thread(target=self._run, args=(command,), name="manual-input-trial")
@@ -288,6 +334,43 @@ class TestSession:
                 return False
         return True
 
+    def _send_target(self, frame, totals, timeout=30):
+        finish = time.monotonic() + timeout
+        next_frame = time.monotonic()
+        next_report = next_frame
+        while time.monotonic() < finish:
+            with self.lock:
+                if self.cancel.is_set():
+                    return False
+                self.check(self.lib.fid_submit(self.handle, ct.byref(frame)))
+                status = Status()
+                self.check(self.lib.fid_get_status(self.handle, ct.byref(status)))
+                if not status.enabled:
+                    reason = "input watchdog timed out" if status.timed_out else "driver paused"
+                    detail = error_message(self.lib, status.last_error) if status.last_error else reason
+                    raise DriverError(f"Output stopped: {detail}")
+                if status.target_reached:
+                    self._collect(totals)
+                    self.output(f"Arrived at ({status.pointer_position_x:.3f}, {status.pointer_position_y:.3f}); "
+                                f"requested speed {status.target_speed:.2f} of max, "
+                                f"last velocity ({status.pointer_velocity_x:.1f}, "
+                                f"{status.pointer_velocity_y:.1f}) units/s.")
+                    return True
+                self._collect(totals)
+                if time.monotonic() >= next_report and status.pointer_position_valid:
+                    self.output(f"Pointer ({status.pointer_position_x:.3f}, {status.pointer_position_y:.3f}) → "
+                                f"({status.target_x:.3f}, {status.target_y:.3f}) at "
+                                f"{status.target_speed:.2f} max speed; velocity "
+                                f"({status.pointer_velocity_x:.1f}, {status.pointer_velocity_y:.1f}) units/s")
+                    next_report = time.monotonic() + 1
+            next_frame += 1 / self.args.rate
+            current = time.monotonic()
+            if next_frame < current:
+                next_frame = current + 1 / self.args.rate
+            if self.cancel.wait(max(0, next_frame - current)):
+                return False
+        raise DriverError("Target was not reached within 30 seconds; output will pause.")
+
     def _run(self, command):
         totals = {"counts": {}, "dx": 0, "dy": 0, "scroll": 0}
         error = None
@@ -311,7 +394,10 @@ class TestSession:
                 if status.awaiting_neutral:
                     raise DriverError("Worker has not armed; try again when the host is less busy.")
                 self.phase = "running"
-            if not self._send(command.frame, self.args.duration, totals):
+            if command.frame.pointer_mode == 1:
+                if not self._send_target(command.frame, totals):
+                    return
+            elif not self._send(command.frame, self.args.duration, totals):
                 return
             with self.lock:
                 self.phase = "settling"
@@ -360,7 +446,7 @@ def interactive(lib, handle, check, args):
 
     session = TestSession(lib, handle, check, args, output=show_message)
     print(session.status_text())
-    print("Try move 0.65 0.5, scroll 0.8, click left, or key delete. Type help for all commands.")
+    print("Try move 0.6 0.8 0.5, velocity 0.65 0.5, scroll 0.8, click left, or hold w. Type help.")
     print("Each trial pauses automatically. stop cancels a trial; quit or Ctrl-C exits.")
     try:
         while True:
@@ -413,6 +499,8 @@ def main():
 
     config = Config()
     lib.fid_default_config(ct.byref(config))
+    if config.abi_version != 3:
+        raise DriverError(f"Expected Driver ABI v3, found v{config.abi_version}; rebuild the library on this OS.")
     config.backend = int(args.native)
     handle = ct.c_void_p()
     check(lib.fid_create(ct.byref(config), ct.byref(handle)))

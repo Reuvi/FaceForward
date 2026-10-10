@@ -27,7 +27,9 @@ bool valid_config(const fid_config &c) {
         c.tick_hz < 10 || c.tick_hz > 1000 || c.stale_timeout_ms < 1 ||
         c.stale_timeout_ms > 60000 ||
         c.stale_timeout_ms < (1000u + c.tick_hz - 1) / c.tick_hz ||
-        !valid_axis(c.pointer_x) || !valid_axis(c.pointer_y) || !valid_axis(c.scroll))
+        !valid_axis(c.pointer_x) || !valid_axis(c.pointer_y) || !valid_axis(c.scroll) ||
+        !std::isfinite(c.target_max_speed) || c.target_max_speed <= 0 ||
+        c.target_max_speed > 100000)
         return false;
     for (const auto &b : c.buttons) {
         if (!std::isfinite(b.activation_threshold) || !std::isfinite(b.release_threshold) ||
@@ -39,8 +41,10 @@ bool valid_config(const fid_config &c) {
 }
 
 bool valid_frame(const fid_frame &f) {
+    if (f.pointer_mode > FID_POINTER_TARGET || (f.keys_down & ~FID_KEY_MASK)) return false;
     const double values[] = {f.pointer_x, f.pointer_y, f.scroll, f.left_click,
-                             f.right_click, f.delete_key, f.insert_key};
+                             f.right_click, f.delete_key, f.insert_key,
+                             f.target_x, f.target_y, f.target_speed};
     for (double v : values)
         if (!std::isfinite(v) || v < 0 || v > 1) return false;
     return true;
@@ -64,6 +68,7 @@ void Control::enable(Time now) {
     have_frame_ = false;
     enabled_at_ = last_tick_ = now;
     buttons_ = {};
+    held_key_mask_ = 0;
     fractions_ = {};
 }
 
@@ -72,6 +77,7 @@ void Control::pause() {
     awaiting_neutral_ = false;
     have_frame_ = false;
     buttons_ = {};
+    held_key_mask_ = 0;
     fractions_ = {};
 }
 
@@ -92,6 +98,7 @@ std::vector<fid_event> Control::tick(Time now) {
     std::vector<fid_event> events;
     if (!enabled_) return events;
     const double dt = std::clamp(now - last_tick_, 0.0, 0.1);
+    tick_seconds_ = dt;
     last_tick_ = now;
     const Time freshest = have_frame_ ? received_at_ : enabled_at_;
     if (now - freshest >= config_.stale_timeout_ms / 1000.0) {
@@ -104,6 +111,7 @@ std::vector<fid_event> Control::tick(Time now) {
     if (awaiting_neutral_) {
         for (size_t i = 0; i < values.size(); ++i)
             if (values[i] >= config_.buttons[i].release_threshold) return events;
+        if (frame_.keys_down) return events;
         awaiting_neutral_ = false;
         // Arming emits no motion, preventing a jump on the first fresh frame.
         return events;
@@ -112,7 +120,22 @@ std::vector<fid_event> Control::tick(Time now) {
     auto add = [&](uint32_t type, int32_t x = 0, int32_t y = 0) {
         events.push_back({type, x, y, stamp});
     };
-    const std::array<double, 3> axis_values{frame_.pointer_x, frame_.pointer_y, frame_.scroll};
+    const uint32_t old_keys = held_key_mask_;
+    const uint32_t new_keys = frame_.keys_down;
+    const uint32_t released = old_keys & ~new_keys;
+    const uint32_t pressed = new_keys & ~old_keys;
+    // Release ordinary keys before Shift; press Shift before modified keys.
+    for (uint32_t bit = 1; bit <= FID_KEY_LEFT_SHIFT; bit <<= 1)
+        if (bit != FID_KEY_LEFT_SHIFT && (released & bit)) add(FID_EVENT_KEY_UP, bit);
+    if (released & FID_KEY_LEFT_SHIFT) add(FID_EVENT_KEY_UP, FID_KEY_LEFT_SHIFT);
+    if (pressed & FID_KEY_LEFT_SHIFT) add(FID_EVENT_KEY_DOWN, FID_KEY_LEFT_SHIFT);
+    for (uint32_t bit = 1; bit <= FID_KEY_SPACE; bit <<= 1)
+        if (pressed & bit) add(FID_EVENT_KEY_DOWN, bit);
+    held_key_mask_ = new_keys;
+    const std::array<double, 3> axis_values{
+        frame_.pointer_mode == FID_POINTER_VELOCITY ? frame_.pointer_x : config_.pointer_x.neutral,
+        frame_.pointer_mode == FID_POINTER_VELOCITY ? frame_.pointer_y : config_.pointer_y.neutral,
+        frame_.scroll};
     const std::array<fid_axis_config, 3> axes{config_.pointer_x, config_.pointer_y, config_.scroll};
     std::array<int32_t, 3> movement{};
     for (size_t i = 0; i < axes.size(); ++i) {

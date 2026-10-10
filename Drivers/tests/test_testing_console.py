@@ -18,8 +18,14 @@ LIBRARY = None
 
 
 class CommandTests(unittest.TestCase):
-    def test_axes_and_neutral_defaults(self):
-        command = driver.parse_command("move 0.65 0.2")
+    def test_target_and_velocity_commands(self):
+        command = driver.parse_command("move 0.6 0.8 0.2")
+        self.assertEqual(command.frame.pointer_mode, 1)
+        self.assertEqual(command.frame.target_speed, 0.6)
+        self.assertEqual(command.frame.target_x, 0.8)
+        self.assertEqual(command.frame.target_y, 0.2)
+        command = driver.parse_command("velocity 0.65 0.2")
+        self.assertEqual(command.frame.pointer_mode, 0)
         self.assertEqual(command.frame.pointer_x, 0.65)
         self.assertEqual(command.frame.pointer_y, 0.2)
         self.assertEqual(command.frame.scroll, 0.5)
@@ -34,6 +40,9 @@ class CommandTests(unittest.TestCase):
                 frame = driver.parse_command(text).frame
                 self.assertEqual(getattr(frame, field), 1)
                 self.assertEqual(frame.pointer_x, 0.5)
+        held = driver.parse_command("hold w shift").frame
+        self.assertEqual(held.keys_down, 1 | 32)
+        self.assertEqual(driver.parse_command("hold space").frame.keys_down, 16)
 
     def test_advanced_frames_and_comments(self):
         for text in ("frame 0 1 0.5 1 0 0 0", "0 1 0.5 1 0 0 0"):
@@ -42,9 +51,10 @@ class CommandTests(unittest.TestCase):
         self.assertEqual(driver.parse_command("# comment").name, "empty")
 
     def test_invalid_commands(self):
-        cases = ("move", "move 0.5", "move 0 1 2", "move nan 0.5", "scroll inf",
-                 "scroll -0.1", "move 1.1 0.5", "scroll abc", "click middle",
+        cases = ("move", "move 0.5", "move 0 1 2", "move nan 0.5 0.5", "scroll inf",
+                 "scroll -0.1", "move 1.1 0.5 0.5", "velocity 1.1 0.5", "scroll abc", "click middle",
                  "key space", "status extra", "stop extra", "frame 0 0", "banana",
+                 "hold", "hold q", "hold w w",
                  "frame 0.5 0.5 0.5 1 0 0 nan", "click 'left")
         for text in cases:
             with self.subTest(text=text), self.assertRaises(ValueError):
@@ -62,6 +72,8 @@ class CommandTests(unittest.TestCase):
         self.assertIn("pointer left: 10 units", text)
         self.assertIn("scroll up: 2 detents", text)
         self.assertIn("left click: 1", text)
+        self.assertIn("key-up transitions: 1", driver.summarize(
+            {"counts": {8: 1}, "dx": 0, "dy": 0, "scroll": 0}))
         self.assertIn("limited", driver.capability_names(63 | 64))
 
     def test_setup_errors_and_missing_library(self):
@@ -70,6 +82,7 @@ class CommandTests(unittest.TestCase):
         self.assertIn("Accessibility", driver.error_message(lib, 3, "Darwin"))
         self.assertIn("modprobe", driver.error_message(lib, 4, "Linux"))
         self.assertIn("FID_NATIVE_BACKEND=ON", driver.error_message(lib, 2, "Linux"))
+        self.assertIn("X11 and XRandR", driver.error_message(lib, 2, "Linux"))
         with tempfile.TemporaryDirectory() as directory:
             with self.assertRaisesRegex(driver.DriverError, "Shared library not found"):
                 driver.load_driver(Path(directory) / "missing.so")
@@ -90,6 +103,7 @@ class SessionTests(unittest.TestCase):
         self.check = check
         config = driver.Config()
         self.lib.fid_default_config(ct.byref(config))
+        self.assertEqual(config.abi_version, 3)
         self.assertEqual(config.backend, 0, "Tests must use dry-run only")
         self.handle = ct.c_void_p()
         check(self.lib.fid_create(ct.byref(config), ct.byref(self.handle)))
@@ -123,11 +137,19 @@ class SessionTests(unittest.TestCase):
             with self.subTest(command=command):
                 self.assertEqual(self.finish(command)["counts"].get(kind), 1)
 
+    def test_held_key_lifecycle(self):
+        totals = self.finish("hold w shift")
+        self.assertEqual(totals["counts"].get(7), 2)
+        self.assertEqual(totals["counts"].get(8), 2)
+        status = driver.Status()
+        self.check(self.lib.fid_get_status(self.handle, ct.byref(status)))
+        self.assertEqual(status.held_key_mask, 0)
+
     def test_motion_and_scroll_at_both_rates(self):
         for rate in (30, 60):
             self.args.rate = rate
             with self.subTest(rate=rate):
-                totals = self.finish("move 0.65 0.2")
+                totals = self.finish("velocity 0.65 0.2")
                 self.assertGreater(totals["dx"], 0)
                 self.assertLess(totals["dy"], 0)
                 self.assertGreater(self.finish("scroll 0.8")["scroll"], 0)
@@ -135,12 +157,17 @@ class SessionTests(unittest.TestCase):
     def test_neutral_and_status(self):
         self.assertIn("DRY-RUN", self.session.status_text())
         self.assertIn("Output: paused", self.session.status_text())
-        totals = self.finish("move 0.5 0.5")
+        totals = self.finish("velocity 0.5 0.5")
         self.assertEqual(totals["counts"], {})
+
+    def test_target_trial_reports_arrival(self):
+        totals = self.finish("move 1 0.51 0.5")
+        self.assertGreater(totals["counts"].get(1, 0), 0)
+        self.assertTrue(any("Arrived at (0.510, 0.500)" in m for m in self.messages), self.messages)
 
     def test_stop_during_trial_and_reject_overlap(self):
         self.args.duration = 5
-        self.session.start(driver.parse_command("move 0.65 0.5"))
+        self.session.start(driver.parse_command("velocity 0.65 0.5"))
         self.wait_phase("running")
         self.assertIn("Output: enabled", self.session.status_text())
         self.assertFalse(self.session.start(driver.parse_command("click left")))
@@ -193,13 +220,27 @@ class CLITests(unittest.TestCase):
         self.assertIn("cmake -S . -B build", result.stderr)
         self.assertNotIn("Traceback", result.stderr)
 
+    def test_queued_w_hold_dry_run(self):
+        help_result = subprocess.run(
+            [sys.executable, str(EXAMPLES / "wasd_w_hold_test.py"), "--help"],
+            text=True, capture_output=True, timeout=5)
+        self.assertEqual(help_result.returncode, 0, help_result.stderr)
+        self.assertIn("default: 180", help_result.stdout)
+        result = subprocess.run(
+            [sys.executable, str(EXAMPLES / "wasd_w_hold_test.py"),
+             "--library", str(LIBRARY), "--delay", "0", "--frames", "4", "--rate", "60"],
+            text=True, capture_output=True, timeout=5)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Sending W-down for 4 frames", result.stdout)
+        self.assertIn("W-down=1 and W-up=1", result.stdout)
+
     def test_ctrl_c_cleanup(self):
         process = subprocess.Popen([sys.executable, str(EXAMPLES / "python_ctypes.py"),
                                    "--library", str(LIBRARY), "--interactive", "--duration", "5"],
                                    stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE, text=True)
         try:
-            process.stdin.write("move 0.65 0.5\n")
+            process.stdin.write("velocity 0.65 0.5\n")
             process.stdin.flush()
             # Startup/trial messages are flushed; wait for initialization.
             for _ in range(12):

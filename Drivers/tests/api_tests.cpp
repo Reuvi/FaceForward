@@ -24,6 +24,17 @@ bool wait_for(fid_driver *driver, bool (*predicate)(const fid_status &), int ms 
     }
     return false;
 }
+bool wait_for_target(fid_driver *driver, double x, double y, int ms = 1500) {
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(ms);
+    while (std::chrono::steady_clock::now() < deadline) {
+        const auto status = status_of(driver);
+        if (status.target_reached && status.pointer_position_valid &&
+            std::abs(status.pointer_position_x - x) < 0.002 &&
+            std::abs(status.pointer_position_y - y) < 0.002) return true;
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+    return false;
+}
 } // namespace
 
 int main() {
@@ -57,12 +68,76 @@ int main() {
     require(fid_drain_events(raw, nullptr, 1, &count) == FID_INVALID_ARGUMENT, "null buffer rejected");
     require(fid_submit(nullptr, &frame) == FID_INVALID_ARGUMENT, "null handle rejected");
 
+    require(fid_enable(raw) == FID_OK, "enable for held-key test");
+    fid_neutral_frame(&frame);
+    require(fid_submit(raw, &frame) == FID_OK, "held-key test arms on neutral frame");
+    require(wait_for(raw, [](const fid_status &s) { return !s.awaiting_neutral; }), "held-key test arms");
+    frame.keys_down = FID_KEY_W | FID_KEY_LEFT_SHIFT;
+    require(fid_submit(raw, &frame) == FID_OK, "submit held W+Shift state");
+    require(wait_for(raw, [](const fid_status &s) {
+        return s.held_key_mask == (FID_KEY_W | FID_KEY_LEFT_SHIFT) && s.emitted_events >= 3;
+    }), "key-down transitions update status");
+    frame.keys_down = FID_KEY_LEFT_SHIFT;
+    require(fid_submit(raw, &frame) == FID_OK, "submit W release state");
+    require(wait_for(raw, [](const fid_status &s) { return s.held_key_mask == FID_KEY_LEFT_SHIFT; }),
+            "cleared key bit releases independently");
+    require(fid_pause(raw) == FID_OK, "pause releases remaining held key");
+    require(status_of(raw).held_key_mask == 0, "pause status reports no held keys");
+    require(fid_drain_events(raw, events, 8, &count) == FID_OK, "drain key journal");
+    bool saw_w_down = false, saw_w_up = false, saw_shift_up = false;
+    for (size_t i = 0; i < count; ++i) {
+        saw_w_down |= events[i].type == FID_EVENT_KEY_DOWN && events[i].x == FID_KEY_W;
+        saw_w_up |= events[i].type == FID_EVENT_KEY_UP && events[i].x == FID_KEY_W;
+        saw_shift_up |= events[i].type == FID_EVENT_KEY_UP && events[i].x == FID_KEY_LEFT_SHIFT;
+    }
+    require(saw_w_down && saw_w_up && saw_shift_up, "journal includes key down, clear, and pause release");
+
+    fid_neutral_frame(&frame);
+    frame.pointer_mode = FID_POINTER_TARGET;
+    frame.target_x = 0.52; frame.target_y = 0.5; frame.target_speed = 0.1;
+    require(fid_enable(raw) == FID_OK, "re-enable for target mode");
+    require(fid_submit(raw, &frame) == FID_OK, "target frame accepted by dry-run backend");
+    const auto slow_start = std::chrono::steady_clock::now();
+    require(wait_for_target(raw, 0.52, 0.5), "slow target mode reaches endpoint");
+    const auto slow_time = std::chrono::steady_clock::now() - slow_start;
+    auto target_status = status_of(raw);
+    require(target_status.pointer_mode == FID_POINTER_TARGET && target_status.pointer_position_valid,
+            "target telemetry reports mode and position");
+    require(std::abs(target_status.pointer_position_x - 0.52) < 0.002 &&
+            std::abs(target_status.pointer_position_y - 0.5) < 0.002, "target is not overshot");
+    frame.target_x = 0.5; frame.target_speed = 1;
+    require(fid_submit(raw, &frame) == FID_OK && wait_for_target(raw, 0.5, 0.5),
+            "target can return to its starting point");
+    frame.target_x = 0.52; frame.target_speed = 0.6;
+    const auto fast_start = std::chrono::steady_clock::now();
+    require(fid_submit(raw, &frame) == FID_OK && wait_for_target(raw, 0.52, 0.5),
+            "faster target reaches the same endpoint");
+    const auto fast_time = std::chrono::steady_clock::now() - fast_start;
+    require(slow_time > fast_time * 2, "higher normalized speed reaches the same target faster");
+    require(fid_pause(raw) == FID_OK, "pause after target trial");
+
     config.stale_timeout_ms = 100;
     fid_driver *second = nullptr;
     require(fid_create(&config, &second) == FID_OK, "create timeout driver");
     Driver timeout_driver(second, fid_destroy);
     require(fid_enable(second) == FID_OK, "enable timeout driver");
     require(wait_for(second, [](const fid_status &s) { return s.timed_out && !s.enabled; }), "worker watchdog without frames");
+    require(fid_enable(second) == FID_OK, "re-enable for held-key watchdog test");
+    fid_neutral_frame(&frame);
+    require(fid_submit(second, &frame) == FID_OK, "submit neutral for watchdog arming");
+    require(wait_for(second, [](const fid_status &s) { return !s.awaiting_neutral; }), "watchdog test arms");
+    frame.keys_down = FID_KEY_D;
+    require(fid_submit(second, &frame) == FID_OK, "submit held key before watchdog");
+    require(wait_for(second, [](const fid_status &s) { return s.held_key_mask == FID_KEY_D; }),
+            "watchdog test key becomes held");
+    require(wait_for(second, [](const fid_status &s) {
+        return s.timed_out && !s.enabled && s.held_key_mask == 0;
+    }, 1000), "watchdog releases held key");
+    require(fid_drain_events(second, events, 8, &count) == FID_OK, "drain watchdog transitions");
+    bool saw_watchdog_key_up = false;
+    for (size_t i = 0; i < count; ++i)
+        saw_watchdog_key_up |= events[i].type == FID_EVENT_KEY_UP && events[i].x == FID_KEY_D;
+    require(saw_watchdog_key_up, "watchdog key-up is observable in journal");
     fid_neutral_frame(&frame); require(fid_submit(second, &frame) == FID_OK, "submit after timeout");
     require(!status_of(second).enabled, "submit cannot resume output");
     fid_destroy(nullptr);

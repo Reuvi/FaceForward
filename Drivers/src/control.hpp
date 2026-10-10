@@ -27,11 +27,15 @@ public:
     bool enabled() const { return enabled_; }
     bool awaiting_neutral() const { return awaiting_neutral_; }
     bool timed_out() const { return timed_out_; }
+    uint32_t held_key_mask() const { return held_key_mask_; }
+    const fid_frame &frame() const { return frame_; }
+    double tick_seconds() const { return tick_seconds_; }
 
 private:
     fid_config config_;
     fid_frame frame_{};
     std::array<ButtonState, 4> buttons_{};
+    uint32_t held_key_mask_ = 0;
     std::array<double, 3> fractions_{};
     bool enabled_ = false;
     bool awaiting_neutral_ = false;
@@ -40,5 +44,6 @@ private:
     Time enabled_at_ = 0;
     Time received_at_ = 0;
     Time last_tick_ = 0;
+    double tick_seconds_ = 0;
 };
 } // namespace fid

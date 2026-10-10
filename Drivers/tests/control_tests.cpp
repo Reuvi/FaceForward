@@ -18,10 +18,12 @@ fid_config defaults() {
     c.stale_timeout_ms = 250;
     c.pointer_x = c.pointer_y = {0.5, 0.05, 600, 0};
     c.scroll = {0.5, 0.05, 12, 0};
+    c.target_max_speed = 600;
     for (auto &b : c.buttons) b = {0.7, 0.3, 150};
     return c;
 }
-fid_frame neutral() { return {0.5, 0.5, 0.5, 0, 0, 0, 0}; }
+fid_frame neutral() { return {0.5, 0.5, 0.5, 0, 0, 0, 0,
+                              FID_POINTER_VELOCITY, 0.5, 0.5, 0, 0}; }
 void arm(fid::Control &control, double now = 0) {
     control.enable(now);
     control.submit(neutral(), now);
@@ -47,6 +49,12 @@ void validation_and_axes() {
     require(!fid::valid_frame(f), "negative rejected");
     f.left_click = 1.01;
     require(!fid::valid_frame(f), "greater than one rejected");
+    f = neutral(); f.pointer_mode = 2;
+    require(!fid::valid_frame(f), "unknown pointer mode rejected");
+    f = neutral(); f.pointer_mode = FID_POINTER_TARGET; f.target_speed = 1.01;
+    require(!fid::valid_frame(f), "target speed outside normalized range rejected");
+    f = neutral(); f.keys_down = 1u << 6;
+    require(!fid::valid_frame(f), "unknown held-key bits rejected");
     c.pointer_x.neutral = 0;
     require(!fid::valid_config(c), "invalid neutral rejected");
     c = defaults(); c.pointer_x.dead_zone = 0.5;
@@ -57,8 +65,10 @@ void validation_and_axes() {
     require(!fid::valid_config(c), "worker rate below supported range rejected");
     c = defaults(); c.stale_timeout_ms = 1;
     require(!fid::valid_config(c), "timeout shorter than tick rejected");
-    c = defaults(); c.abi_version = 2;
+    c = defaults(); c.abi_version = 1;
     require(!fid::valid_config(c), "ABI mismatch rejected");
+    c = defaults(); c.target_max_speed = 0;
+    require(!fid::valid_config(c), "target speed configuration must be positive");
     c = defaults(); c.backend = 10;
     require(!fid::valid_config(c), "invalid backend rejected");
     const auto a = defaults().pointer_x;
@@ -110,6 +120,43 @@ void buttons_and_hysteresis() {
     require(count(events, FID_EVENT_RIGHT_CLICK) == 1, "right click emitted");
     require(count(events, FID_EVENT_DELETE) == 1, "Delete emitted");
     require(count(events, FID_EVENT_INSERT) == 1, "Insert emitted");
+}
+
+void held_keys() {
+    fid::Control core(defaults());
+    auto frame = neutral(); frame.keys_down = FID_KEY_W;
+    core.enable(0);
+    core.submit(frame, 0);
+    require(core.tick(0).empty() && core.awaiting_neutral(), "held key blocks neutral arming");
+    core.submit(neutral(), 0.01);
+    require(core.tick(0.01).empty() && !core.awaiting_neutral(), "all-up snapshot arms output");
+
+    frame.keys_down = FID_KEY_W | FID_KEY_LEFT_SHIFT;
+    core.submit(frame, 0.02);
+    auto events = core.tick(0.02);
+    require(events.size() == 2 && events[0].type == FID_EVENT_KEY_DOWN &&
+            events[0].x == FID_KEY_LEFT_SHIFT && events[1].type == FID_EVENT_KEY_DOWN &&
+            events[1].x == FID_KEY_W, "modifier presses before modified key");
+    require(core.held_key_mask() == (FID_KEY_W | FID_KEY_LEFT_SHIFT), "held-key status reflects snapshot");
+    core.submit(frame, 0.03);
+    require(core.tick(0.03).empty(), "repeated held state does not repeat key-down");
+
+    frame.keys_down = FID_KEY_LEFT_SHIFT;
+    core.submit(frame, 0.04);
+    events = core.tick(0.04);
+    require(events.size() == 1 && events[0].type == FID_EVENT_KEY_UP &&
+            events[0].x == FID_KEY_W, "clearing a bit releases that key");
+    frame.keys_down = 0;
+    core.submit(frame, 0.05);
+    events = core.tick(0.05);
+    require(events.size() == 1 && events[0].type == FID_EVENT_KEY_UP &&
+            events[0].x == FID_KEY_LEFT_SHIFT, "clearing Shift releases modifier");
+
+    frame.keys_down = FID_KEY_A | FID_KEY_SPACE;
+    core.submit(frame, 0.06);
+    require(core.tick(0.06).size() == 2, "simultaneous ordinary key-downs emitted");
+    core.pause();
+    require(core.held_key_mask() == 0 && core.tick(0.07).empty(), "pause clears logical held state");
 }
 
 void lifecycle() {
@@ -198,6 +245,7 @@ void motion_and_scroll() {
 int main() {
     validation_and_axes();
     buttons_and_hysteresis();
+    held_keys();
     lifecycle();
     motion_and_scroll();
     std::cout << checks << " control checks passed\n";

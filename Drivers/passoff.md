@@ -1,6 +1,126 @@
 # Input driver handoff
 
-Last updated: 2026-10-10 18:33 UTC. Owner of this update: repository implementation agent.
+Last updated: 2026-10-10. Owner of this update: repository implementation agent.
+
+## Latest change — ABI v3 held-key state
+
+- Goal: add continuous W/A/S/D, Space, and left Shift state to the Driver so
+  Processing can hold/release keys by sending complete snapshots. No dictation,
+  Windows support, or Xbox/gamepad emulation was added.
+- Public ABI is now v3. `fid_frame.keys_down` uses `FID_KEY_*` bit flags;
+  `fid_status.held_key_mask` reports current logical state; event types 7/8 are
+  key-down/key-up and carry the key bit in `fid_event.x`.
+- Repeated frames with an unchanged key mask produce no transitions. Shift goes
+  down before other keys and up after them. The frame must be key-neutral to
+  arm. Pause, watchdog expiry, backend errors, and destroy release active keys.
+  The driver does not generate keyboard repeat.
+- Linux maps to evdev/uinput codes; macOS maps to Quartz virtual key codes. The
+  Python tester supports finite `hold w shift` trials and reports held keys.
+  `examples/wasd_w_hold_test.py` waits five seconds, sends 180 W-down frames at
+  60 Hz by default (about three seconds), then sends release state and pauses. Use `--native` for a
+  Roblox test; dry-run is the default. It confirms Driver transitions, not that
+  Roblox consumed the events.
+  Dry-run tests cover held, clear, repeat-free, pause-release, validation, and
+  ordering behavior. Linux native backend compiled successfully in this turn;
+  live input was not tested. macOS source was not compiled on an Apple host.
+- ABI v2 C structure consumers are incompatible: rebuild the library and all
+  ctypes/C/C++ callers together. The Python tester now rejects non-v3 libraries.
+- Shared `Contracts/README.md` remains untouched. The proposed binary `keys`
+  snapshot and integration semantics are recorded in
+  `interface-requests/held-key-state.md`; integration must agree before cross-
+  component adoption.
+- Verification: the W test passed in dry-run and the terminal tester
+  suite passes with its short W-hold integration check. Dry-run and
+  Linux-native Debug builds each passed all four CTest suites. Python syntax
+  compilation passed with bytecode redirected to
+  `/tmp` because the workspace cache path is read-only. No commit or push was made.
+
+### Next work
+
+1. Rebuild and run on macOS to verify Quartz key events, especially left Shift,
+   with Accessibility permission; then test Linux live key holds where uinput
+   access is available.
+2. Have Processing/integration owners approve field naming and complete-snapshot
+   semantics; update the shared contract only through its owner.
+3. Test held keys in a harmless text editor or browser page before any game.
+4. Keep ABI v3 consumers synchronized; do not load an ABI v2 library into the
+   updated Python tester.
+
+### Mistakes and boundaries
+
+- Do not model held WASD/Shift as repeated taps. A set bit holds; a cleared bit
+  releases. A stable set bit must not generate repeated key-down events.
+- Do not assume synthetic dry-run or successful compilation proves a desktop or
+  game accepts the key events.
+- Do not edit `Contracts/README.md` from the Drivers lane; the request document
+  is the handoff point.
+- Do not stage, commit, or push unless the user explicitly asks.
+
+## Previous change — explicit pointer target mode
+
+- User objective: add an endpoint command with independent speed while retaining
+  continuous velocity axes for joystick/gaze, clarify the Processing→Drivers
+  interface, and focus this work on the driver component.
+- Implemented ABI v2 in `include/face_input_driver.h`: `fid_frame.pointer_mode`
+  selects velocity or target mode. Existing `pointer_x/pointer_y` continue to
+  mean velocity axes. Target fields are normalized primary-display
+  `target_x/target_y` plus normalized `target_speed`; default max target speed is
+  600 display units/second. Status now reports current position, target,
+  requested speed, measured step velocity, and arrival.
+- Target movement is straight-line constant speed, clamps the final step, and
+  stops at the endpoint. A later frame can update target/speed, and another
+  target moves back. Compare different speeds from the same starting position.
+- Native macOS target movement uses Quartz main-display geometry. Linux target
+  mode requires X11 + XRandR and an X11 session; pure Wayland is explicitly
+  unsupported for absolute target mode. Linux relative uinput velocity stays
+  available there. Dry-run simulates a 1920×1080 display centered initially.
+- Tester commands are now `move SPEED X Y` for target mode and `velocity X Y`
+  for the original continuous axes. Target trials stream until arrival (30 s
+  safety limit), print position/target/speed/velocity, then pause. Velocity and
+  action trials retain the duration setting. `testing/README.md` and
+  `readme.MD` describe syntax, values, OS support, and the ABI.
+- Added `Drivers/architecture.md` to explain why controller/joystick axes keep
+  velocity semantics, plus `Drivers/interface-requests/target-pointer-mode.md`
+  proposing shared-contract fields. `Contracts/README.md` remains untouched;
+  integration ownership belongs to the contract lane.
+- Open interface decision: the current `control.cpp` still applies the
+  configurable dead zone and linear response curve on velocity axes, while the
+  shared contract assigns value shaping to Processing. Team must agree on one
+  owner before integrating; do not apply the response curve in both places.
+- Verification so far: Linux native-enabled Debug build succeeded in
+  `/tmp/fid-build`; all four CTest suites passed (control, C API, C header,
+  Python tester). This host is Wayland and has no `/dev/uinput`, so native live
+  movement was not tested. macOS compile/live validation remains pending.
+- A review caught that re-emitting an absolute target step as relative uinput
+  would move twice. Target steps now write to the backend's absolute path and
+  enter the event journal without being emitted a second time.
+- No stage, commit, push, or live GitHub update was performed.
+
+### Next work
+
+1. On macOS, compile and test target movement, velocity, and event posting with
+   Accessibility permission; record OS and host app results.
+2. On Linux X11 with XRandR, test pointer query/warp and target arrival on a
+   live desktop. On Wayland, confirm target commands return unsupported while
+   velocity output still works after uinput is available.
+3. Ask the Processing/contract owners to agree field names and response-curve
+   ownership. The proposed contract is in `interface-requests/`.
+4. Keep all C ABI/ctypes consumers on the current ABI v3. This ABI prototype is not a
+   stable wire format.
+5. Add/verify same-destination speed comparison from a controlled start
+   position during live desktop testing. Buttons remain threshold/dwell taps;
+   align that separately with the shared held-state button contract.
+
+### Keep these boundaries
+
+- Do not reinterpret `pointer_x/pointer_y` as screen coordinates. Keep the mode
+  explicit so future joystick/gaze axes remain velocity controls.
+- Do not edit the integration-owned `Contracts/README.md` from Drivers; send
+  shared field changes through the proposal and coordinate with that owner.
+- Do not claim native target movement works on Wayland. Do not claim live OS
+  behavior from dry-run or compile-only checks.
+- Dictation stays in phase 2; Windows and gamepad emulation are not part of this
+  implementation.
 
 ## Goals and direction
 
@@ -96,39 +216,47 @@ and recorded below; item 1 remains pending.
   Shared files match origin/main. Verification details are also recorded in
   `item3-verification.json` inside the backup directory.
 - Historical verification below refers to the old layout. Item 3 is complete.
-  The named-command tester and upstream contract documentation were not part of
-  the recovery task; the tester is now being updated separately as item 2.
+  The named-command tester was a separate item 2 change and has since been
+  updated with target and velocity commands; the shared contract remains owned
+  by its integration lane.
 
-## Progress
+## Current implementation status
 
 - Implemented the C-compatible ABI in `Drivers/include/face_input_driver.h`.
-  It can be called directly from C++ or through Python ctypes. ABI version 1.
+  It can be called directly from C++ or through Python ctypes. ABI version 3;
+  consumers need the matching current header and ctypes layouts.
 - Implemented the shared control core, 60 Hz worker, validation, configurable
   thresholds/dead zones/speeds, one-tap activations, pause/watchdog/rearming, and
   bounded event journal. Configuration is immutable for an instance.
-- Implemented Linux libevdev/uinput and macOS Quartz backend source.
+- Implemented Linux libevdev/uinput velocity and held-key mode, optional
+  X11/XRandR target mode, and macOS Quartz velocity/target/held-key backend
+  source. macOS source has not been compiled on an Apple host.
 - Added CMake builds, C++ synthetic/stdin/probe demo, Python ctypes example,
   dry-run backend, and automated control/C API/C header tests.
-- Added a Python interactive manual tester: `python3
-  Drivers/examples/python_ctypes.py --interactive` (append `--native` for OS
-  input). Type seven normalized values; each trial streams for one second and
-  pauses. Native trials allow three seconds to focus a target app. `quit`, EOF,
-  or Ctrl-C stops the tester. Duration/rate/delay are configurable CLI options.
-- Added build/setup/integration documentation in `Drivers/readme.MD`.
-- Phase 1 code and portable verification are complete. Current next action:
-  validate the macOS build/live behavior and Linux live behavior on target hosts,
-  then connect the processing producer. Platform verification remains incomplete.
+- Tester commands are `move SPEED X Y` (target) and `velocity X Y` (continuous
+  axes), plus scroll/click/key. Target trials run until arrival with a 30-second
+  limit; velocity/action trials use the duration setting and then pause.
+- Added teammate and technical guides in `Drivers/testing/README.md` and
+  `Drivers/readme.MD`. `Drivers/architecture.md` explains the two modes;
+  `Drivers/interface-requests/target-pointer-mode.md` proposes shared fields.
+- Linux native-enabled Debug and dry-run-only Release builds passed all four
+  CTest suites, including same-target/different-speed arrival checks and Python
+  tester tests. Scope and whitespace checks passed. Linux live movement and
+  macOS compilation/live movement remain unverified on target hosts.
 
 ## Main integration parts
 
 - API: `fid_default_config`, `fid_create`, `fid_enable`, `fid_submit`,
   `fid_pause`, `fid_get_status`, `fid_drain_events`, `fid_destroy`.
-- Frames: pointer X/Y, scroll, left click, right click, Delete, Insert. All
-  finite `[0,1]` levels. No Dictation field yet.
+- Frames: explicit `FID_POINTER_VELOCITY` (existing X/Y speed axes) or
+  `FID_POINTER_TARGET` (normalized destination plus normalized speed), scroll,
+  left/right click, Delete, Insert. All numeric levels are finite `[0,1]`. No
+  Dictation field yet.
 - Default axis neutral `0.5` is temporary/configurable; dead zone `0.45–0.55`.
   Smaller values mean left/up, larger right/down. Pointer 600 units/sec per
-  axis; scroll 12 detents/sec. Linux units are relative counts subject to
-  acceleration; macOS units are Quartz coordinates on the primary display.
+  axis; scroll 12 detents/sec; target max 600 primary-display units/sec. Linux
+  velocity units are relative counts subject to acceleration; target mode uses
+  X11 display coordinates. macOS uses Quartz display coordinates.
 - Button defaults: strictly above `0.7` for 150 ms triggers one tap; strictly
   below `0.3` rearms. Individual button settings can differ.
 - Creation starts paused/dry-run. Explicit enable discards older frames. Submit

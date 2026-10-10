@@ -3,9 +3,31 @@
 #include <linux/input.h>
 #include <libevdev/libevdev.h>
 #include <libevdev/libevdev-uinput.h>
+#ifdef FID_HAS_X11
+#include <X11/Xlib.h>
+#ifdef FID_HAS_XRANDR
+#include <X11/extensions/Xrandr.h>
+#endif
+#endif
+#include <algorithm>
+#include <cmath>
+#include <cstdlib>
+#include <memory>
+#include <string>
 
 namespace fid {
 namespace {
+unsigned linux_key_code(uint32_t key) {
+    switch (key) {
+        case FID_KEY_W: return KEY_W;
+        case FID_KEY_A: return KEY_A;
+        case FID_KEY_S: return KEY_S;
+        case FID_KEY_D: return KEY_D;
+        case FID_KEY_SPACE: return KEY_SPACE;
+        case FID_KEY_LEFT_SHIFT: return KEY_LEFTSHIFT;
+        default: return 0;
+    }
+}
 fid_result translate(int error) {
     if (!error) return FID_OK;
     if (error == -EACCES || error == -EPERM) return FID_PERMISSION_DENIED;
@@ -19,14 +41,101 @@ public:
         release();
         if (mouse_) libevdev_uinput_destroy(mouse_);
         if (keyboard_) libevdev_uinput_destroy(keyboard_);
+#ifdef FID_HAS_X11
+        if (display_) XCloseDisplay(display_);
+#endif
     }
     fid_result initialize() {
         auto result = create_device(true, &mouse_);
         if (result != FID_OK) return result;
-        return create_device(false, &keyboard_);
+        result = create_device(false, &keyboard_);
+        if (result != FID_OK) return result;
+#ifdef FID_HAS_X11
+        const char *session = std::getenv("XDG_SESSION_TYPE");
+        const char *wayland = std::getenv("WAYLAND_DISPLAY");
+        if ((session && std::string(session) == "wayland") || wayland) return FID_OK;
+        display_ = XOpenDisplay(nullptr);
+        if (display_) {
+            root_ = DefaultRootWindow(display_);
+#ifdef FID_HAS_XRANDR
+            width_ = 0; height_ = 0;
+#else
+            width_ = DisplayWidth(display_, DefaultScreen(display_));
+            height_ = DisplayHeight(display_, DefaultScreen(display_));
+#endif
+#ifdef FID_HAS_XRANDR
+            int count = 0;
+            XRRMonitorInfo *monitors = XRRGetMonitors(display_, root_, True, &count);
+            if (monitors) {
+                for (int i = 0; i < count; ++i) {
+                    if (monitors[i].primary) {
+                        origin_x_ = monitors[i].x; origin_y_ = monitors[i].y;
+                        width_ = monitors[i].width; height_ = monitors[i].height;
+                        break;
+                    }
+                }
+                XRRFreeMonitors(monitors);
+            }
+#endif
+        }
+#endif
+        return FID_OK;
     }
     fid_result ready() const override {
         return mouse_ && keyboard_ ? FID_OK : FID_BACKEND_UNAVAILABLE;
+    }
+    bool supports_target_pointer() const override {
+#if defined(FID_HAS_X11) && defined(FID_HAS_XRANDR)
+        return display_ && width_ > 1 && height_ > 1;
+#else
+        return false;
+#endif
+    }
+    fid_result pointer_position(double &x, double &y) const override {
+        if (!supports_target_pointer()) return FID_UNSUPPORTED;
+#ifdef FID_HAS_X11
+        Window root_return, child_return;
+        int root_x, root_y, win_x, win_y;
+        unsigned mask;
+        if (!XQueryPointer(display_, root_, &root_return, &child_return,
+                           &root_x, &root_y, &win_x, &win_y, &mask)) return FID_IO_ERROR;
+        x = std::clamp((root_x - origin_x_) / static_cast<double>(width_ - 1), 0.0, 1.0);
+        y = std::clamp((root_y - origin_y_) / static_cast<double>(height_ - 1), 0.0, 1.0);
+        return FID_OK;
+#else
+        (void)x; (void)y; return FID_UNSUPPORTED;
+#endif
+    }
+    fid_result move_toward(double tx, double ty, double speed, double dt,
+                           bool &reached, int32_t &dx, int32_t &dy) override {
+        if (!supports_target_pointer()) return FID_UNSUPPORTED;
+#ifdef FID_HAS_X11
+        Window root_return, child_return;
+        int root_x, root_y, win_x, win_y;
+        unsigned mask;
+        if (!XQueryPointer(display_, root_, &root_return, &child_return,
+                           &root_x, &root_y, &win_x, &win_y, &mask)) return FID_IO_ERROR;
+        const double target_x = origin_x_ + tx * (width_ - 1);
+        const double target_y = origin_y_ + ty * (height_ - 1);
+        const double vx = target_x - root_x, vy = target_y - root_y;
+        const double distance = std::hypot(vx, vy);
+        const double step = std::min(distance, speed * dt);
+        double next_x = root_x, next_y = root_y;
+        if (distance > 0 && step > 0) {
+            next_x += vx / distance * step; next_y += vy / distance * step;
+        }
+        reached = distance < 0.5 || (speed > 0 && distance <= speed * dt);
+        if (reached) { next_x = target_x; next_y = target_y; }
+        const int dest_x = static_cast<int>(std::lround(next_x));
+        const int dest_y = static_cast<int>(std::lround(next_y));
+        XWarpPointer(display_, None, root_, 0, 0, 0, 0, dest_x, dest_y);
+        XFlush(display_);
+        dx = dest_x - root_x; dy = dest_y - root_y;
+        return FID_OK;
+#else
+        (void)tx; (void)ty; (void)speed; (void)dt; (void)reached; (void)dx; (void)dy;
+        return FID_UNSUPPORTED;
+#endif
     }
     fid_result emit(const fid_event &event) override {
         switch (event.type) {
@@ -47,6 +156,23 @@ public:
             case FID_EVENT_RIGHT_CLICK: return tap(mouse_, BTN_RIGHT, 1);
             case FID_EVENT_DELETE: return tap(keyboard_, KEY_DELETE, 2);
             case FID_EVENT_INSERT: return tap(keyboard_, KEY_INSERT, 3);
+            case FID_EVENT_KEY_DOWN:
+            case FID_EVENT_KEY_UP: {
+                const auto key = static_cast<uint32_t>(event.x);
+                const auto code = linux_key_code(key);
+                if (!code || (key & (key - 1))) return FID_INVALID_ARGUMENT;
+                const bool down = event.type == FID_EVENT_KEY_DOWN;
+                const bool was_down = (held_keys_ & key) != 0;
+                if (down == was_down) return FID_OK;
+                // Remember a possibly successful key-down even if syncing
+                // fails, so release() can make a best-effort cleanup. Keep a
+                // key marked held until its key-up write and sync both pass.
+                if (down) held_keys_ |= key;
+                auto r = write(keyboard_, EV_KEY, code, down ? 1 : 0);
+                if (r == FID_OK) r = sync(keyboard_);
+                if (r == FID_OK && !down) held_keys_ &= ~key;
+                return r;
+            }
             default: return FID_UNSUPPORTED;
         }
     }
@@ -60,6 +186,15 @@ public:
             const auto s = sync(device);
             if (r == FID_OK) r = s;
             if (r == FID_OK) held_[i] = false;
+            else result = r;
+        }
+        for (uint32_t key = 1; key <= FID_KEY_LEFT_SHIFT; key <<= 1) {
+            if (!(held_keys_ & key)) continue;
+            const auto code = linux_key_code(key);
+            auto r = write(keyboard_, EV_KEY, code, 0);
+            const auto s = sync(keyboard_);
+            if (r == FID_OK) r = s;
+            if (r == FID_OK) held_keys_ &= ~key;
             else result = r;
         }
         return result;
@@ -122,6 +257,12 @@ private:
     libevdev_uinput *mouse_ = nullptr;
     libevdev_uinput *keyboard_ = nullptr;
     bool held_[4]{};
+    uint32_t held_keys_ = 0;
+#ifdef FID_HAS_X11
+    Display *display_ = nullptr;
+    Window root_ = 0;
+    int origin_x_ = 0, origin_y_ = 0, width_ = 0, height_ = 0;
+#endif
 };
 } // namespace
 

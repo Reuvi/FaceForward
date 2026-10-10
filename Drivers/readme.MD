@@ -15,11 +15,21 @@ From the `Drivers/` directory (`cd Drivers` from the repository root):
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
-cmake --build build -j 4
+cmake --build build --clean-first -j 4
 ctest --test-dir build --output-on-failure
 ./build/driver_demo
 python3 examples/python_ctypes.py
 ```
+
+After pulling driver updates, rebuild the shared library before running the
+tester or an application that loads it. This is required for ABI changes such
+as v3, which changed the public C structure layouts. From `Drivers/`, rerun the
+configure/build/test commands above; `--clean-first` removes old compiled
+objects before rebuilding. The resulting library is
+`build/libface_input_driver.so` on Linux or `build/libface_input_driver.dylib`
+on macOS, and the Python tester uses that path by default. Build separately on
+each OS; never reuse the other OS's library. If you use a different build
+directory, pass its library path with `--library`.
 
 Default demonstrations use **dry-run** and log generated actions without
 injecting OS input. The C++ demo exercises all actions; Python demonstrates
@@ -74,23 +84,38 @@ python3 examples/python_ctypes.py --interactive --native
 ```
 
 Native mode requires the OS setup and permissions described below. It allows
-three seconds to focus the target app before each trial. Each command streams
-for one second by default, then pauses. Use `--duration`, `--delay`, or `--rate`
-to change trial length, focus delay, or producer rate. Type `help` for commands;
-`status` reports mode and output state, `stop` cancels a trial, and `quit`, EOF,
-or Ctrl-C pauses output and exits.
+three seconds to focus the target app before each trial. Velocity and action
+commands stream for one second by default; target commands stream until arrival
+(up to 30 seconds). Each trial then pauses. Use `--duration`, `--delay`, or
+`--rate` to change velocity/action length, focus delay, or producer rate. Type
+`help` for commands; `status` reports output and target telemetry, `stop` cancels
+a trial, and `quit`, EOF, or Ctrl-C pauses output and exits.
 
-At `test>`, enter `move X Y` using values from `0` to `1`. The default neutral
-point is `0.5` on each axis: X below `0.5` moves left and above it moves right;
-Y below `0.5` moves up and above it moves down. Values are direction and speed
-controls, not screen coordinates. The default dead zone is `0.45`–`0.55`, so
-`move 0.5 0.5` is still, and values just outside that band move slowly. For
-example, `move 0.65 0.5` moves right at about 133 pointer units per second with
-default settings; `move 0.9 0.5` moves faster, about 467 units per second. A
-trial lasts one second, so the approximate total movement also depends on the
-trial duration and desktop handling. Linux units are relative mouse counts and
-macOS units are Quartz coordinate units; neither is guaranteed to equal visible
-screen pixels.
+At `test>`, `move SPEED X Y` moves toward a destination. All values are in
+`[0,1]`: X/Y are normalized primary-display coordinates (`0,0` top-left,
+`1,1` bottom-right, and `0.5,0.5` center); SPEED is a fraction of configured
+maximum target speed (default 600 display units/second). For example,
+`move 0.1 0.8 0.5` and `move 0.6 0.8 0.5` use the same destination at different
+speeds. The driver moves along a straight line, clamps the last step to avoid
+overshoot, and stops on arrival. Target trials end on arrival, with a 30-second
+safety limit. Send another `move` command to travel back to a previous point.
+For a fair speed comparison, start each trial from the same cursor position.
+
+Use `velocity X Y` for the original continuous axes intended for future joystick
+or gaze input. Their neutral value is `0.5`: X below it moves left and above it
+moves right; Y below it moves up and above it moves down. The default dead zone
+is `0.45`–`0.55`. `velocity 0.65 0.5` moves right at about 133 pointer units per
+second with defaults, and `velocity 0.9 0.5` at about 467 units per second. Such
+velocity trials run for the configured duration. The axis meanings are unchanged
+by target mode; each frame explicitly selects which interpretation to use.
+
+Dry-run target movement starts at the simulated center of a 1920×1080 display.
+Native macOS uses the main display. Native Linux target movement is supported
+only when built with X11/XRandR and run in an X11 session; on Wayland, target
+commands report unsupported while `velocity` continues to use uinput. Linux
+velocity values are relative mouse counts; macOS values use Quartz coordinate
+units. Neither scale is guaranteed to equal visible physical pixels. See
+[`architecture.md`](architecture.md) for mode rationale and Processing handoff.
 
 For other actions, `scroll 0.8` scrolls down and `scroll 0.2` up; `0.5` is
 neutral. `click left` / `click right` send one click, and `key delete` /
@@ -127,7 +152,8 @@ def check(result):
 check(lib.fid_create(ct.byref(config), ct.byref(handle)))
 try:
     check(lib.fid_enable(handle))
-    frame = Frame(0.5, 0.5, 0.5, 0, 0, 0, 0)  # Neutral axes; buttons inactive.
+    frame = Frame()
+    lib.fid_neutral_frame(ct.byref(frame))  # Neutral axes/buttons; velocity mode.
     status = Status()
     while True:  # In an application, run this producer at about 30–60 Hz.
         check(lib.fid_submit(handle, ct.byref(frame)))
@@ -135,7 +161,15 @@ try:
         if not status.awaiting_neutral:
             break
         time.sleep(1 / 60)
-    # Continue submitting current processing values at 30–60 Hz.
+    # Set a target explicitly, and keep refreshing it until the endpoint is reached.
+    frame.pointer_mode = 1  # FID_POINTER_TARGET from the C header.
+    frame.target_x, frame.target_y, frame.target_speed = 0.8, 0.5, 0.6
+    while True:
+        check(lib.fid_submit(handle, ct.byref(frame)))
+        check(lib.fid_get_status(handle, ct.byref(status)))
+        if not status.enabled or status.target_reached:
+            break
+        time.sleep(1 / 60)
 finally:
     lib.fid_pause(handle)
     lib.fid_destroy(handle)
@@ -154,8 +188,11 @@ integration example and C++ linking instructions.
 
 Uses libevdev and the existing kernel
 [`uinput` interface](https://docs.kernel.org/input/uinput.html), with separate
-virtual pointer and keyboard devices. It does not depend on X11 and is intended
-for Wayland or X11 desktops. Actual compositor acceptance needs live testing.
+virtual pointer and keyboard devices for velocity mode. That path does not
+depend on X11 and is intended for Wayland or X11 desktops. Absolute target mode
+additionally needs X11 plus XRandR primary-display geometry and is rejected on
+Wayland; CMake treats these development files as optional. Actual compositor
+acceptance needs live testing.
 The keyboard advertises standard key capabilities so udev can classify it as a
 keyboard, but this MVP only emits Delete/Insert. See the
 [udev classification source](https://github.com/systemd/systemd/blob/main/src/udev/udev-builtin-input_id.c).
@@ -208,8 +245,10 @@ Python executable for ctypes, or the application's executable when integrated.
 CLI permissions may also depend on the terminal/launcher; check the actual host.
 Keep the binary in a stable location while testing permissions.
 
-Pointer motion uses Quartz coordinates and is constrained to the primary
-display. Speed is in coordinate units/sec rather than physical display pixels.
+Pointer velocity uses Quartz coordinates. Target mode reads the cursor and moves
+to normalized coordinates on the main display, at a constant fraction of the
+configured maximum speed. Speed is in coordinate units/sec rather than physical
+display pixels.
 Delete sends forward Delete (`0x75`). Insert sends the macOS Help/Insert-position
 key (`0x72`) and sets `FID_CAP_INSERT_LIMITED`: it does **not** promise a
 Windows-style overwrite toggle. Verify its behavior in the intended app.
@@ -222,18 +261,26 @@ them. Live tests remain necessary. No Dictation trigger is implemented.
 
 Public header: [`include/face_input_driver.h`](include/face_input_driver.h).
 Use the header's exact layouts and `FID_ABI_VERSION`; the included ctypes
-example mirrors ABI version 1. It is not a stable cross-version serialization
-format.
+example mirrors ABI version 3. ABI v2 added explicit pointer mode, target inputs,
+target speed configuration, and pointer telemetry. ABI v3 adds complete
+held-key state and key transition events. This is not a stable cross-version
+serialization format; rebuild every C, C++, or Python ctypes consumer against
+this header after updating.
 
 | Frame field | Meaning |
 |---|---|
-| `pointer_x` | `<0.5` left, `>0.5` right; distance from neutral controls velocity |
-| `pointer_y` | `<0.5` up, `>0.5` down |
+| `pointer_x` | In velocity mode, `<0.5` left, `>0.5` right; distance from neutral controls speed |
+| `pointer_y` | In velocity mode, `<0.5` up, `>0.5` down |
+| `pointer_mode` | `FID_POINTER_VELOCITY` uses those axes; `FID_POINTER_TARGET` uses the target fields below |
+| `target_x`, `target_y` | Normalized primary-display endpoint, used only in target mode |
+| `target_speed` | Fraction `[0,1]` of `config.target_max_speed`, used only in target mode |
 | `scroll` | `<0.5` scroll up, `>0.5` scroll down |
 | `left_click`, `right_click` | Dwell-triggered complete click |
 | `delete_key`, `insert_key` | Dwell-triggered complete key tap |
+| `keys_down` | Complete held-state bitmask using `FID_KEY_W`, `_A`, `_S`, `_D`, `_SPACE`, and `_LEFT_SHIFT`; set bits are held, cleared bits are released |
 
-All seven fields are current levels, finite and within `[0,1]`. Invalid frames
+All scalar input values are finite and within `[0,1]`; `keys_down` may contain
+only the named key bits. Invalid frames
 return `FID_INVALID_ARGUMENT` and do not refresh the watchdog; previous valid
 input may continue until it expires. A valid neutral frame stops motion sooner.
 Only one selected user's controls should reach a driver instance; processing
@@ -269,7 +316,8 @@ The worker samples the latest frame. Brief pulses between ticks can be missed;
 send sustained levels through the dwell interval. One activation emits one
 press/release. Keeping a button high does not repeat; dip strictly below its
 release threshold before activating again. Dropping to or below activation
-threshold before dwell completes resets the dwell. Dragging/held keys are deferred.
+threshold before dwell completes resets the dwell. Held keys use `keys_down`
+state as documented below and do not use button dwell thresholds.
 
 ## Lifecycle and status
 
@@ -282,7 +330,7 @@ else {
     if (fid_enable(driver) == FID_OK) {
         fid_frame frame;
         fid_neutral_frame(&frame);
-        // Submit fresh neutral-button frames for at least one worker tick.
+        // Submit a fresh frame with neutral buttons and keys for a worker tick.
         // Then continuously submit processing frames at 30–60 Hz.
         fid_submit(driver, &frame);
     }
@@ -296,16 +344,35 @@ The snippet demonstrates ownership, not a complete producer loop; use the
 examples for continuous submission. Check every return value in application code.
 
 Creation starts paused. Enabling discards pre-enable frames and waits for all
-four button values to be below their release thresholds. The arming tick emits
-no output. Submit a fresh neutral-button frame after enabling, and retain it
-until `awaiting_neutral` is false. Calling enable while already enabled is
-idempotent. Motion can use nonneutral axes once armed.
+four button values to be below their release thresholds and `keys_down` to be
+zero. The arming tick emits no output. Submit a fresh neutral frame after
+enabling, and retain it until `awaiting_neutral` is false. Calling enable while
+already enabled is idempotent. Motion and held keys can be used once armed.
 
 No valid frame for the timeout period latches output paused, even before the
 first frame. Fresh input does not resume it: explicitly enable and rearm.
 Async backend errors also pause output; inspect `last_error`, resolve the cause,
-and enable again. Pause/destroy release any library-owned Linux keys/buttons.
-No OS event is intentionally held between ticks.
+and enable again. Pause, timeout, backend errors, and destroy release any
+library-owned held keys and buttons.
+
+For keys, `keys_down` is the complete desired state: a set bit means stay held
+and a cleared bit means release. Supported keys are W/A/S/D, Space, and left
+Shift. Repeated frames with W set produce no repeated key-downs. A frame that
+clears W emits one key-up. Shift goes down before other keys and up after them.
+The driver does not synthesize keyboard auto-repeat; the desktop or application
+may repeat a held key according to its own settings.
+
+For example, Processing can hold W with Shift, release only W, then release
+both by submitting these snapshots:
+
+```cpp
+frame.keys_down = FID_KEY_W | FID_KEY_LEFT_SHIFT; // W and Shift down
+fid_submit(driver, &frame);
+frame.keys_down = FID_KEY_LEFT_SHIFT;             // W up; Shift stays down
+fid_submit(driver, &frame);
+frame.keys_down = 0;                              // Shift up
+fid_submit(driver, &frame);
+```
 
 API operations are internally serialized. Do not destroy a handle while other
 threads call it. No C++ exceptions cross the ABI. This MVP is not hard real-time;
@@ -316,6 +383,9 @@ accepted/rejected frames, emitted events, and dropped journal records.
 `fid_drain_events` destructively reads a bounded 1024-record journal on both
 backends. Slow readers lose oldest records; output itself is not replayed or
 queued for them. Dry-run capabilities represent modeled controls, not OS support.
+For `FID_EVENT_KEY_DOWN` and `FID_EVENT_KEY_UP`, `fid_event.x` contains the
+single `FID_KEY_*` bit that changed; `fid_status.held_key_mask` reports the
+current logical held state.
 
 For simple external testing, `driver_demo --stdin` accepts one complete frame
 per line in the field order above (seven space-separated numbers). Stream at

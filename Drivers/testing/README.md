@@ -14,6 +14,13 @@ All commands below start inside `Drivers/`. From the repository root, run
 `cd Drivers` once. Build on the OS where you will run the tester; Linux `.so`
 files cannot be used on macOS, which builds a `.dylib`.
 
+After pulling updates, rebuild the library before testing or loading it from
+your component. This is essential after ABI changes: the v3 header has different
+C structure layouts, so an older shared library and newer Python/C++ caller do
+not match. Each OS section below reconfigures CMake, clean-rebuilds the library,
+and runs the tests. Python loads `build/libface_input_driver.so` or `.dylib` by
+default; for a different build directory, pass `--library /path/to/library`.
+
 ### Linux
 
 You need CMake, a C++17 compiler, pkg-config, libevdev development headers, and
@@ -27,6 +34,12 @@ sudo apt install build-essential cmake pkg-config libevdev-dev python3 acl
 sudo pacman -S --needed base-devel cmake pkgconf libevdev python acl
 ```
 
+X11 and XRandR development packages are optional for relative velocity input,
+but needed to compile Linux target-pointer support. On Ubuntu/Debian install
+`libx11-dev` and `libxrandr-dev`; on Arch install `libx11` and `libxrandr`.
+Target commands also require an X11 session. Wayland supports `velocity` but
+reports target movement unsupported.
+
 Ubuntu provides the headers in [libevdev-dev](https://packages.ubuntu.com/noble/libevdev-dev);
 Arch includes them with [libevdev](https://archlinux.org/packages/extra/x86_64/libevdev/).
 
@@ -34,7 +47,7 @@ Build and check:
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
-cmake --build build -j 4
+cmake --build build --clean-first -j 4
 ctest --test-dir build --output-on-failure
 python3 examples/python_ctypes.py --interactive
 ```
@@ -72,6 +85,27 @@ When the probe succeeds:
 python3 examples/python_ctypes.py --interactive --native
 ```
 
+In the interactive tester, `hold w shift` holds those keys for the configured
+trial duration; the tester then pauses and releases them. Try this in a text
+editor or a safe test page before using a game. Repeated held frames do not
+generate repeated key-down events. The driver's safety release happens on
+pause, timeout, output error, or destroy.
+
+### Test a short W hold in Roblox
+
+On macOS, build the library on the Mac, grant Accessibility permission to the
+Python host, and run this from `Drivers/`:
+
+```sh
+python3 examples/wasd_w_hold_test.py --native
+```
+
+The script gives five seconds to focus Roblox, then submits W-down for 180 frames
+at 60 Hz (about three seconds), sends W-up, and pauses. It reports the driver's
+key transition events; that confirms the library emitted the events, not that
+Roblox consumed them. Use `--delay`, `--frames`, and `--rate` to adjust the test.
+Without `--native`, it runs dry-run and sends no desktop input.
+
 The backend uses the kernel input path for Wayland/X11. The actual desktop must
 discover and accept the virtual devices; live verification is still required.
 
@@ -96,7 +130,7 @@ Build and check:
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
-cmake --build build -j 4
+cmake --build build --clean-first -j 4
 ctest --test-dir build --output-on-failure
 python3 examples/python_ctypes.py --interactive
 python3 examples/python_ctypes.py --native --probe
@@ -125,26 +159,41 @@ At `test>`, type one command and press Enter:
 
 | Command | Expected result |
 | --- | --- |
-| `move 0.65 0.5` | Move right at a moderate speed |
-| `move 0.35 0.5` | Move left |
-| `move 0.5 0.2` | Move up |
-| `move 0.5 0.8` | Move down |
-| `move 0.5 0.5` | Neutral; no movement |
+| `move 0.1 0.8 0.5` | Move toward 80% across, halfway down at 10% max speed |
+| `move 0.6 0.8 0.5` | Same destination at 60% max speed; should arrive sooner |
+| `move 0.6 0.5 0.5` | Move to primary-display center |
+| `velocity 0.65 0.5` | Continuous movement right |
+| `velocity 0.35 0.5` | Continuous movement left |
+| `velocity 0.5 0.2` | Continuous movement up |
+| `velocity 0.5 0.8` | Continuous movement down |
+| `velocity 0.5 0.5` | Neutral; no movement |
 | `scroll 0.8` / `scroll 0.2` | Scroll down / up |
 | `click left` / `click right` | Exactly one complete click |
 | `key delete` | Exactly one forward Delete |
 | `key insert` | One Insert-position key; behavior varies on macOS |
-| `status` | Mode, trial/output state, capabilities, counters, and errors |
+| `status` | Mode, trial/output state, target position/speed/velocity when active, counters, and errors |
 | `stop` | Cancel the trial or focus delay immediately and pause output |
 | `help` | Show commands and examples |
 | `quit` | Stop the producer, close the library, and exit |
 
-Axis values are **0–1**, with **0.5 neutral**. The current driver's default dead
-zone is 0.45–0.55. Smaller values mean left/up; larger values mean right/down.
-These are velocity levels, not coordinates. Commands activate button values at
-1; 0 is inactive. The tester does not interpret eye openness or facial gestures.
+All values are **0–1**. `move SPEED X Y` uses normalized primary-display target
+coordinates: `(0,0)` is top-left, `(1,1)` bottom-right, and `(0.5,0.5)` center.
+Speed is a fraction of the configured maximum (600 display units/second by
+default). Movement follows a straight line, clamps at the endpoint, and stops
+without overshooting. Type another `move` to go back. Target trials stop on
+arrival or after a 30-second safety limit. Dry-run simulates a 1920×1080 screen.
+Compare speeds from the same starting cursor position; send a target back to
+that start between trials.
+Native macOS supports its main display; Linux target mode requires X11 and
+XRandR. On Wayland use `velocity` instead.
 
-Each trial runs for **one second**, then pauses automatically. You can enter
+`velocity X Y` retains the direction/speed axes: `0.5` is neutral, lower values
+mean left/up, and higher values mean right/down. The default dead zone is
+0.45–0.55. These values are not screen coordinates. Action commands activate
+button values at 1; 0 is inactive. The tester does not interpret facial gestures.
+
+Velocity and action trials run for **one second** by default, then pause
+automatically. Target trials pause on arrival. You can enter
 `status` or `stop` while it runs. A second trial is rejected while another is
 active; commands are not queued. Repeating `click left` after completion produces
 another click because each trial first sends neutral button levels.
@@ -166,7 +215,7 @@ Duration is 0.2–10 seconds; delay is 0–30 seconds; rate is 30 or 60 Hz. The 
 supplies frames continuously during a trial and pauses while you type; the
 driver's independent 250 ms watchdog is unchanged.
 
-Advanced input remains available:
+Advanced input remains available for velocity mode:
 
 ```text
 frame 0.65 0.5 0.5 0 0 0 0
@@ -206,6 +255,7 @@ current prototype `fid_frame` API; it does not yet consume the full shared
 | --- | --- |
 | Shared library not found | Build inside Drivers, or pass `--library /absolute/path/to/library` |
 | Could not load / wrong architecture | Rebuild on this OS; use the same architecture as Python |
+| `fid_create` reports invalid argument immediately after an update | Rebuild the library and caller from the same ABI/header version; do not load a stale `.so`/`.dylib` through `--library` |
 | Linux backend unavailable | Check host `/dev/uinput`; load the module or expose the device to the container |
 | Input permission denied on Linux | Check `ls -l`/`getfacl`, then account-specific access as above |
 | Input permission denied on macOS | Grant the actual Python host Accessibility access and relaunch |
