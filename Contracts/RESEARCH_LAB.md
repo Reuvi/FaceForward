@@ -38,3 +38,28 @@ false actions per observation time, missed/wrong/repeated actions, durations, sp
 latency and invalid time. Compare geometry, added blink coefficients, then facial
 features on identical held-out events. Models are experimental and need user data;
 synthetic tests cannot establish live accuracy.
+
+## Eye-only neutral samples (user-requested update)
+
+Every fresh captured frame now has an explicit Processing `eye_sample_v1` record,
+including frames with uncalibrated/unknown eyes or no selected face. This additive
+local sample contains capture `session_id`, `sequence`, `timestamp_ms`, the requested
+`subject_id` (nullable when unselected), and independent `left`/`right` entries:
+`{"value": 0.0, "known": false}` for unknown. The value convention is normalized
+closure: **0 = open/no action, 1 = closed**, with continuous calibrated scores in the
+research recognizer and binary values in the original mouse adapter.
+
+Unknown eye input defaults numerically to open. Its `known=false` flag cancels a
+pending gesture and releases a hold immediately; fallback open must never qualify
+as intentional reopening/click-on-release or as a measured open calibration sample.
+Rearming still requires observed open samples. A valid opposite eye remains independent.
+Missing selected face records neutral samples and stops output; it never selects a
+bystander. Invalid/duplicate/out-of-order/stale captures do not refresh the stream.
+
+Raw SignalFrame/feature observations, graph data and calibration/training data retain
+null/invalid values. Unknown graph intervals remain darker holds of the previous known
+height. Per-frame exports also include explicit `left_input`/`right_input` numeric
+values and `*_input_known` flags. The ordinary 100 Hz output clock remains independent
+of camera rate. No samples are invented when capture stops. This fallback applies to
+eyes only; head, tongue and other facial channels keep their existing invalid-data
+behavior pending their own calibration decisions.
