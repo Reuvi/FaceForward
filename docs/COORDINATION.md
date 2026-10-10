@@ -1,5 +1,14 @@
 # Main chat and agent coordination hub
 
+## Current tongue-tip task
+
+Claim: Reuvi integration, `work/reuvi/integration/tongue-tip`, base `0123b8d`.
+Scope: Vision crop/color/tip estimator/calibration/profiles, App raw labels, shared
+contracts/docs and tests. User authorized trying a visible-tip estimate with the
+current color segmentation. Contract first: [TONGUE_TIP.md](../Contracts/TONGUE_TIP.md).
+Keep eye/head fits, one capture stream, local execution and invalid-input release.
+
+
 ## Current head/tongue calibration and raw views task
 
 Claim: Reuvi integration, `work/reuvi/integration/movement-calibration`, base
