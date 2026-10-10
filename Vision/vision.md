@@ -3,8 +3,9 @@
 This is a design plan, not an implemented tracker. Use OpenCV for frame capture,
 image operations, and pose estimation; use MediaPipe Face Landmarker for face,
 eye, iris, and lip landmarks. Tongue localization requires a separate detector.
-Vision emits measurements, while Processing owns gesture thresholds, dwell,
-smoothing for controls, dead zones, and mappings to actions.
+Vision emits measurements, including binary eye-open classifications for this
+MVP. Processing owns gesture activation thresholds, dwell, smoothing for controls,
+dead zones, and mappings to actions.
 
 ## Existing files and scope
 
@@ -30,8 +31,8 @@ vertical position in the image and not rotation around the vertical axis (yaw).
 | --- | --- | --- | --- |
 | `gaze_x` | Iris center in each usable eye; combine after individual calibration | That eye's corners and lid frame | User's left / calibrated center / user's right |
 | `gaze_y` | Iris center vertically within each usable eye | That eye's local vertical axis and calibrated eye geometry | Up / calibrated center / down |
-| `left_eye_open` | Anatomical left upper/lower eyelid separation | Left eye corner-to-corner width | Closed / intermediate openness / open |
-| `right_eye_open` | Anatomical right upper/lower eyelid separation | Right eye corner-to-corner width | Closed / intermediate openness / open |
+| `left_eye_open` | Anatomical left upper/lower eyelid separation | Left eye corner-to-corner width | Binary: 0 closed, 1 open; no 0.5 output |
+| `right_eye_open` | Anatomical right upper/lower eyelid separation | Right eye corner-to-corner width | Binary: 0 closed, 1 open; no 0.5 output |
 | `tongue_x` | Center of a confidently segmented visible tongue region | Head-aligned mouth corners and mouth center | User's left mouth boundary / mouth center / user's right boundary |
 | `tongue_y` | Same tongue region center | Head-aligned upper/lower inner lip boundaries | Upper mouth boundary / mouth center / lower mouth boundary |
 | `head_y` | Head pitch relative to a captured neutral orientation | Camera frame and user's neutral head pose | Comfortable up limit / neutral / comfortable down limit |
@@ -39,7 +40,11 @@ vertical position in the image and not rotation around the vertical axis (yaw).
 
 All eight keys remain present, including unsupported or uncalibrated signals as
 invalid. Keep per-eye gaze estimates as internal diagnostics; v1 emits one gaze
-pair. Do not introduce new public fields or reinterpret existing axes.
+pair. Tongue X/Y remain continuous in `[0, 1]`; do not quantize these measurements
+into direction labels. Head X/Y retain their existing continuous definitions.
+The v1 contract permits intermediate eye openness, but this MVP producer emits
+only its valid endpoints, `0` or `1`. Consumers of other v1 producers must still
+accept intermediate openness. No new public fields or shared schema are needed.
 
 ## Capture and coordinate conventions
 
@@ -128,16 +133,25 @@ both usable eyes disagree beyond a validated tolerance, report affected gaze as
 invalid instead of averaging contradictory estimates. Eye openness remains
 independent so a unilateral closure does not falsely close both eyes.
 
-For openness, collect comfortable open and closed samples for each eye:
+For openness, collect comfortable open and closed samples for each eye. Keep the
+continuous calibrated score internal and emit a binary classification:
 
 ```text
-eye_open = clamp((openness_ratio - closed_ratio) /
-                 (open_ratio - closed_ratio), 0, 1)
+openness_score = clamp((openness_ratio - closed_ratio) /
+                       (open_ratio - closed_ratio), 0, 1)
+eye_open = 1 if openness_score >= calibrated_open_threshold else 0
 ```
 
+Choose and validate the threshold per eye using those samples. There is no dwell
+wait in this Vision classification; Processing decides whether a sequence of
+closed/open states is a blink, wink, or held gesture. Evaluate near-threshold
+chatter and let Processing debounce action activation. Vision does not trigger
+clicks. Each valid `left_eye_open`/`right_eye_open` value must be numeric `0` or `1`,
+never an intermediate fraction.
+
 Reject a missing or degenerate calibration denominator. A visible closed lid can
-produce a valid zero; an occluded eye cannot. Processing decides whether a closure
-means a blink, wink, or held gesture. Vision does not trigger clicks.
+produce a valid zero; an occluded or unreliable eye remains invalid/null. Clear
+classification state on track loss or restart rather than reusing an old state.
 
 ## Tongue: use a mouth reference carried by the head
 
@@ -194,6 +208,42 @@ Tongue detection is the largest feasibility dependency:
   out-of-domain positions invalid instead of clamping them into false edge commands.
   Support beyond the mouth requires an explicitly agreed range convention.
 
+## MVP direction zones and later velocity
+
+Keep tongue coordinates continuous at the Vision boundary. Processing may map
+them to left/center/right and up/center/down zones for simple MVP actions, using
+calibrated thresholds and a neutral dead zone. This simplifies control decisions
+without discarding the underlying measurements. Exact physical tongue position
+is not required; the goal is a reliable mouth-relative position estimate.
+
+Continuous versus discrete representation does not itself require waiting for
+additional frames. Capture, inference, queues, smoothing windows, and gesture
+dwell dominate latency. A zone threshold can delay activation until movement
+crosses it; quantization is not an inherent latency improvement.
+
+For a later motion-based mapping, Processing can estimate each tongue-axis
+velocity from consecutive valid observations of the same selected subject:
+
+```text
+dt_seconds = (current.timestamp_ms - previous.timestamp_ms) / 1000
+velocity = (current.value - previous.value) / dt_seconds
+```
+
+The unit is normalized mouth-range units per second, not pixels or physical
+centimeters per second. Require positive elapsed time, the same session/subject,
+and an acceptable sample gap. Reset history on invalid input, loss, a changed
+calibration/profile, or stream restart. Skip the first sample after a reset; never
+compare it with another person or session. Use capture times, including actual
+gaps from dropped frames, rather than assuming a fixed FPS.
+
+Two samples are needed to initialize velocity, so the first estimate comes on
+the next valid frame; no extra buffering beyond the previous sample is necessary.
+Differencing amplifies noise, and mouth/reference changes can contribute apparent
+velocity, so validate any filtering and account for its added delay. Discrete-only
+positions would yield zero velocity within zones and jumps at their boundaries.
+This estimated tongue motion is distinct from the existing ControlFrame velocity
+demand: Processing must still map it to bounded `[0, 1]` output if adopted.
+
 ## Head Y: calibrated pitch, independent of image translation
 
 Estimate a rigid head pose using `cv2.solvePnP` with corresponding points from a
@@ -234,9 +284,11 @@ geometry, or unsupported pose rather than emitting a guessed angle.
    geometry, pose fit, image resolution, and detector evidence. MediaPipe task
    thresholds and expression scores are not per-signal confidence probabilities.
    Validate any derived quality score; do not hard-code high confidence.
-4. Emit each supported calibrated value as `{value, confidence, valid}`. Values and
-   confidence must be finite and within `[0, 1]`. Missing, uncalibrated, or rejected
-   measurements are exactly `{value: null, confidence: 0, valid: false}`. Clip only
+4. Emit each supported calibrated value as `{value, confidence, valid}`. Valid eye
+   openness values are `0` or `1`; tongue, gaze, and head coordinates are continuous
+   in `[0, 1]`. Confidence stays continuous in `[0, 1]` for every signal, including
+   binary eye states. All numeric values must be finite. Missing, uncalibrated, or
+   rejected measurements are exactly `{value: null, confidence: 0, valid: false}`. Clip only
    small, validated endpoint noise; reject large out-of-domain errors.
 5. Emit `faces: []` for a successfully processed frame with no faces. On capture
    failure, report stream failure through the agreed lifecycle and stop emitting
@@ -250,9 +302,9 @@ geometry, or unsupported pose rather than emitting a guessed angle.
 | --- | --- | --- |
 | 1 | Synthetic/replay source, envelope timing, explicit OpenCV camera mode | Failed reads, irregular timing, restarts, and sequence gaps are handled |
 | 2 | Face landmarks, subject association, overlay of reference axes | No/one/two faces; crossing faces and loss never silently transfer an ID |
-| 3 | Per-eye openness and calibrated gaze | Known left/right signs; blinks invalidate gaze; unilateral closure stays independent |
+| 3 | Binary per-eye openness and calibrated gaze | Valid openness is always 0/1; threshold boundaries checked; blinks invalidate gaze; unilateral closure stays independent |
 | 4 | Head pitch/yaw calibration and pose quality | Up/down signs; translation does not masquerade as nodding; bad fits are invalid |
-| 5 | Tongue detector feasibility and mouth-relative coordinates | Tongue-absent cases are invalid; head motion alone does not create tongue motion |
+| 5 | Tongue detector feasibility and continuous mouth-relative coordinates | Intermediate positions are retained; tongue-absent cases are invalid; head motion alone does not create tongue motion |
 | 6 | Full SignalFrame v1 emitter against logging/mocked consumers | All eight signals, envelope preservation, invalid cases, and subject loss match v1 |
 
 For the head-compensation experiment, hold tongue position relative to the mouth
