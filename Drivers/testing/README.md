@@ -91,20 +91,23 @@ editor or a safe test page before using a game. Repeated held frames do not
 generate repeated key-down events. The driver's safety release happens on
 pause, timeout, output error, or destroy.
 
-### Test a short W hold in Roblox
+### Run the hardcoded input simulation
 
 On macOS, build the library on the Mac, grant Accessibility permission to the
 Python host, and run this from `Drivers/`:
 
 ```sh
-python3 examples/wasd_w_hold_test.py --native
+python3 examples/hard_input_simulation.py --native
 ```
 
-The script gives five seconds to focus Roblox, then submits W-down for 180 frames
-at 60 Hz (about three seconds), sends W-up, and pauses. It reports the driver's
-key transition events; that confirms the library emitted the events, not that
-Roblox consumed them. Use `--delay`, `--frames`, and `--rate` to adjust the test.
-Without `--native`, it runs dry-run and sends no desktop input.
+The script gives five seconds to focus the target app, then holds W for 180
+frames at 60 Hz (about three seconds), moves the pointer right and then left
+using relative velocity for one second each, taps Space for 0.2 seconds, and
+holds Space for three seconds. It releases keys between actions and pauses at
+the end. The event counts confirm Driver output, not that a game consumed it.
+Dry-run is the default and sends no desktop input. `--native` enables live
+input. Adjust the sequence with `--delay`, `--rate`, `--w-frames`,
+`--spin-seconds`, `--space-tap-seconds`, and `--space-hold-seconds`.
 
 The backend uses the kernel input path for Wayland/X11. The actual desktop must
 discover and accept the virtual devices; live verification is still required.

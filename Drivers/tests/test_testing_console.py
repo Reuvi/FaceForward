@@ -220,19 +220,28 @@ class CLITests(unittest.TestCase):
         self.assertIn("cmake -S . -B build", result.stderr)
         self.assertNotIn("Traceback", result.stderr)
 
-    def test_queued_w_hold_dry_run(self):
+    def test_hard_input_simulation_dry_run(self):
         help_result = subprocess.run(
-            [sys.executable, str(EXAMPLES / "wasd_w_hold_test.py"), "--help"],
+            [sys.executable, str(EXAMPLES / "hard_input_simulation.py"), "--help"],
             text=True, capture_output=True, timeout=5)
         self.assertEqual(help_result.returncode, 0, help_result.stderr)
         self.assertIn("default: 180", help_result.stdout)
+        self.assertIn("default: 1", help_result.stdout)
+        self.assertIn("default: 3", help_result.stdout)
         result = subprocess.run(
-            [sys.executable, str(EXAMPLES / "wasd_w_hold_test.py"),
-             "--library", str(LIBRARY), "--delay", "0", "--frames", "4", "--rate", "60"],
-            text=True, capture_output=True, timeout=5)
+            [sys.executable, str(EXAMPLES / "hard_input_simulation.py"),
+             "--library", str(LIBRARY), "--delay", "0", "--w-frames", "4",
+             "--rate", "60", "--spin-seconds", "0.1",
+             "--space-tap-seconds", "0.05", "--space-hold-seconds", "0.1"],
+            text=True, capture_output=True, timeout=10)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("Sending W-down for 4 frames", result.stdout)
-        self.assertIn("W-down=1 and W-up=1", result.stdout)
+        self.assertIn("Hold W (4 frames at 60 Hz)", result.stdout)
+        self.assertIn("Move mouse right", result.stdout)
+        self.assertIn("Move mouse left", result.stdout)
+        self.assertIn("Tap Space", result.stdout)
+        self.assertIn("Hold Space", result.stdout)
+        self.assertIn("W down/up=1/1", result.stdout)
+        self.assertIn("Space down/up=2/2", result.stdout)
 
     def test_ctrl_c_cleanup(self):
         process = subprocess.Popen([sys.executable, str(EXAMPLES / "python_ctypes.py"),

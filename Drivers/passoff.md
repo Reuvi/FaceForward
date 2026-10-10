@@ -16,10 +16,12 @@ Last updated: 2026-10-10. Owner of this update: repository implementation agent.
   The driver does not generate keyboard repeat.
 - Linux maps to evdev/uinput codes; macOS maps to Quartz virtual key codes. The
   Python tester supports finite `hold w shift` trials and reports held keys.
-  `examples/wasd_w_hold_test.py` waits five seconds, sends 180 W-down frames at
-  60 Hz by default (about three seconds), then sends release state and pauses. Use `--native` for a
-  Roblox test; dry-run is the default. It confirms Driver transitions, not that
-  Roblox consumed the events.
+  `examples/hard_input_simulation.py` waits five seconds, holds W for 180 frames
+  at 60 Hz, moves the mouse right and left for one second each, taps Space for
+  0.2 seconds, then holds it for three seconds. It releases keys between
+  actions and pauses after the sequence. Use `--native` for live app input;
+  dry-run is the default. Event counts confirm Driver output, not that a game
+  consumed the events. All durations and frame rate are configurable.
   Dry-run tests cover held, clear, repeat-free, pause-release, validation, and
   ordering behavior. Linux native backend compiled successfully in this turn;
   live input was not tested. macOS source was not compiled on an Apple host.
@@ -29,8 +31,9 @@ Last updated: 2026-10-10. Owner of this update: repository implementation agent.
   snapshot and integration semantics are recorded in
   `interface-requests/held-key-state.md`; integration must agree before cross-
   component adoption.
-- Verification: the W test passed in dry-run and the terminal tester
-  suite passes with its short W-hold integration check. Dry-run and
+- Verification: the hardcoded input simulation passed in dry-run and the
+  terminal tester suite passes with a shortened full-sequence integration
+  check. Dry-run and
   Linux-native Debug builds each passed all four CTest suites. Python syntax
   compilation passed with bytecode redirected to
   `/tmp` because the workspace cache path is read-only. No commit or push was made.
