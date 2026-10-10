@@ -73,3 +73,36 @@ ignored Vision-local directories. The README records the model source/checksum.
   events.
 - Integrate the existing replay output first. Agree shared lifecycle/profile
   representation before importing the local calibration API across lanes.
+
+## Local runtime and efficiency follow-up
+
+Behavior: recorded the user's native/local runtime requirement and added a
+repeatable standard-library benchmark. Runtime processing behavior is unchanged.
+The Processing desktop was inspected read-only; it already supports a direct
+in-process SignalFrame handoff.
+
+Ownership: Vision lane, based on `eb9d361`, same Vision branch. Changed
+`Vision/AGENTS.md`, `Vision/README.md`, `Vision/benchmark.py`, this handoff,
+and `Vision/interface-requests/runtime-calibration.md`. No shared interfaces
+or Processing files changed. This follow-up is committed locally, not pushed.
+
+Verification on Python 3.12.5 / macOS arm64:
+
+- `python3 -m Vision.benchmark --faces 1`: 5,000 synthetic samples, geometry/
+  pipeline mean **229.27 µs**, p95 **268.75 µs**.
+- `python3 -m Vision.benchmark --faces 2`: 5,000 synthetic samples, geometry/
+  pipeline mean **445.25 µs**, p95 **513.42 µs**.
+- Optional JSON encoding averaged 7.10 µs / 10.92 µs respectively; direct
+  application calls do not need this encoding.
+- Read-only `Lab.ingest(frame)` probe: accepted the synthetic Vision frame;
+  continuous gaze, independent eye polarity, and capture time were preserved.
+  Bytecode writes were disabled for that inspection; no GUI or worker was started.
+- `git diff --check` and
+  `python3 tools/check_scope.py --base eb9d361 --lane vision`: passed.
+
+These timings exclude neural inference, camera capture, UI, and Drivers; they
+are not an end-to-end latency or real-world frame-rate claim. The remaining
+dependencies above still apply. App should invoke the detector away from Tk's
+main thread and hand dictionaries to Processing's external-source controller.
+The inspected Processing code is active, uncommitted work; the integration owner
+must use its final published API.

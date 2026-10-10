@@ -7,6 +7,45 @@ It produces SignalFrame v1 dictionaries or newline-delimited JSON. No Processing
 or Drivers imports are required. Python 3.10+ is required; tested with Python
 3.12.5 on Apple Silicon macOS.
 
+## Native, local runtime
+
+Runtime inference uses the model already on disk. There is no browser, JavaScript,
+web server, HTTP transport, remote inference, or runtime download. The dependency
+installation and optional model download below are setup steps only.
+
+The inspected `work/reuvi/processing/mouse-lab` worktree runs a native Python/Tk
+desktop: its processing clock is 100 Hz, readouts up to 20 Hz, and scopes 10 Hz.
+It accepts SignalFrame v1 through its documented `Lab.ingest(frame)` API in
+external-source mode. App can pass our frame dictionary from a detector worker
+directly into that controller; Tk remains on the main thread. No serialization,
+server, or transport is needed for that path. The full application wiring belongs
+to the integration owner; this inspection did not modify Processing.
+
+Preserve continuous gaze/tongue values and the v1 eye convention (1 = open,
+0 = closed). Processing's alternative one-hot/raw format uses different eye
+polarity and does not require Vision to change its contract. Select gaze as the
+pointer source when testing calibrated eye/gaze output; tongue and head controls
+remain unavailable until their detectors are implemented.
+
+## Measure overhead
+
+```bash
+python3 -m Vision.benchmark --faces 1
+python3 -m Vision.benchmark --faces 2
+```
+
+This uses synthetic 478-point meshes, in-memory calibration, and 200 warmup frames
+before measuring 5,000 iterations. It reports mean/p95/max for pixel geometry,
+association, calibration, and frame construction, and reports optional JSON
+serialization separately. It requires only the standard library and opens no UI
+or camera. Neural inference, camera buffering, rendering, and drivers are excluded;
+these numbers cannot establish live frame rate or end-to-end latency.
+
+Keep the hot path independent of UI rendering and avoid introducing a frame
+backlog. The current optional OpenCV debugging preview draws synchronously and
+should be disabled for detector throughput measurements. App's native UI should
+consume current diagnostics on its own drawing cadence.
+
 ## Run without hardware
 
 Run commands from this worktree's root:
