@@ -1,5 +1,16 @@
 # Main chat and agent coordination hub
 
+## Current single-user lifecycle change (October 10)
+
+Reuvi requests one subject instead of simultaneous people, preservation of
+calibration through rapid head motion/loss, and saved-file loading. This supersedes
+the explicit tracker selection/recalibration-on-loss rules in earlier entries.
+Claim: integration, `work/reuvi/integration/single-subject`, base `86f8e17`.
+Authorized paths: Vision workbench/capture/UI, App lifecycle/UI, their tests,
+contracts and shared documentation/agent instructions. Drivers and transfer
+functions are unchanged. Contract lands first; acceptance covers motion/absence,
+restart, profile loading without a face, and safe preview release/rearming.
+
 Reuvi designated the conversation that integrated the mouse MVP as the **main
 coordination chat**. Use it to collect testing observations, resolve shared
 interface decisions, and review changes from the other agents. Component agents

@@ -18,9 +18,11 @@ named `mouse_preview_v0` is not silently presented as that driver format.
   **nondecreasing**. A newer sample with the same timestamp replaces that axis
   interpolation point and advances no eye dwell time. Duplicate sequences or
   regressing capture times are rejected without refreshing freshness.
-- Processing selects the exact subject. The named demo fixture is selected by
-  default; replay/camera require explicit selection. Loss/restart disables output
-  and never auto-binds another face. Changing selection resets/disarms filters.
+- The calibrated camera and detector demo use one logical `single-user` subject,
+  automatically attached to the sole observation. Geometric tracker ID changes
+  do not change the active person's calibration. Replay retains explicit subject
+  selection for legacy recordings. Loss/restart disables output; reacquisition
+  resumes detection but never arms the mouse preview.
 - EOF, errors, explicit source stop, and application shutdown call
   `Lab.disconnect(reason)` immediately. Timeouts independently disable output.
   Re-enabling requires explicit Start preview and fresh neutral axes; each eye
@@ -108,12 +110,17 @@ images, live validation pass flags, arming state, or driver permissions are save
 Processing owns atomic local JSON persistence and its settings validation; Vision
 owns detector preset validation/export/import; App validates/binds both together.
 
-Load requires a fresh, explicitly selected current face and a matching source kind.
-It clears learned session state, attaches parameters to that selected track, resets
-and disarms the processor, and requires fresh tongue absent/visible validation.
+Load requires a matching source kind, but no visible face or running camera.
+It replaces the active single user's parameters, resets and disarms the processor,
+and requires fresh tongue absent/visible validation.
 Eye/head parameters apply to subsequent samples; the operator must recheck them.
-Stop, stale input, loss, and restart detach calibration; the saved file remains
-available for deliberate reload. No automatic identity matching occurs. Files are
+Stop, stale input, loss, and same-source restart preserve completed calibration.
+An interrupted capture/guide is cancelled; invalid observations never train it.
+Changing source kind or explicitly resetting calibration clears the in-memory
+fits. Restart invalidates live tongue checks but retains its appearance model.
+No biometric identity matching occurs: the sole face is assumed to be the user.
+Camera inference requests one face; injected multi-face input is treated as unavailable.
+Files are
 suggested under ignored `local-profiles/`; old Processing-only JSON import/export
 continues to mean transfer settings, not a complete detector profile.
 
@@ -138,7 +145,8 @@ App's command allowlist. A new phase waits for the UI to present its instruction
 before accepting captures. `DetectorWorkbench.calibrating` includes both legacy
 collections and all active guided phases; App disarms throughout. Restart drops
 both eye fits/samples but preserves unrelated head/tongue fits. Leaving the active
-Eyes view cancels the guide; loss/staleness clears calibration as before.
+Eyes view cancels the guide; loss/staleness cancels only active collection and
+preserves completed fits.
 
 
 ### Full-screen guide and unknown trace display

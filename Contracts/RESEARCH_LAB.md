@@ -28,8 +28,8 @@ hardware agreement. Gaze/head pointer modes disable head scrolling by default.
 Profiles v2 contain the existing detector/processing/preview sections plus research
 settings, scalar feature fits, event model coefficients and gaze coefficients.
 Profiles v1 remain readable. No recordings, trial histories, event IDs, selected
-identities or armed states are persisted. Loading binds only to a fresh explicitly
-selected face, disarms both previews, and requires fresh gaze validation before
+identities or armed states are persisted. Loading applies to the single user,
+including while tracking is unavailable, disarms both previews, and requires fresh gaze validation before
 absolute preview. All training/evaluation/export stays local and scalar-only.
 
 Native lab trials have user-supplied labels and session/trial IDs. Split whole trials
@@ -56,8 +56,11 @@ Unknown eye input holds the preceding input value. Its `known=false` flag cancel
 pending gesture and releases a button immediately; held input must never qualify
 as continued closure, intentional reopening/click-on-release or calibration evidence.
 Rearming still requires observed open samples. A valid opposite eye remains independent.
-Missing selected face records held samples in the existing selection context and stops output; it never selects a
-bystander. Invalid/duplicate/out-of-order/stale captures do not refresh the stream.
+Missing face records held samples in the existing single-user context and stops
+output. Reacquisition uses the same calibration without rearming. Source restart
+preserves learned research fits/models and completed trials, cancels active
+trials/fixations, and requires fresh gaze validation. No identity recognition occurs.
+Invalid/duplicate/out-of-order/stale captures do not refresh the stream.
 
 Raw SignalFrame/feature observations, graph data and calibration/training data retain
 null/invalid values. Unknown graph intervals remain darker holds of the previous known

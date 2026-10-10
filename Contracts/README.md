@@ -64,10 +64,12 @@ preview mirroring. Normalize positional signals using that user's calibrated
 reference/range. Uncalibrated positional signals are invalid for control. Store
 raw landmarks/angles as optional diagnostics, with explicit units if introduced.
 
-App selects a `subject_id` and loaded profile explicitly and passes that context
-to Processing. A tracker ID alone must not load a person's saved profile or
-silently transfer control. Missing selected subject means disabled output even
-when another face remains visible. Reacquisition/selection must be deliberate.
+The single-user calibrated app automatically uses logical subject `single-user`;
+its completed calibration survives geometric tracker changes and brief absence.
+This is a single-person assumption, not identity recognition. Missing face disables
+output and returning does not rearm it. Profiles are loaded explicitly. The generic
+v1 wire format still accepts 0–2 observations for legacy replay compatibility;
+see [the current mouse lifecycle](MOUSE_MVP.md) for the app's one-user policy.
 
 ## Processing → Drivers: ControlFrame
 
