@@ -249,16 +249,20 @@ class SingleUserWindowTests(unittest.TestCase):
             root.geometry("1420x850")
             session.detector_command("configure",dict(settle_ms=0,collect_ms=300,movement_rest_ms=0,min_samples=5))
             sequence=0
-            def feed():
+            def feed(**controls):
                 nonlocal sequence
                 sequence+=1;now[0]+=25
-                image,observations=demo_image(**session.detector_runtime.demo_input())
+                image,observations=demo_image(**dict(session.detector_runtime.demo_input(), **controls))
                 session.deliver_detection(CapturedImage(Envelope("tk-movement",sequence,now[0]),image),observations,preview=False)
             feed();ui.refresh_vision();root.update()
             self.assertGreaterEqual(ui.raw_canvas.winfo_height(),160)
             self.assertIn("Raw capture #1",ui.raw_capture.get())
             ui.notebook.select(ui.calibration_page);ui.open_calibration();root.update()
             view=ui.calibration_ui;view.calibration_tabs.select(view.head_tab);root.update()
+            self.assertFalse(any(child.winfo_class() == "TCombobox" for child in view.head_tab.winfo_children()))
+            self.assertNotIn('"head_mode"', view.settings.get("1.0", "end"))
+            self.assertNotIn('"head_position_separation"', view.settings.get("1.0", "end"))
+            self.assertEqual(view.head_panel.start["text"], "Start head pitch guide")
             view.head_panel.start.invoke()
             view.tick();root.update()
             core=session.detector_runtime.workbench
@@ -267,6 +271,19 @@ class SingleUserWindowTests(unittest.TestCase):
                 self.assertLess(sequence,300)
             self.assertTrue(core.movement_guide.passed,core.notice)
             self.assertIsNotNone(core.head)
+            self.assertEqual(core.config.head_mode, "pitch")
+            for position, expected in ((.2, 0), (.5, .5), (.8, 1)):
+                feed(head=position);view.tick();root.update()
+                text = {view.eye_scope.itemcget(item, "text") for item in view.eye_scope.find_all()
+                        if view.eye_scope.type(item) == "text"}
+                self.assertTrue({"-12°", "0°", "12°"}.issubset(text))
+                for color in ("#b18bff", "#75e3a8"):
+                    dot = next(item for item in view.eye_scope.find_all()
+                               if view.eye_scope.type(item) == "oval" and view.eye_scope.itemcget(item, "fill") == color)
+                    coordinates = view.eye_scope.coords(dot)
+                    self.assertAlmostEqual((coordinates[1]+coordinates[3])/2,
+                                           50 + expected * (max(160, view.eye_scope.winfo_height())-82))
+            self.assertIn("Up -12.0° = 0", view.head_details.get())
             for mode in view.movement_scope_picker["values"]:
                 view.movement_scope_mode.set(mode);view.tick();root.update()
                 self.assertTrue(view.scope.find_all())

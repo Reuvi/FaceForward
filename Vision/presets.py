@@ -1,6 +1,6 @@
 """Versioned detector parameter serialization; no identity or capture data."""
 
-from dataclasses import asdict
+from dataclasses import asdict, replace
 
 import numpy as np
 
@@ -41,7 +41,12 @@ def decode_preset(data):
     if (type(data["version"]) is not int
             or (data["version"], data["algorithm"]) not in ((1, LEGACY_ALGORITHM), (2, ALGORITHM), (3,WINK_ALGORITHM), (4,MOVEMENT_ALGORITHM), (5,TIP_ALGORITHM))):
         raise ValueError("Unsupported detector preset version or algorithm")
-    config = DetectionConfig.from_dict(data["settings"])
+    settings = data["settings"]
+    if isinstance(settings, dict):
+        # Before pitch-only calibration, omitted mode meant image position.
+        settings = dict(settings)
+        settings.setdefault("head_mode", "position")
+    config = DetectionConfig.from_dict(settings)
     if data["version"]==5 and data["tongue_measurement"]!=TONGUE_MEASUREMENT:
         raise ValueError("Unsupported tongue measurement coordinate space")
     if not isinstance(data["eyes"], dict) or set(data["eyes"]) - {"left", "right"}:
@@ -93,6 +98,8 @@ def decode_preset(data):
             raise ValueError("Legacy tongue range requires its appearance model")
     if decode_tongue_range(data,config) is not None and tongue is None:
         raise ValueError("Tongue movement range requires an appearance model")
+    if config.head_mode == "position":
+        config, head = replace(config, head_mode="pitch"), None
     # Expanded negatives and front-edge coordinates cannot reuse an inner-mouth fit.
     return config, eyes, head, tongue if data["version"]==5 else None
 

@@ -30,7 +30,8 @@ class Collection:
 
 class DetectorWorkbench:
     def __init__(self, config=None, *, clock=monotonic_ms):
-        self.config = config or DetectionConfig()
+        # Position remains decodable for old files, never an active lab mode.
+        self.config = replace(config, head_mode="pitch") if config else DetectionConfig()
         self.clock = clock
         self.pipeline = VisionPipeline()
         self.pipeline.tracker.max_gap_ms = self.config.stale_ms
@@ -120,7 +121,7 @@ class DetectorWorkbench:
         self.notice = "Single user ready; calibrate or load a profile"
 
     def configure(self, values):
-        config = DetectionConfig.from_dict(values)
+        config = replace(DetectionConfig.from_dict(values), head_mode="pitch")
         self.reset_calibration()
         self.notice = "Settings changed; recalibrate or load a saved profile"
         self.config = config
@@ -145,8 +146,10 @@ class DetectorWorkbench:
         self.tongue_range = tongue_range
         self.pipeline.tracker.max_gap_ms = config.stale_ms
         self.notice = "Profile loaded. Check live readings; output remains stopped."
+        if data["settings"].get("head_mode", "position") == "position":
+            self.notice += " Old image-position head fit removed; run the head pitch guide. Other compatible fits retained."
         if data["version"]<5 and data.get("tongue") is not None:
-            self.notice += " Old centroid tongue calibration removed; repeat appearance and tip range. Eyes/head retained."
+            self.notice += " Old centroid tongue calibration removed; repeat appearance and tip range. Compatible eyes/pitch retained."
         if tongue is not None:
             self.notice += (" Recheck saved tongue range." if tongue_range else
                             " Run tongue position guide to learn a personal range.")
@@ -254,20 +257,6 @@ class DetectorWorkbench:
         self.eye_guide = None
         self.movement_guide = None
         self.notice = "Collection cancelled"
-
-    def set_head_mode(self, mode):
-        self._require_idle()
-        config=replace(self.config,head_mode=mode)
-        if mode==self.config.head_mode:
-            return
-        self.config=config
-        self.head=None
-        self.features.pop("head",None)
-        self.movement_guide=None
-        self.samples={key:value for key,value in self.samples.items() if not key.startswith("head_")}
-        self._invalidate("head_y")
-        self.generation+=1
-        self.notice="Head measurement changed; run head calibration. Other fits retained."
 
     def start_movement_guide(self, kind, recheck=False):
         self._require_subject()

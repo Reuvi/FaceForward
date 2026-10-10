@@ -29,9 +29,9 @@ class MovementGuideTests(unittest.TestCase):
             state = guide.state(now)
             name = state["name"]
             if kind == "head":
-                value = ({"up": 0.25, "neutral": 0.5, "down": 0.75}[name],)
+                value = ({"up": -12, "neutral": 4, "down": 28}[name],)
                 if reverse:
-                    value = (1 - value[0],)
+                    value = (-value[0],)
             else:
                 value = {
                     "absent": None,
@@ -42,9 +42,9 @@ class MovementGuideTests(unittest.TestCase):
                     "down": (0.45, 0.8),
                 }[name]
             if overlap and name == "up":
-                value = (0.5,) if kind == "head" else (0.45, 0.55)
+                value = (4,) if kind == "head" else (0.45, 0.55)
             if bad_check and state["role"] == "check":
-                value = (0.9,) if kind == "head" else (0.9, 0.9)
+                value = (50,) if kind == "head" else (0.9, 0.9)
             usable = not missing
             if state["phase"] in ("prepare", "rest"):
                 value = (999.0,) if kind == "head" else (999.0, 999.0)
@@ -57,11 +57,16 @@ class MovementGuideTests(unittest.TestCase):
             self.assertLess(now, 30000)
         return guide
 
-    def test_head_translation_and_reverse_axis_check_with_new_samples(self):
+    def test_asymmetric_pitch_and_reverse_axis_use_full_normalized_range(self):
         for reverse in (False, True):
             guide = self.run_guide(reverse=reverse)
             self.assertTrue(guide.passed, guide.report)
-            self.assertEqual(guide.normalized((0.5,)), (0.5,))
+            direction = -1 if reverse else 1
+            for degrees, expected in ((-12, 0), (-4, .25), (4, .5), (16, .75), (28, 1)):
+                self.assertEqual(guide.normalized((degrees * direction,)), (expected,))
+            self.assertEqual(guide.normalized((-13 * direction,)), (0,))
+            self.assertEqual(guide.normalized((29 * direction,)), (1,))
+            self.assertIsNone(guide.normalized((50 * direction,)))
             self.assertEqual(set(guide.checks), {"neutral", "up", "down"})
 
     def test_tongue_asymmetric_personal_range_and_recheck(self):

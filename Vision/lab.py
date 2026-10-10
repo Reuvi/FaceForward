@@ -80,13 +80,9 @@ class DetectionLab:
         ttk.Label(eye,textvariable=self.eye_details,justify="left",wraplength=465,font=("Menlo",10)).pack(anchor="w",pady=8)
         head=self.tab(tabs,"2 Head Y")
         self.head_tab=head
-        self.text(head,"Choose what moves: whole-head height in the image, or nodding angle. Changing this resets only head calibration.")
-        self.head_mode=tk.StringVar(value=self.runtime.snapshot()["config"]["head_mode"])
-        self.head_mode_picker=ttk.Combobox(head,textvariable=self.head_mode,values=("position","pitch"),state="readonly")
-        self.head_mode_picker.pack(fill="x",pady=5)
-        self.head_mode_picker.bind("<<ComboboxSelected>>",lambda event:self.call("set_head_mode",self.head_mode.get()))
+        self.text(head,"Nod your head up and down. The guide learns your comfortable pitch limits and neutral position automatically.")
         self.head_panel=MovementPanel(head,root,self.call,"head")
-        self.text(head,"Stay at the same camera distance. Move only as far as comfortable. Purple is raw position; green is the calibrated 0–1 position. Neutral is .5, up is 0, down is 1. This is position, not scrolling speed.")
+        self.text(head,"Purple shows pitch in degrees using your learned range; green uses the full 0–1 range. Your up limit is 0, neutral is .5 and down limit is 1. Move only as far as comfortable.")
         ttk.Label(head,textvariable=self.head_details,justify="left",wraplength=440,font=("Menlo",10)).pack(anchor="w",pady=10)
         self.tongue_tab=self.tab(tabs,"3 Tongue")
         self.tongue_panel=MovementPanel(self.tongue_tab,root,self.call,"tongue")
@@ -103,12 +99,12 @@ class DetectionLab:
         ttk.Button(tongue,text="Reset tongue calibration",command=lambda:self.call("reset_tongue")).pack(fill="x",pady=3)
         ttk.Label(tongue,textvariable=self.tongue_details,justify="left",wraplength=420,font=("Menlo",10)).pack(anchor="w",pady=6)
         settings=self.tab(tabs,"Settings")
-        self.text(settings,"Edit tunables below. Applying clears calibration; your face reconnects automatically. Saving stores these tunables only. Use Save active profile in the main App to save learned calibration. head_mode is position or pitch.")
+        self.text(settings,"Edit tunables below. Applying clears calibration; your face reconnects automatically. Saving stores these tunables only. Use Save active profile in the main App to save learned calibration. Head calibration always uses pitch.")
         ttk.Button(settings,text="Reset all calibration",command=lambda:self.call("reset_calibration")).pack(fill="x",pady=5)
         self.settings=tk.Text(settings,width=48,height=26,font=("Menlo",10))
         self.settings.pack(fill="both",expand=True,pady=5)
         self.displayed_config = self.runtime.snapshot()["config"]
-        self.settings.insert("1.0",json.dumps(self.displayed_config,indent=2))
+        self.settings.insert("1.0",json.dumps(self.editable_settings(self.displayed_config),indent=2))
         row=ttk.Frame(settings);row.pack(fill="x")
         ttk.Button(row,text="Apply settings",command=self.apply_settings).pack(side="left")
         ttk.Button(row,text="Load JSON",command=self.load_settings).pack(side="left")
@@ -153,6 +149,11 @@ class DetectionLab:
             return
         self.call("mark_tongue",event.x/256,event.y/256)
 
+    @staticmethod
+    def editable_settings(config):
+        return {key: value for key, value in config.items()
+                if key not in ("head_mode", "head_position_separation")}
+
     def apply_settings(self):
         try:
             self.runtime.command("configure",json.loads(self.settings.get("1.0","end")))
@@ -164,13 +165,14 @@ class DetectionLab:
         if path:
             try:
                 config=DetectionConfig.from_dict(json.loads(Path(path).read_text()))
-                self.settings.delete("1.0","end");self.settings.insert("1.0",json.dumps(config.to_dict(),indent=2))
+                self.settings.delete("1.0","end");self.settings.insert("1.0",json.dumps(self.editable_settings(config.to_dict()),indent=2))
             except (ValueError,OSError) as exc:
                 messagebox.showerror("Cannot load",str(exc),parent=self.root)
 
     def save_settings(self):
         try:
             config=DetectionConfig.from_dict(json.loads(self.settings.get("1.0","end")))
+            config=DetectionConfig.from_dict(self.editable_settings(config.to_dict()))
             path=filedialog.asksaveasfilename(defaultextension=".json",initialfile="detector-settings.json")
             if path:
                 Path(path).write_text(json.dumps(config.to_dict(),indent=2)+"\n")
@@ -226,12 +228,10 @@ class DetectionLab:
         self.eye_panel.update(state)
         self.head_panel.update(state)
         self.tongue_panel.update(state)
-        self.head_mode.set(state["config"]["head_mode"])
-        self.head_mode_picker.configure(state="disabled" if state["calibrating"] else "readonly")
         if state["config"] != self.displayed_config:
             self.displayed_config = state["config"]
             self.settings.delete("1.0","end")
-            self.settings.insert("1.0",json.dumps(self.displayed_config,indent=2))
+            self.settings.insert("1.0",json.dumps(self.editable_settings(self.displayed_config),indent=2))
         self.status.set(state["notice"])
         frame=state["frame"] or {"faces":[]}
         timing=state["timing"]
@@ -263,7 +263,7 @@ class DetectionLab:
             eye_lines.append("")
         self.eye_details.set("\n".join(eye_lines))
         head=state["features"].get("head",{})
-        self.head_details.set(f"Mode: {state['config']['head_mode']}\nRaw: {self.fmt(head.get('value'))}\nNormalized Y: {self.fmt(signals.get('head_y',{}).get('value'))}\nQuality: {head.get('quality',0):.2f}\n{state['reasons'].get('head','Waiting for face')}\n\nComfortable range: " + (f"{state['head']['low']:.3f} → {state['head']['center']:.3f} → {state['head']['high']:.3f}" if state["head"] else "not calibrated"))
+        self.head_details.set(f"Raw pitch: {self.fmt(head.get('value'))}°\nNormalized Y: {self.fmt(signals.get('head_y',{}).get('value'))}\nQuality: {head.get('quality',0):.2f}\n{state['reasons'].get('head','Waiting for face')}\n\nLearned references: " + (f"\nUp {state['head']['low']:.1f}° = 0\nNeutral {state['head']['center']:.1f}° = .5\nDown {state['head']['high']:.1f}° = 1" if state["head"] else "not calibrated"))
         val=state["validation"]
         self.tongue_details.set(f"{'FROZEN — click tissue' if state['frozen'] else 'LIVE crop / green candidate mask'}\n{state['reasons'].get('tongue','Waiting for face')}\nRaw tip (mouth widths): {state['candidate']}\nPixels: {state['tongue_pixels']}\n" + "\n".join(f"{k}: {'PASS' if v['passed'] else 'FAIL'} ({v['detected_fraction']:.0%}, n={v['samples']})" for k,v in val.items()))
         self.metrics.set("\n".join(f"{k:16} {self.fmt(signals.get(k,{}).get('value'))}   {'valid' if signals.get(k,{}).get('valid') else 'unavailable'}" for k in ("left_eye_open","right_eye_open","head_y","tongue_x","tongue_y")))

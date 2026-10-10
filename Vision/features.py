@@ -27,7 +27,7 @@ class DetectionConfig:
     max_clipped_fraction: float = 0.5
     eye_separation: float = 0.015
     endpoint_tolerance: float = 0.05
-    head_mode: str = "position"
+    head_mode: str = "pitch"
     head_position_separation: float = 0.02
     head_pitch_separation: float = 3
     tongue_position_separation: float = 0.04

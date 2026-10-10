@@ -55,8 +55,7 @@ The requested FPS takes effect on source start; actual Hz and capture age are sh
    countdown and the next instruction. **Restart blinks & winks** keeps eye
    geometry; **Restart eye open/closed** clears geometry and its dependent wink
    models. Head/tongue fits remain. Follow [the eye testing guide](../docs/EYE_CALIBRATION_GUIDE.md).
-3. In **2 Head Y**, select **position** (vertical image translation) or **pitch**
-   (nodding), then **Start head position guide**. Follow neutral/up/down and a
+3. In **2 Head Y**, press **Start head pitch guide**. Follow neutral/up/down and a
    separate repeat for checking. The selector resets only head calibration.
 4. In **3 Tongue**, capture an EMPTY open mouth, freeze a visible tongue, click
    tongue-only tissue, and fit appearance. Then **Start tongue position guide**:
@@ -90,7 +89,7 @@ eye is required before that eye can activate. Both intentional winks can activat
 | Channel | Detector measurement | Processing result |
 | --- | --- | --- |
 | Left/right eye | Anatomical `*_eye_open` unchanged; added `eye_intent` from independent calibrated facial appearance | Per-frame wink states: 1 while held, 0 for open/blink; no dwell |
-| Head Y | Image-height fraction or pitch degrees → calibrated `[0,1]`: up 0, neutral .5, down 1 | Smoothed scroll velocity; .5 means stopped |
+| Head Y | Pitch degrees → full personal `[0,1]` range: comfortable up 0, neutral .5, down 1; no mode selector | Smoothed scroll velocity; .5 means stopped |
 | Tongue X/Y | Visible front-edge midpoint → personal movement range; center .5, X toward anatomical right, Y down | Relative pointer velocity; .5 means stopped per output axis |
 
 Gaze and head X remain unavailable in this calibrated path. Tongue absence is

@@ -197,14 +197,13 @@ The legacy per-eye `collect()` API remains for developer regression tests, not U
 
 ## 2. Vertical head calibration
 
-Choose **position** or **pitch** directly in **2 Head Y**. This selector clears only
-head calibration. Press **Start head position guide** and follow neutral/up/down,
+Head Y always measures nodding pitch; there is no mode selector. Press
+**Start head pitch guide** and follow neutral/up/down,
 then three fresh checks. Rest/preparation frames do not train. See the
 [head/tongue testing guide](../docs/MOVEMENT_CALIBRATION_GUIDE.md) for cues and views.
 
-| Mode | Raw measurement and units | What changes it |
+| Measurement | Raw measurement and units | What changes it |
 | --- | --- | --- |
-| `position` | Landmark 168 nose-bridge Y / camera image height; image-height fraction | Translating the face vertically; camera movement, distance/perspective, and nodding can also affect it |
 | `pitch` | `atan2(-R[1,2], hypot(R[0,2], R[2,2])) × 180/pi`; approximate degrees | Camera-frame pitch from MediaPipe's optional facial transform; yaw/roll can affect this proxy |
 
 For pitch, the transform's 3×3 component is normalized by SVD to remove approximately
@@ -215,7 +214,7 @@ pose proxy; it is not a camera-intrinsics-calibrated physical angle measurement.
 The guide captures **NEUTRAL**, **UP**, and **DOWN**, at comfortable, repeatable positions.
 The labels define direction even if a raw angle increases in the opposite order.
 The robust groups must be ordered, nonoverlapping, and separated by at least
-0.02 image-height fraction in position mode, or 3 degrees in pitch mode.
+3 degrees between each neighboring pitch reference.
 
 The medians map to `head_y`: up **0**, neutral **0.5**, down **1**. Linear mapping
 is applied separately on each side of neutral. A default normalized endpoint
@@ -223,6 +222,12 @@ overshoot up to 0.05 is clipped to 0/1; farther outside the range is invalid.
 Try the midpoint of each half: it should read roughly 0.25 or 0.75. Return to
 neutral several times and note drift. Keep the camera stationary and head distance
 consistent. This output is position, **not scroll velocity or acceleration**.
+Raw graphs/bars use the learned min/max in degrees once fitted; normalized views
+remain 0–1. The detail panel labels up/neutral/down angles with 0/.5/1 explicitly.
+Unequal ranges and reversed pitch signs still use the full normalized range.
+Old position-mode presets are validated, converted to pitch settings, and lose
+only their incompatible head fit. Other compatible fits remain; rerun this guide.
+Saved pitch fits and preset v5 / combined profile v3 remain compatible.
 
 ## 3. Tongue appearance detector — experimental
 
@@ -321,8 +326,7 @@ Settings JSON contains only the following tunables, not learned face calibration
 | `movement_rest_ms` | 1500 | Rest between head/tongue guide steps |
 | `tongue_position_separation` | 0.04 | Minimum adjacent tongue reference separation, mouth widths |
 | `position_check_tolerance` | 0.2 | Maximum normalized error in each fresh movement check |
-| `head_mode` | `position` | `position` or `pitch` |
-| `head_position_separation` | 0.02 | Minimum adjacent head-target image-height fraction separation |
+| `head_mode` | `pitch` | Fixed in the live lab; hidden from the settings editor. Legacy position values migrate on load |
 | `head_pitch_separation` | 3 | Minimum adjacent head-target separation, degrees |
 | `min_mouth_px` | 28 | Minimum corner-to-corner mouth width, pixels |
 | `min_mouth_opening` | 0.07 | Minimum mouth opening / width ratio |
@@ -365,8 +369,9 @@ bars/tongue planes plus a calibrated-position time graph. Select the relevant
 graph in either view; UI redraws never add samples.
 X uses actual monotonic capture time; lines between samples are display-only.
 There is no detector interpolation, fabricated new sample, or Processing filter.
-The displayed raw scope ranges are 0–0.4 for eyes, 0–1 for image head position,
-−45–45 degrees for pitch, and 0–1 for normalized values. Numeric readings/CSV retain
+The shared raw scope ranges are 0–0.5 for eyes, −45–45 degrees for uncalibrated
+pitch (learned min/max after calibration), and −.8–.8 mouth widths for tongue.
+Normalized values use 0–1. Numeric readings/CSV retain
 values outside those display limits. Invalid normalized measurements are dark
 holds for display only; they remain invalid/null in the data.
 

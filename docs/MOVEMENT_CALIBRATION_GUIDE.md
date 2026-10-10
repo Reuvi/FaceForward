@@ -24,7 +24,7 @@ The **Raw measurements** panel and bottom graphs show:
 | Raw measurement | Units and availability |
 | --- | --- |
 | Left/right eyelid gap / eye width | Dimensionless ratio; available before eye calibration |
-| Head Y | Nose-bridge image-height fraction, or pitch in degrees, selected in Head Y calibration |
+| Head Y | Nodding pitch in degrees; no mode selection |
 | Tongue front-edge midpoint X/Y | Signed mouth-width units about mouth midpoint; available after appearance training, before personal range calibration |
 | Eye facial coefficients | Choose Left/Right facial features in the raw graph selector; same-side blink, squint, cheek and brow scores, 0–1 |
 
@@ -50,23 +50,30 @@ from duplicate timestamps.
 ## Calibrate vertical head movement
 
 1. Open **Detection calibration → 2 Head Y**.
-2. Choose **position** for moving your whole head up/down in the camera image,
-   or **pitch** for nodding. The selector resets only head calibration; eye and
-   tongue fits remain. Keep the camera and your distance reasonably consistent.
-3. Press **Start head position guide**. Follow neutral → comfortable up →
+2. Keep the camera and your distance reasonably consistent. This guide always
+   measures nodding pitch; it has no position/pitch selector.
+3. Press **Start head pitch guide**. Follow neutral → comfortable up →
    comfortable down. Get into position during preparation and hold during capture.
 4. Repeat the three positions for the fresh checks. These samples verify the fit;
    they do not change the learned references. The flow takes about 25 seconds
    with default preparation, capture and rest times.
-5. Inspect the two bars: purple is the raw measurement, green is the calibrated
-   position. The orange line is the requested target during guidance. Up maps
-   to 0, neutral to .5, and down to 1, even when the raw pitch sign is reversed.
+5. Inspect the two bars: purple is pitch in degrees, scaled to your learned
+   minimum/maximum; green is normalized position over the full 0–1 range. The
+   orange line is the requested target during guidance. Your comfortable up limit
+   maps to 0, neutral to .5, and down limit to 1, even when the raw pitch sign is
+   reversed. The text below lists the actual learned angles and their outputs.
+
+The two halves are normalized independently, so unequal up/down movement ranges
+still reach both endpoints. For example, up −12°, neutral 4°, down 28° maps to
+0, .5, 1; halfway angles −4° and 16° map to .25 and .75. Raw graphs retain degree
+units and use the learned limits after calibration (before calibration: −45–45°).
+Those initial display bounds never determine the normalized output.
 
 Return to neutral repeatedly, then stop halfway toward each limit. Expect about
 .25 and .75 at those halfway positions. Test comfortable motion while blinking and
 speaking; record drift or unavailable readings. Head X is not implemented in this
-mouse MVP. Image translation and rotation are distinct measurements; this guide
-does not claim to fully disentangle them or correct camera perspective.
+mouse MVP. Image translation does not directly drive this pitch signal; pose
+estimation can still drift with perspective, yaw, roll, blur or landmark errors.
 
 ## Calibrate tongue appearance and position
 
@@ -124,6 +131,10 @@ the color-tip measurement and its personal range; the enclosing
 `face_mouse_profile_v3` is unchanged. v1-v4 detector files load compatible
 eye/wink/head fits but discard old centroid-based tongue appearance/ranges.
 Repeat both tongue appearance and position calibration for those files.
+Saved **pitch** head fits remain compatible. Old **image-position** head fits
+are removed on load, with a notice to run **Start head pitch guide**; compatible
+eye/wink/tongue data follow their usual loading rules. A missing head mode in an
+older file is treated as the old image-position default, never as degree data.
 
 Loading works while stopped or without a face, and always leaves preview stopped.
 After loading or restarting the source, use **Recheck saved tongue range**:
@@ -150,14 +161,15 @@ These are transparent MVP checks, not validated human accuracy claims.
 | `settle_ms` / `collect_ms` | 1000 / 1800 ms | Preparation and capture windows |
 | `movement_rest_ms` | 1500 ms | Rest between movement steps |
 | `min_samples` | 12 | Minimum usable distinct-timestamp samples |
-| `head_position_separation` | .02 | Minimum adjacent reference separation, image-height fraction |
 | `head_pitch_separation` | 3° | Minimum adjacent pitch separation |
 | `tongue_position_separation` | .04 | Minimum adjacent X/Y separation in mouth widths |
 | `position_check_tolerance` | .2 | Maximum normalized error in a fresh target check |
 | `endpoint_tolerance` | .05 | Small normalized overshoot clips to 0/1; larger overshoot is unavailable |
 
 Advanced detector settings remain in **Settings**; applying the whole settings
-JSON resets all fits. Use the dedicated head selector to change only head mode.
+JSON resets all fits. Head mode is fixed to pitch; starting its guide resets only
+the head range and preserves eye/tongue fits. Legacy image-position settings are
+accepted for file compatibility but cannot switch the live detector away from pitch.
 These thresholds control calibration reliability; they are not mouse sensitivity,
 dead zones, velocity or acceleration.
 

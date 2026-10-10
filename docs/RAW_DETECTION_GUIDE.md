@@ -64,7 +64,7 @@ that guarantees a matching region is tongue. Inspect its mask while testing.
 ```text
 Local camera → face landmarks (+ optional transform) → explicit subject selection
    ├─ each eye: lid ratio → independent open/closed calibration → binary measurement
-   ├─ head Y: image position or pitch → up/neutral/down fit → normalized position
+   ├─ head Y: pitch degrees → personal up/neutral/down fit → full 0–1 position
    └─ tongue: padded mouth crop → calibrated pixel segmentation → visible front-edge midpoint
                               → new absent/visible exercises → normalized X/Y
 All channels → native measurements / time scopes / local scalar CSV
@@ -83,8 +83,9 @@ calibration clear on stop, stale input, track loss, restart, or settings changes
    then open Detection calibration.
 2. In **1 Eyes**, collect open and closed for each eye; test all four combinations.
    Closed bits use 1=closed; named `*_eye_open` values use 1=open.
-3. In **2 Head Y**, capture neutral/up/down. Default means vertical face movement.
-   For nodding, select `head_mode: pitch` in Settings before calibration.
+3. In **2 Head Y**, press **Start head pitch guide** and follow neutral/up/down,
+   then repeat the fresh checks. Pitch is automatic: comfortable up = 0, neutral
+   = .5, down = 1. Old image-position head profiles need this guide again.
 4. In **3 Tongue**, capture an empty open mouth, freeze and mark tongue-only tissue,
    fit, then validate absent and visible on new frames. Inspect the green mask.
 5. Save the active profile on the source tab; reload only for an explicitly selected

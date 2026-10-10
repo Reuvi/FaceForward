@@ -131,8 +131,12 @@ are software checks, not measured human accuracy.
 
 Read Contracts/MOVEMENT_CALIBRATION.md and docs/MOVEMENT_CALIBRATION_GUIDE.md before
 changing head/tongue. Shared raw graphs use original workbench captures across tabs.
-Head and tongue guides fit personal ranges then check new captures. Tongue needs
-appearance plus a personal range; saved ranges need fresh rechecks on load/restart.
+Head and tongue guides fit personal ranges then check new captures.
+Head calibration always uses pitch: no mode selector/settings choice. Map learned
+up/neutral/down to 0/.5/1, and scale raw degree displays to learned limits. Loading
+legacy position-mode head fits clears only the incompatible head fit; compatible
+other calibration survives. Keep raw degrees separate from normalized position.
+Tongue needs appearance plus a personal range; saved ranges need fresh rechecks on load/restart.
 Read Contracts/TONGUE_TIP.md and docs/TONGUE_TIP_TESTING.md. The color detector now
 reports the visible front-edge midpoint in mouth-width units. Reject ambiguous
 tips; never substitute the region centroid. v1-v4 profiles discard old tongue

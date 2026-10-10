@@ -9,6 +9,36 @@ choice; use pitch and show learned up/neutral/down as 0/.5/1. Preserve unrelated
 fits and migrate old position presets without treating image fractions as degrees.
 Contract first: [MOVEMENT_CALIBRATION.md](../Contracts/MOVEMENT_CALIBRATION.md).
 
+Implementation handoff:
+
+- The native lab always uses transform pitch. Removed the position/pitch selector
+  and mode-switch command; mode and legacy position separation are absent from
+  editable settings. Old settings cannot re-enable image-position measurement.
+- `Start head pitch guide` learns comfortable up/neutral/down, then checks new
+  captures. The existing piecewise linear normalization maps these references to
+  0/.5/1, including unequal ranges and reversed pitch signs. Small overshoot keeps
+  the existing tolerance; large overshoot/missing transform stays unavailable.
+- Shared raw pitch graphs and the purple bar now use learned degree limits;
+  normalized graphs/green bar remain 0–1. The panel labels each learned angle
+  and its corresponding output. Raw samples and CSV units remain degrees.
+- Fully validated legacy position-mode presets (including missing mode) migrate
+  to pitch settings and discard only their incompatible head fit. Compatible
+  eyes/winks/tongue survive under existing version rules. Saved pitch fits load
+  unchanged; detector v5 and combined profile v3 are unchanged.
+- Updated [movement testing instructions](MOVEMENT_CALIBRATION_GUIDE.md). Real
+  camera accuracy/comfort still requires the user's trial; no Processing transfer
+  functions or Drivers changed.
+
+Validation: **177 unique tests passed**: 109 Vision, including the separately run
+local-model smoke, and all 68 integration tests (20 calibration, 11 movement,
+9 calibration-window checks, 28 remaining). Opt-in native checks were enabled
+for their separate runs. New checks cover asymmetric/reversed ranges and exact
+endpoints, image translation versus pitch, missing transforms, repeated guides,
+legacy/malformed preset migration, and native bar endpoints/labels with no mode
+selector. The 490-frame headless mouse demo accepted all frames, exercised all
+four outputs and released at EOF. Ruff F, whitespace and integration scope checks
+passed against `d539a78`. Contract landed first in `ed2d3b6`.
+
 ## Previous separate eye guides handoff (d539a78)
 
 Claim: Reuvi integration, `work/reuvi/integration/separate-eye-guides`, base

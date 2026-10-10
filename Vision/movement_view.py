@@ -7,6 +7,14 @@ from .eye_scope import scope_samples
 from LabUI.traces import darker, trace_runs
 
 
+def head_display_range(state):
+    """Degree units stay raw; learned limits set the display extent only."""
+    fit = state.get("head")
+    if fit:
+        return tuple(sorted((fit["low"], fit["high"])))
+    return (-45, 45) if state["config"]["head_mode"] == "pitch" else (0, 1)
+
+
 def draw_raw_scopes(canvas, state):
     """Read only the workbench capture history, shared by every detector view."""
     canvas.delete("all")
@@ -24,8 +32,7 @@ def draw_raw_scopes(canvas, state):
             if pitch
             else "Raw head Y · image-height fraction",
             (("head_raw", "Head", "#b18bff"),),
-            -45 if pitch else 0,
-            45 if pitch else 1,
+            *head_display_range(state),
         ),
         (
             "Raw tongue tip · mouth widths",
@@ -201,6 +208,8 @@ def draw_position(canvas, state, kind):
     if kind == "head":
         raw, raw_known = display_point(state, ("head_raw",))
         normalized, known = display_point(state, ("head_y",))
+        raw_low, raw_high = head_display_range(state)
+        raw_center = state["head"]["center"] if state.get("head") else (raw_low + raw_high) / 2
         for i, (title, point, valid, color) in enumerate(
             (
                 (
@@ -219,6 +228,7 @@ def draw_position(canvas, state, kind):
         ):
             x = 15 + i * w / 2
             size = w / 2 - 30
+            center = (raw_center - raw_low) / (raw_high - raw_low) if i == 0 else .5
             canvas.create_text(
                 x,
                 5,
@@ -233,16 +243,13 @@ def draw_position(canvas, state, kind):
             )
             canvas.create_line(
                 x + size / 2 - 10,
-                (h + 18) / 2,
+                50 + center * (h - 82),
                 x + size / 2 + 10,
-                (h + 18) / 2,
+                50 + center * (h - 82),
                 fill="#aab8c8",
             )
-            for fraction, label in (
-                (0, "−45°" if i == 0 and pitch else "0"),
-                (0.5, "0°" if i == 0 and pitch else ".5"),
-                (1, "45°" if i == 0 and pitch else "1"),
-            ):
+            labels = ((0, f"{raw_low:g}°"), (center, f"{raw_center:g}°"), (1, f"{raw_high:g}°")) if i == 0 and pitch else ((0, "0"), (.5, ".5"), (1, "1"))
+            for fraction, label in labels:
                 canvas.create_text(
                     x + size / 2 + 15,
                     50 + fraction * (h - 82),
@@ -252,7 +259,7 @@ def draw_position(canvas, state, kind):
                     font=("Arial", 9),
                 )
             if point:
-                value = (point[0] + 45) / 90 if i == 0 and pitch else point[0]
+                value = (point[0] - raw_low) / (raw_high - raw_low) if i == 0 else point[0]
                 y = 50 + max(0, min(1, value)) * (h - 82)
                 canvas.create_oval(
                     x + size / 2 - 7,
@@ -394,7 +401,7 @@ class MovementPanel:
         row.pack(fill="x", pady=5)
         self.start = ttk.Button(
             row,
-            text=f"Start {kind} position guide",
+            text="Start head pitch guide" if kind == "head" else "Start tongue position guide",
             command=lambda: call("start_movement_guide", kind),
         )
         self.start.pack(side="left")

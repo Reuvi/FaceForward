@@ -47,6 +47,9 @@ lane documentation here. Put requests for shared changes in `interface-requests/
 
 Read `../Contracts/MOVEMENT_CALIBRATION.md` for guided head/tongue ranges and
 shared capture diagnostics. Detector presets are v5; combined profiles remain v3.
+The lab is pitch-only for head Y, with learned up/neutral/down mapped to 0/.5/1.
+Do not reintroduce a position/pitch choice. Validated legacy position fits are
+dropped on load; compatible other fits survive. Raw degree plots use learned limits.
 Use the same workbench trace in camera setup and calibration. No UI-sampled history
 or second worker. Keep tongue raw mouth coordinates separate from personal ranges,
 require fresh saved-range rechecks, and preserve invalid observations. Read `../Contracts/TONGUE_TIP.md`: the current expanded crop reports the middle
