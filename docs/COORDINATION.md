@@ -243,7 +243,7 @@ checks passed. No live-person calibration accuracy or real driver output was tes
 - Read `docs/DETECTION_RESEARCH_GUIDE.md` for calibration/trials, exact settings, ownership and test commands. Export human data only to ignored private paths.
 - Follow-up dependencies: real-person held-out evidence, comfortable per-user control mapping and final Drivers delivery/monitor-coordinate agreement. Synthetic tests are implementation evidence only.
 
-## Eye-only neutral sample handoff — 2026-10-10
+## Eye-only neutral sample handoff — 2026-10-10 (superseded below)
 
 User requested unknown eye input default to no action while keeping dark graph holds
 and sending a sample each frame. Branch `work/reuvi/integration/eye-neutral-samples`,
@@ -262,3 +262,14 @@ release, equal timestamps, retained raw evidence and CSV startup/export. Real-mo
 blank-image initialization passed; real-person detection accuracy still needs live
 testing. Changed runtime modules/new tests pass Ruff; compilation, whitespace and
 integration scope checks pass. Head/tongue and the Drivers handoff remain unchanged.
+
+## Unknown eye input hold — 2026-10-10
+
+User superseded the numeric-open fallback: unknown eyes now retain each eye's
+previous numeric input, still flagged unknown and emitted on every fresh capture.
+Integration branch `work/reuvi/integration/eye-held-samples`, base `3024796`, owns
+the Processing eye sample/cache, App readout/lifecycle, affected tests and docs.
+No prior input starts at 0. Source, selection, profile and calibration boundaries
+clear history. Unknowns still cancel timers/release button output; held input is not
+new measurement evidence. Dark plot holds remain. Vision observations, Drivers and
+other facial components keep their existing contracts.

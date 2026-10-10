@@ -39,21 +39,24 @@ latency and invalid time. Compare geometry, added blink coefficients, then facia
 features on identical held-out events. Models are experimental and need user data;
 synthetic tests cannot establish live accuracy.
 
-## Eye-only neutral samples (user-requested update)
+## Eye samples with unknown-value hold
 
 Every fresh captured frame now has an explicit Processing `eye_sample_v1` record,
 including frames with uncalibrated/unknown eyes or no selected face. This additive
 local sample contains capture `session_id`, `sequence`, `timestamp_ms`, the requested
 `subject_id` (nullable when unselected), and independent `left`/`right` entries:
-`{"value": 0.0, "known": false}` for unknown. The value convention is normalized
+`{"value": previous_value, "known": false}` for unknown. Each eye independently
+holds its previous numeric input across consecutive unknown captures. With no prior
+input, use 0. Source/session, subject, profile and calibration changes clear history;
+ordinary unknown intervals and preview Stop do not. The value convention is normalized
 closure: **0 = open/no action, 1 = closed**, with continuous calibrated scores in the
 research recognizer and binary values in the original mouse adapter.
 
-Unknown eye input defaults numerically to open. Its `known=false` flag cancels a
-pending gesture and releases a hold immediately; fallback open must never qualify
-as intentional reopening/click-on-release or as a measured open calibration sample.
+Unknown eye input holds the preceding input value. Its `known=false` flag cancels a
+pending gesture and releases a button immediately; held input must never qualify
+as continued closure, intentional reopening/click-on-release or calibration evidence.
 Rearming still requires observed open samples. A valid opposite eye remains independent.
-Missing selected face records neutral samples and stops output; it never selects a
+Missing selected face records held samples in the existing selection context and stops output; it never selects a
 bystander. Invalid/duplicate/out-of-order/stale captures do not refresh the stream.
 
 Raw SignalFrame/feature observations, graph data and calibration/training data retain
@@ -66,6 +69,6 @@ behavior pending their own calibration decisions.
 
 Vision's feature values now include numeric `left_eye_known`/`right_eye_known`
 (0/1) from the calibrated eye classifier. The raw geometry closure score may remain
-finite while this flag is 0; Processing must then supply the numeric open fallback.
+finite while this flag is 0; Processing must then hold the preceding numeric input.
 Legacy feature fixtures without these optional flags retain finite-or-null behavior.
 The research trace preserves `*_measured_closure` separately from masked graph values.

@@ -156,12 +156,13 @@ hold to a driver command.
 
 ### Eye sampling update
 
-Processing now normalizes an unknown eye to numeric **closed=0 / open**, with a
+Processing now holds an unknown eye at its **previous numeric input**, with a
 separate `known=false` flag. The per-capture `eye_sample_v1` is defined in
-[the research handoff](RESEARCH_LAB.md#eye-only-neutral-samples-user-requested-update).
+[the research handoff](RESEARCH_LAB.md#eye-samples-with-unknown-value-hold).
 `Lab.state()["eye_sample"]` exposes the latest normalized eye input, including
-neutral samples when the selected face is absent. Source observations and dark
+held samples when the selected face is absent. Source observations and dark
 unknown graph holds are retained. The unknown flag cancels eye timers and releases
 held state; it cannot trigger a release-click or count as measured calibration data.
-Missing-person frames continue to disable control, even while their neutral eye
-samples are recorded. Head/tongue and output formats are unchanged.
+Missing-person frames continue to disable control, even while their held eye
+samples are recorded. With no history an eye starts at 0; source, selected-person,
+profile and calibration changes clear history. Head/tongue and output formats are unchanged.
