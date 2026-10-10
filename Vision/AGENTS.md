@@ -23,10 +23,12 @@ lane documentation here. Put requests for shared changes in `interface-requests/
 - Track gaze/pupils, tongue position when available, each eye's openness, and head
   horizontal/vertical bias. Mark unsupported/occluded features invalid; do not fake
   a detector. Keep detector feasibility and performance limitations visible.
-- Own detection-calibration algorithms and overlay generation. The user explicitly
-  authorized the separate detector-only `Vision.lab` UI; read `DETECTION_LAB.md`.
-  Processing still owns its diagnostics UI and profile persistence. Do not connect
-  this new workbench to Processing/Drivers until the requested later integration.
+- Own detection-calibration algorithms, overlay generation and the reusable
+  `Vision.lab` calibration view. The user now authorized embedding it in App;
+  read `DETECTION_LAB.md` and `../App/README.md`. App invokes `LabRuntime.ingest`
+  without starting another worker. Keep the standalone developer entry point.
+  Vision owns preset validation; Processing owns atomic profile persistence;
+  App owns selected-face binding. Never auto-arm on load or restore tongue checks.
 - Support synthetic/replay input so other lanes can work without owning the camera.
 - Do not select gestures for clicks, send OS input, or import Processing internals.
 - Before handoff, check no face, one/two faces, identity loss/reacquisition, missing

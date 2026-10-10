@@ -1,192 +1,196 @@
-# Native mouse MVP: Vision + Processing
+# One native lab: detection calibration + mouse processing
 
-The local Vision and Processing implementations now run together in one native
-Python application. This is a **mouse-only signal lab**: left button, right button,
-vertical scrolling, and relative pointer movement. Output moves the simulated
-desktop inside the lab. The hardware emulator is still a separate integration.
+Run **one `App` window** for the complete testing workflow. The original Processing
+lab now contains **Detection calibration** as another tab. One camera/inference
+worker supplies the calibrated measurements to both the detector view and the
+existing input/output scopes and simulated desktop. Switching tabs keeps the source,
+selected face, calibration, and Processing state.
 
-Keep the [testing companion](../docs/TESTING_GUIDE.md) open while experimenting.
-The [engineering guide](../docs/ENGINEERING_GUIDE.md) explains the complete pipeline,
-formulas, defaults, and diagnostic fields. Other agents should follow the
-[main chat coordination guide](../docs/COORDINATION.md) for task claims and handoffs.
+The standalone detector was initially isolated because the team wanted to test
+measurement before connecting Processing. That connection is now implemented.
+`Vision.lab` and `Processing.mouse` remain optional component development tools;
+you do not launch them alongside App. They reuse the same detector view/runtime
+and Processing controller. There is no browser, JavaScript, HTTP server, remote
+inference, or real OS mouse injection. The emulator connection remains pending.
 
-## Start here
+## Launch and choose a source
 
-From the repository root on `main`, with Python **3.10+** including Tk:
+From the repository root, with Python 3.10+ and Tk. For pixel/camera modes, install
+[Vision's optional dependencies and local model](../Vision/README.md#install-the-optional-camera-dependencies).
+The prepared `Vision/.venv` and model are machine-local and ignored by Git.
 
 ```bash
+# Interactive calibration using generated pixels + landmarks. No camera or ML.
+Vision/.venv/bin/python -m App --source detector-demo
+
+# The same app using your local camera and MediaPipe model.
+Vision/.venv/bin/python -m App --source camera \
+  --model Vision/.local/face_landmarker.task --camera-id 0 --fps 30
+
+# Original automatic 16-second mouse exercise. No optional packages required.
 python3 -m App
 ```
 
-No pip packages, model, browser, JavaScript, network, or camera are needed for the
-default **Vision demo (synthetic)**. It runs Vision's SignalFrame producer through
-the same callback used by camera/replay, then through the real Processing filters.
-It does not use the Processing lab's one-hot mock generator.
+| Source in the app | Purpose | Calibration/profile behavior |
+| --- | --- | --- |
+| Detector demo (synthetic pixels) | Manually test detection and Processing together | Select `subject-0`; calibrate using fake eye/tongue switches and sliders; saves synthetic profiles |
+| Camera (live calibration) | Test your actual facial measurements | Select your face; calibrate or load a camera profile; validate on your current image |
+| Vision demo (synthetic) | Automatic four-action Processing regression | Supplies prebuilt valid SignalFrames; no detector training or face profile |
+| Vision replay (NDJSON) | Inspect recorded synthetic SignalFrame sequences | Select a subject; preserves input timing; no images or calibration collection |
 
-1. The source starts automatically. Read its type and measured FPS in **Vision
-   source & raw signals**. The default subject is the explicitly named fixture
-   `mouse-demo-person`.
-2. Click **Start preview**, then **Live lab**. If input is currently off-center,
-   output waits for the next neutral period before enabling.
-3. The 16-second repeating exercise contains a short blink (ignored at default
-   dwell), a left wink, a right wink, both eyes held independently, a tongue/gaze
-   circle, and head up/down. Neutral periods separate the exercises.
-4. Compare raw detector values, delayed interpolation/dwell, and processed output
-   on the five scopes. Watch left/right press counters and simulated page scroll.
-5. Change **Transfer settings**, apply, then Start preview again. Settings are
-   described in [Processing's tuning guide](../Processing/README.md). The source's
-   FPS field takes effect on the next source start; Processing's mock input Hz
-   setting does not change an external Vision source.
-6. **Stop / Escape** disables output while leaving diagnostics running. **Stop
-   source** also stops the producer and disables output. Close the window to stop
-   both workers. To change source, stop it, select the new source, then Start source.
+Stop the current source before starting another. Only one app should own a physical
+camera. Other agents can run synthetic sources in their separate worktrees.
+The requested FPS takes effect on source start; actual Hz and capture age are shown.
 
-For manual one-hot matrices/vectors and eye switches, the original independent
-tester remains available as `python3 -m Processing.mouse`. Those controls are
-disabled when the integrated app owns input, preventing mocks from mixing with
-Vision frames. Grid highlights in external mode visualize continuous position;
-they do not quantize the values passed to Processing.
+## Calibrate, then use the original lab
 
-## What is working, and what is still missing
+1. On **Vision source & raw signals**, select your visible ID and press
+   **Use selected subject**. A dropdown choice alone is not selection. A tracker ID
+   is session-local, not biometric identity. Selection resets/disarms Processing.
+2. Open **Detection calibration**. In **1 Eyes**, capture OPEN and CLOSED for the
+   anatomical left eye, then independently for the right. Default capture gives
+   one second to pose, then collects 1.8 seconds. Wait for the status result.
+3. In **2 Head Y**, capture NEUTRAL, UP, DOWN. Default measurement is vertical
+   position of the nose bridge divided by image height. For nodding, choose
+   `head_mode: "pitch"` in detector Settings **before** selecting/calibrating; it
+   uses degrees from the facial transform. Applying detector settings clears fits.
+4. In **3 Tongue**, capture an EMPTY open mouth, freeze a visible tongue, mark
+   tongue-only tissue, and fit the appearance model. Run **Validate ABSENT** with
+   tongue hidden and **Validate VISIBLE** with it visible, using new frames. Both
+   must pass before tongue X/Y becomes valid. Inspect the mask for false candidates.
+5. On **Vision source & raw signals**, inspect valid values; or stay in calibration
+   to examine the raw ratios, thresholds, masks and detector scopes. You may test
+   one fitted channel while others remain unavailable.
+6. Open **Live lab**, return your head/tongue to neutral and open both eyes, then
+   press **Start preview**. Existing scopes show input, intermediate processing,
+   and output. Mouse movement, scroll and click counters occur inside the lab.
+7. Use **Transfer settings** for click dwell, dead zones, smoothing, sensitivity,
+   acceleration and preview speed. Apply changes and start preview again. Use
+   **Save active profile** in the source tab to save the applied settings and fits.
 
-| Mouse behavior | Signal into Processing | Integrated demo/replay | Live camera today |
-| --- | --- | --- | --- |
-| Left click | `left_eye_open` | Independent dwell/release; tested | Raw left eye ratio visible; live calibration/quality collection pending |
-| Right click | `right_eye_open` | Independent dwell/release; tested | Raw right eye ratio visible; live calibration/quality collection pending |
-| Scroll wheel | `head_y` | Dead zone, smoothing, acceleration/boost; tested | Calibrated head-position detector pending |
-| Pointer X/Y | `tongue_x/y` by default; optional `gaze_x/y` | Continuous 2D velocity processing; tested | Tongue detector absent; iris ratios visible, live gaze calibration pending |
+The preview is unmirrored: your left eye appears on the image's right. Both eye
+classifiers and both Processing timers stay independent. Holding both can activate
+both; short closures are filtered separately by each dwell threshold.
 
-**This merge does not make all four gestures detectable from a real face.** The
-Vision branch had calibration primitives and raw eye geometry but no live
-calibration collection/quality implementation, head-pose detector, or tongue
-detector. Camera mode therefore retains its invalid control signals. The lab
-displays those as unavailable instead of inventing neutral values or swapping
-gaze in for tongue. This gives us one testable application in which to add each
-detector incrementally.
+| Channel | Detector measurement | Processing result |
+| --- | --- | --- |
+| Left/right eye | Separate dimensionless lid-gap/width ratios → binary `*_eye_open` (`1=open`, `0=closed`) | Independent button states after dwell/release debounce |
+| Head Y | Image-height fraction or pitch degrees → calibrated `[0,1]`: up 0, neutral .5, down 1 | Smoothed scroll velocity; .5 means stopped |
+| Tongue X/Y | Color candidate centroid in the mouth frame; X toward anatomical right, Y down | Relative pointer velocity; .5 means stopped per output axis |
 
-The eyes never suppress one another. SignalFrame v1 uses **1 = open, 0 = closed**;
-Processing converts those into internal closed states. Its separate raw one-hot
-format uses **1 = closed**. See the clearly labeled raw table and input JSON;
-do not invert values again between modules.
+Gaze and head X remain unavailable in this calibrated path. Tongue absence is
+unavailable input, never an invented center. The raw-mock adapter's eye bits use
+`1=closed`; App's SignalFrame path has the opposite, explicitly named polarity.
+All geometry, quality gates, thresholds, settings and limitations are documented
+in [the detector runbook](../Vision/DETECTION_LAB.md). Transfer functions are in
+[Processing's guide](../Processing/README.md) and [the engineering guide](../docs/ENGINEERING_GUIDE.md).
 
-## Inspect real camera diagnostics
+### Camera-free calibration exercise
 
-Install the optional dependencies and local model following
-[Vision's setup](../Vision/README.md#install-the-optional-camera-dependencies).
-After setup, `Vision/.venv/bin/python -m App` opens the demo with camera libraries
-available for switching sources in the same window. The main checkout on Reuvi's
-machine has this ignored environment and the verified local model prepared.
-All inference is local. The camera opens only in explicit camera mode:
+In `detector-demo`, select `subject-0`. Leave Left closed unchecked for its OPEN
+capture, check it for CLOSED, then uncheck. Repeat for the right eye. For head
+captures, place the Head slider at about .5, .2, .8 for neutral/up/down respectively;
+these are generator controls, not measured image fractions. Leave Tongue visible
+unchecked for EMPTY. Check it, freeze, **Mark center patch**, fit; uncheck for
+ABSENT validation, check for VISIBLE. Keep tongue sliders near .5 initially.
 
-```bash
-Vision/.venv/bin/python -m App --source camera \
-  --model Vision/.local/face_landmarker.task --camera-id 0 --fps 30
-```
+Start preview with neutral/open input. Hold Left closed beyond the default 320 ms;
+then test Right closed and both. Move head and tongue sliders to see scrolling and
+pointer velocity in Live lab. The synthetic source bypasses neural inference;
+it proves wiring and deterministic behavior, not accuracy on real faces.
 
-Choose a detected subject in the source tab and press **Use selected subject**.
-Selection always stops/reset filters. A tracker ID is not a recognized identity;
-there is no automatic transfer to a bystander or newly detected person.
+## Saved face + mouse profiles
 
-The native preview shows Vision's mirrored overlay. Raw anatomical left/right eye
-openness, iris X/Y ratios, and image-reference width appear beside it. Three raw
-ratio scopes use the latest observation at a 10 Hz diagnostic display cadence.
-Their plot ranges are labeled; values outside the display range are clipped only
-for drawing, while the numeric readout retains the actual ratio. SignalFrame
-values/confidence/validity appear in the table. After stop/staleness the table and
-preview explicitly show last-observed status; historical traces remain inspectable.
+**Save active profile** writes a versioned local JSON file, by default under ignored
+`local-profiles/`. At least one fitted detector and a fresh selected face are
+required. A left-eye-only profile is valid; it does not calibrate the other eye.
 
-Raw eye ratios are geometry, not probabilities or normalized control signals.
-The head reference drawn on the face is a 2D image frame, not calibrated pitch/yaw.
-The demo/replay has no images or raw landmark ratios, so those panels remain empty
-there; use **Live lab** for their input-versus-output plots.
+| Saved section | Contents |
+| --- | --- |
+| `format`, `source_kind` | `face_mouse_profile_v1`; camera or synthetic |
+| `detector` | Version/algorithm, detector settings, independent eye fits, head mode and three-point fit, optional tongue color prototypes/radius/margin |
+| `processing` | Applied mouse mapping, dwell, thresholds, smoothing, response and acceleration settings |
+| `preview` | Simulated pointer and scroll speed |
 
-`--no-preview` skips overlay encoding/drawing. The UI retains only the latest
-preview in memory; no images, recordings, or personal calibration are saved.
-Camera acquisition and inference run outside Tk's main thread. EOF, capture/model
-errors, and stopping the source disable output immediately. The Processing
-watchdog continues ticking through producer stalls.
+It does **not** save pictures, raw training pixels, sample traces, tracking IDs,
+selection, validation pass flags, armed state, or driver permission. Local files
+are written atomically with private file permissions. They are not committed.
+Saving does not activate anything; it records the current applied configuration.
 
-## Replay and bounded checks
+To reuse: start the matching source → **Use selected subject** → **Load profile
+for face**. App validates the whole profile before applying it, attaches it to that
+currently selected face, restores Processing settings, and leaves preview stopped.
+Camera and synthetic profiles cannot be mixed. Check eye/head readings again;
+repeat tongue ABSENT and VISIBLE checks under current lighting. If those fail,
+recollect tongue training. Loaded color prototypes do not retain training samples.
 
-```bash
-python3 -m App --source replay --replay tests/vision/fixtures/scenario.ndjson
-python3 -m App --headless --frames 490
-```
+Stop, stale input, track loss, restart, selecting a face again, or detector settings
+changes clear the active calibration binding. The saved file remains. Select again
+and explicitly reload/recalibrate; a bystander never inherits it automatically.
+The source tab shows the file name and whether it is attached to the current face.
+After further edits, save again to preserve current values. Detector Settings
+**Save JSON** saves only detector tunables; Transfer settings export saves only
+Processing settings. Neither is a substitute for **Save active profile**.
 
-The existing six-frame Vision fixture is short and primarily exercises tracking
-loss; it is not the full mouse gesture demo. Replay honors the file's intervals,
-sequence gaps, and session changes, rebases times onto the local monotonic clock,
-and stops at EOF. Select its subject explicitly in the UI, or use `--subject ID`.
-Restart/re-arm deliberately to repeat. Long replay waits are interruptible.
+## Stop and runtime boundaries
 
-The 490-frame headless demo lasts about 16.3 seconds and reports observed left,
-right, pointer, and scroll output. It runs both real worker clocks without Tk or
-OS events. `--frames N` limits headless runs. `--config profile.json` loads
-Processing tunables; App continues to own the external source and subject.
-
-## Runtime boundaries
+**Stop / Escape** immediately disables preview but keeps measurement running.
+**Stop source** also stops capture and clears active calibration. Calibration
+captures/changes and profile loading disarm preview. Tab changes do neither.
+Close the window to shut down the source and Processing workers.
 
 ```text
-Vision demo / replay / explicit camera worker
-    ↓ SignalFrame v1 dictionaries + capture timestamps
-App.MouseSession.deliver(frame)
-    ↓ synchronous Lab.ingest(frame), no network or growing frame queue
-Processing 100 Hz worker → normalized mouse state / bounded trace history
-    ↓ latest state and new trace rows
-Native Tk main thread → raw table, plots, simulated pointer and scroll
+One App worker: camera → MediaPipe OR synthetic image generator
+    ↓ image + landmarks + original capture timestamp
+Vision.LabRuntime.ingest → DetectorWorkbench: measurements/calibration
+    ├─ latest image + raw features + trace → Detection calibration tab
+    └─ calibrated SignalFrame v1 → App → Lab.ingest
+                                         ↓ independent 100 Hz Processing clock
+                                     existing Live lab / scopes / simulated mouse
 ```
 
-- `Vision/mouse_demo.py`: deterministic continuous fixtures for all four actions.
-- `App/mouse_runtime.py`: producer lifecycle, explicit selection, common clock,
-  latest diagnostics/preview, EOF/error/stop handling.
-- `App/desktop.py`: adds source and raw-diagnostic views to `DesktopLab`.
-- `App/__main__.py`: native/headless launch and configuration.
-- `Processing/mouse/controller.py`: serialized input handoff, independent output
-  clock, immediate disconnect, settings, and a 2,000-row trace ring.
-- `Processing/mouse/signals.py`: preserves continuous v1 positions and interprets
-  its eye polarity; one-hot decoding remains a separate input adapter.
+The embedded runtime never starts its own worker or camera. The Tk thread reads
+bounded snapshots; inference stays off Tk. Preview is capped near 10 Hz; Processing
+keeps its own clock and stale-input watchdog. Locks are acquired session → lab.
+There is no growing frame queue or JSON serialization in the sample handoff.
+The standalone `Vision.lab` starts that runtime's worker only when run by itself.
+
+- `App/mouse_runtime.py`: source ownership, detector commands, selection, profile
+  binding, direct measurement handoff and stop/error/EOF behavior.
+- `Vision/lab.py`, `lab_runtime.py`, `workbench.py`: reused UI, image runtime and
+  detector algorithms. `Vision/presets.py` validates/serializes fitted parameters.
+- `Processing/mouse/profiles.py`: bounded JSON reads and atomic file writes, with
+  Processing settings validation. App calls Vision for detector validation.
+- `Processing/mouse/controller.py`: input acceptance, independent output clock,
+  immediate disconnect and bounded trace history.
 - `Processing/mouse/output.py`: provisional `mouse_preview_v0` serialization.
 
-`MouseSession` uses a session lock before the lab lock. The UI never waits for an
-inference result. There is one producer per session and one processing worker;
-starting either worker twice is rejected. Stop disables output immediately even
-if a platform camera read takes longer to return. A blocked native camera read
-cannot be forcibly interrupted; the app waits up to two seconds on close and
-never starts a second producer while the first is alive.
+A blocked native camera read cannot be forcibly interrupted. Stop disables output
+immediately; close waits up to two seconds. Starting a second producer while the
+first is still alive is rejected. `--no-preview` skips camera overlay encoding;
+scalar diagnostics remain. Images stay in memory and are not recorded.
 
-Public integration details and provisional output are recorded in
-[the MVP contract](../Contracts/MOUSE_MVP.md). There is no live Drivers import.
-Velocity remains normalized `[0,1]`, where **0.5 = stopped**; left/right button
-values are states, not repeated click events. Driver update units/transport remain
-to be agreed with the emulator teammate.
-
-## Verification and incremental work
+## Checks and remaining work
 
 ```bash
-python3 -m unittest discover -s tests/integration -v
-python3 -m unittest discover -s tests/processing -v
-python3 -m unittest discover -s tests/vision -v
+Vision/.venv/bin/python -m unittest discover -s tests/vision -v
+Vision/.venv/bin/python -m unittest discover -s tests/processing -v
+Vision/.venv/bin/python -m unittest discover -s tests/integration -v
 python3 -m unittest discover -s tests/tooling -v
 python3 -m App --headless --frames 490
 ```
 
-The integration suite runs the Vision producer and timestamp-rebasing replay into
-Processing, verifies all four outputs and short-blink rejection, tests the actual
-Vision eye classifier with fixture calibration, and checks subject loss, stale
-input, malformed frames, duplicate/equal timestamps, source EOF/error/restart,
-and interruptible stop. Camera adapter tests preserve raw ratios while keeping
-unsupported control signals invalid. Optional real-model tests use
-`VISION_MODEL_PATH` as documented by Vision. These checks do not establish live
-gesture accuracy.
+New integration tests send generated pixels through real detector calibration and
+Processing and verify all four outputs, independent eyes, disarming during capture,
+profile round trips, fresh tongue checks, bad-profile rejection, stale/lost subjects,
+and single-worker restart. CI runs these with optional image dependencies as well
+as the dependency-free core suite. Real-model blank-image smoke does not establish
+live gesture accuracy. Real-person testing, lighting/distance repeatability and
+tongue false-positive measurement are still required.
 
-Suggested next increments:
-
-1. Collect open/closed eye samples for the explicitly selected face, assess live
-   visibility/quality, bind the existing per-eye calibration, and tune dwell while
-   observing false activations in this lab.
-2. Implement calibrated head Y, verify up/down sign and neutral range, then tune
-   scroll response. Keep image-reference geometry separate from pose.
-3. Add and validate tongue detection; feed its continuous mouth-relative X/Y into
-   the existing adapter. Gaze can be evaluated separately with explicit selection.
-4. Agree the emulator's format and test `mouse/output.py` → driver with synthetic
-   input before enabling real OS pointer events.
+The original automatic demo and replay still work; see [the testing companion](../docs/TESTING_GUIDE.md)
+for their timeline and assertions. `--config` loads Processing tunables only;
+combined profile loading is deliberately through the selected-face UI. The emulator
+message format, units, transport and OS output remain the next Drivers handoff.
+See [the adopted contract](../Contracts/MOUSE_MVP.md) and
+[main chat coordination](../docs/COORDINATION.md) before changing those boundaries.

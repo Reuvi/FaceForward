@@ -8,7 +8,10 @@ events. The driver's final message format is deliberately still pending.
 
 For **Vision + Processing together**, run `python3 -m App` from the repository
 root. See [the integrated MVP runbook](../App/README.md). The standalone command
-below remains useful for manual one-hot mock tuning. App's external-source mode
+below remains useful for manual one-hot mock tuning. App now embeds detector
+calibration, and its Save active profile button stores detector fits and applied
+Processing settings together. `mouse/profiles.py` owns local atomic persistence;
+Vision validates detector fits and App handles explicit selected-face binding. App's external-source mode
 disables those mock controls and displays actual Vision input, including rejected
 frames, without changing filtering or eye polarity.
 

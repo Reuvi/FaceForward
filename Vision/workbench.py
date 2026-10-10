@@ -96,6 +96,25 @@ class DetectorWorkbench:
         self.config = config
         self.pipeline.tracker.max_gap_ms = config.stale_ms
 
+    def export_calibration(self):
+        from .presets import encode_preset
+        self._require_subject()
+        self._require_idle()
+        return encode_preset(self)
+
+    def load_calibration(self, data):
+        from .presets import decode_preset
+        self._require_subject()
+        self._require_idle()
+        config, eyes, head, tongue = decode_preset(data)
+        if not 0 <= self.clock() - self.frame["timestamp_ms"] <= config.stale_ms:
+            raise ValueError("Profile requires a fresher camera frame")
+        self._clear_calibration()
+        self._invalidate("left_eye_open", "right_eye_open", "head_y", "tongue_x", "tongue_y")
+        self.config, self.eyes, self.head, self.tongue_model = config, eyes, head, tongue
+        self.pipeline.tracker.max_gap_ms = config.stale_ms
+        self.notice = "Profile bound to selected face. Recheck eyes/head; repeat tongue ABSENT and VISIBLE checks."
+
     def _invalidate(self, *keys):
         if self.frame:
             faces = []

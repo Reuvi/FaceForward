@@ -1,9 +1,9 @@
 # Mouse MVP testing companion
 
-**Detector increment (October 10, 2026):** live calibration now has its own native
-`Vision.lab`. See [the detector runbook](../Vision/DETECTION_LAB.md) for eye, head
-and tongue measurements/tests. The combined App/Processing behavior documented
-below remains the earlier baseline; the new detectors have not been wired into it.
+**Unified lab update (October 10, 2026):** detector calibration is now a tab in
+`App`, using its single source. Calibrated eyes/head/tongue feed the existing lab.
+Start with [App's workflow and profile guide](../App/README.md); see
+[the detector runbook](../Vision/DETECTION_LAB.md) for measurements and limitations.
 
 Keep this open while testing. It covers the native application at runtime baseline
 `481fd34` from October 10, 2026. Read the
@@ -17,6 +17,7 @@ Run commands from the repository root, not from inside `App/` or `Processing/`.
 
 | Test | Command | What it opens |
 | --- | --- | --- |
+| Detector calibration + Processing | `Vision/.venv/bin/python -m App --source detector-demo` | Same window with manual generated image controls |
 | Combined Vision → Processing | `python3 -m App` | Native app with a repeating synthetic Vision source |
 | Manual matrices/vectors/eye switches | `python3 -m Processing.mouse` | Independent native Processing lab |
 | Combined app ready for camera switching on Reuvi's prepared checkout | `Vision/.venv/bin/python -m App` | Same native app with optional camera libraries available |
@@ -175,7 +176,7 @@ ignored `data/private/` rather than tracked source directories.
 The full [settings reference](ENGINEERING_GUIDE.md#6-configuration-reference)
 includes units and allowed bounds. **Calibrate current neutral** changes only
 Processing's center offsets from fresh valid input and stops preview. It does not
-implement the missing Vision calibration flow. Avoid using an extreme matrix cell
+replace the Vision calibration flow on Detection calibration. Avoid using an extreme matrix cell
 as center: centers must be between 0.05 and 0.95.
 
 For sample-rate experiments, change standalone **Input Hz** from 30 to 10, then
@@ -200,22 +201,24 @@ Vision/.venv/bin/python -m App --source camera \
    and source errors rather than assuming the requested FPS was achieved.
 2. Choose a currently detected subject and press **Use selected subject**. Merely
    displaying a dropdown option does not bind Processing to it.
-3. Observe separate raw left/right openness ratios while closing each eye, and
-   iris X/Y ratios while looking around. Note noise, occlusion, and asymmetry.
-4. Verify the control table remains unavailable in this uncalibrated path. No
-   live head or tongue values should be invented. Start preview cannot turn raw
-   ratios into valid controls.
+3. Open Detection calibration and collect both independent eyes, head targets and
+   tongue training/checks following [the runbook](../Vision/DETECTION_LAB.md).
+   Inspect raw ratios, masks, unavailable periods and both eye combinations.
+4. Verify each channel becomes valid only after its requirements pass. Open Live
+   lab and explicitly Start preview with neutral/open input. Compare raw versus
+   processed values; missing channels remain unavailable. Save active profile on
+   the source tab, then test restart → select → load → fresh tongue checks.
 5. Move out of view, then return. Check the selected subject is missing or the
    tracker creates a new ID. Select deliberately; another face must not silently
    take control. Test with at most two faces when ready.
 6. Stop the source. The view labels retained values/frame as last observed; source
    stop disables output. Add `--no-preview` to compare throughput without overlay
-   generation/drawing; it does not add missing calibration or detectors.
+   generation/drawing; it does not change calibration requirements.
 
-The mirrored preview changes display only. The head-reference axes are image
-geometry, not head pose. Bounding-box tracker IDs are not recognized people.
-This checklist evaluates diagnostics; meaningful false-click and live motion
-accuracy testing begins after the corresponding calibrated detector is wired.
+The preview is unmirrored: anatomical left appears on image right. Bounding-box
+IDs are not recognized people. Loading a profile requires explicit selection and
+never starts output. Record actual false clicks, missed gestures and unavailable
+frames; synthetic integration tests do not establish live accuracy.
 
 ## 7. Replay, automated checks, and known evidence
 
@@ -273,7 +276,7 @@ in [App/HANDOFF.md](../App/HANDOFF.md).
 | --- | --- |
 | No real desktop pointer movement | Expected: this is the simulated playground; driver connection is pending |
 | Waiting for fresh neutral input | Center valid axes; provide fresh samples; each eye needs its own open baseline |
-| Camera overlay but no clicks | Expected before live calibration/quality integration; inspect raw ratios |
+| Camera overlay but no clicks | Select your face, calibrate or load a profile, then inspect validity and arm preview |
 | All camera values unavailable | Select the subject explicitly; normalized controls still remain invalid today |
 | Received increases but accepted does not | Read latest input reason; check selected subject, capture age, and frame validity |
 | Source FPS setting seems ineffective | Restart source; camera backend may not deliver requested rate |

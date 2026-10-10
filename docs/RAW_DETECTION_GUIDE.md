@@ -1,18 +1,18 @@
 # Raw detection status and where to test it
 
-Updated October 10, 2026: use the **new detector-only Vision lab** for live
-calibration. The original combined `python -m App` camera path still exposes its
-uncalibrated baseline. Synthetic mouse behavior in App is not live detector evidence.
+Updated October 10, 2026: use **Detection calibration inside the combined App**.
+The calibrated measurements now also reach the existing Processing scopes and
+simulated mouse. Keep preview stopped to focus on detection only.
 
 ```bash
-Vision/.venv/bin/python -m Vision.lab --camera \
+Vision/.venv/bin/python -m App --source camera \
   --model Vision/.local/face_landmarker.task
 ```
 
-For a camera-free walkthrough, replace the camera arguments with `--demo`.
-For a window that starts with the camera off, omit both source flags.
-Read [the full detector runbook](../Vision/DETECTION_LAB.md) for installation,
-buttons to press, all measurements/units, every setting, testing, and implementation.
+For camera-free calibration use `--source detector-demo` instead. See the
+[unified workflow/profile guide](../App/README.md) and
+[detector measurements/runbook](../Vision/DETECTION_LAB.md). The standalone
+`Vision.lab` is an optional developer tool using the same detector components.
 
 | Required mouse input | Implemented in the detector lab | Evidence still needed |
 | --- | --- | --- |
@@ -21,10 +21,9 @@ buttons to press, all measurements/units, every setting, testing, and implementa
 | Head vertical | Calibrated up/neutral/down; default nose-bridge vertical image fraction, optional camera-frame pitch degrees | Neutral drift, comfortable repeatable range, pose and distance sensitivity |
 | Tongue X/Y | Marked positive tissue + empty-mouth negatives, color segmentation, visible mask and actual candidate centroid; separate absent/visible checks gate valid output | Real-person precision/recall, false positives on gums/lips, lighting sensitivity and usable movement range |
 
-The new workbench is **not connected to Processing or Drivers**. It displays v1
-normalized detector values locally; the later integration task will connect these
-once the team has evaluated them. Gaze and horizontal head output remain invalid
-in this lab. The older iris/gaze mathematical helpers still exist; an iris position
+App connects valid v1 measurements directly to Processing. The real Drivers
+connection remains pending. Gaze and horizontal head output remain invalid
+in this calibrated path. The older iris/gaze mathematical helpers still exist; an iris position
 proxy is not a calibrated screen gaze estimator.
 
 ## What ML and image processing run?
@@ -51,7 +50,7 @@ Local camera → face landmarks (+ optional transform) → explicit subject sele
    └─ tongue: mouth crop → calibrated pixel segmentation → candidate centroid
                               → new absent/visible exercises → normalized X/Y
 All channels → native measurements / time scopes / local scalar CSV
-No connection to mouse processing in this increment
+Same calibrated values → Processing → existing Live lab (explicit Start preview)
 ```
 
 Image gates check size, bounds, brightness, clipping, focus and plausible geometry.
@@ -62,14 +61,16 @@ calibration clear on stop, stale input, track loss, restart, or settings changes
 
 ## First real session
 
-1. Stop other camera consumers. Open the Vision lab, start Camera and select your ID.
+1. Stop other camera consumers. Open App in camera mode, use the selected ID,
+   then open Detection calibration.
 2. In **1 Eyes**, collect open and closed for each eye; test all four combinations.
    Closed bits use 1=closed; named `*_eye_open` values use 1=open.
 3. In **2 Head Y**, capture neutral/up/down. Default means vertical face movement.
    For nodding, select `head_mode: pitch` in Settings before calibration.
 4. In **3 Tongue**, capture an empty open mouth, freeze and mark tongue-only tissue,
    fit, then validate absent and visible on new frames. Inspect the green mask.
-5. Export a local trace. Record misses, false candidates and invalid frames instead
+5. Save the active profile on the source tab; reload only for an explicitly selected
+   face, recheck eyes/head and repeat tongue checks. Export a local trace. Record misses, false candidates and invalid frames instead
    of judging only whether numbers move. Follow the repeated-trial checklist in
    [the detector runbook](../Vision/DETECTION_LAB.md#tests-and-remaining-live-evidence).
 

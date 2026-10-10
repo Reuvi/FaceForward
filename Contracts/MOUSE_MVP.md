@@ -8,7 +8,7 @@ named `mouse_preview_v0` is not silently presented as that driver format.
 ## Accepted input and lifecycle
 
 - App imports Vision's `mouse_demo_records`, `replay`, `read_ndjson`,
-  `OpenCVCamera`, `MediaPipeDetector`, and `VisionPipeline`. These are the adopted
+  `OpenCVCamera`, `MediaPipeDetector`, and externally driven `LabRuntime`. These are the adopted
   native producer interfaces; construction/import does not open hardware.
 - All components use the same host's monotonic milliseconds. Capture time is
   preserved through inference/handoff. Replay rebases session time deliberately.
@@ -25,8 +25,10 @@ named `mouse_preview_v0` is not silently presented as that driver format.
   `Lab.disconnect(reason)` immediately. Timeouts independently disable output.
   Re-enabling requires explicit Start preview and fresh neutral axes; each eye
   needs its own open baseline.
-- Live Vision has no validated calibration collector, head detector, or tongue
-  detector yet. Those measurements remain invalid. Raw geometry is diagnostic.
+- Camera and detector-demo use the selected-face calibration workbench. Per-eye
+  fits, head calibration and fresh tongue checks gate their respective measurements.
+  Uncalibrated/unavailable channels remain invalid. Raw geometry is diagnostic;
+  synthetic checks do not establish real-person accuracy.
 
 Input meanings are still those in [SignalFrame v1](README.md): continuous positions,
 `*_eye_open` bits with **1 = open**, confidence, and validity. Processing's
@@ -85,3 +87,31 @@ The driver's accepted units, maximum speed, fractional deltas/scroll accumulatio
 button transitions, disconnect/watchdog behavior, and public callback/queue remain
 pending. Adapt them in `Processing/mouse/output.py` after agreement; do not change
 the detector or filtering algorithms to fit a serialization choice.
+
+## Unified calibration and profile handoff (current increment)
+
+The main chat now authorizes integrating detector calibration into App. App owns
+one capture/inference worker for camera or `detector-demo` (synthetic pixels),
+and invokes Vision's public `LabRuntime.ingest` and calibration commands. That
+runtime is externally driven in App and does not start another worker. Calibrated
+SignalFrame values pass directly to the existing `Lab.ingest` and 100 Hz processor.
+Calibration collection and changes disarm the simulated preview. Tab changes do
+not restart capture, lose calibration, or arm output. The real driver is not wired.
+
+`face_mouse_profile_v1` contains `format`, `source_kind` (`camera` or `synthetic`),
+`detector`, `processing`, and `preview`. Detector section version 1 contains an
+algorithm identifier, DetectionConfig settings, separate eye fits, a head fit,
+and optional tongue color prototypes/radius/margin. Processing is MouseConfig;
+preview contains pointer/scroll speeds. No subject/session IDs, raw pixel samples,
+images, live validation pass flags, arming state, or driver permissions are saved.
+Processing owns atomic local JSON persistence and its settings validation; Vision
+owns detector preset validation/export/import; App validates/binds both together.
+
+Load requires a fresh, explicitly selected current face and a matching source kind.
+It clears learned session state, attaches parameters to that selected track, resets
+and disarms the processor, and requires fresh tongue absent/visible validation.
+Eye/head parameters apply to subsequent samples; the operator must recheck them.
+Stop, stale input, loss, and restart detach calibration; the saved file remains
+available for deliberate reload. No automatic identity matching occurs. Files are
+suggested under ignored `local-profiles/`; old Processing-only JSON import/export
+continues to mean transfer settings, not a complete detector profile.

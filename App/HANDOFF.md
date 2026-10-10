@@ -1,5 +1,34 @@
 # Native mouse MVP integration handoff
 
+## Unified calibration/profile update — October 10, 2026
+
+- Task: connect the detector tester to the original lab in one native app.
+- Branch: `work/reuvi/integration/unified-calibration-lab`, base `b712a73`.
+- Changed App wiring/view, reusable Vision UI/runtime + preset serialization,
+  Processing profile persistence, contract, tests, CI and current documentation.
+- One App capture/inference worker drives `LabRuntime.ingest`; no second camera.
+  Valid measurements feed the same Processing controller/scopes/simulated mouse.
+- Camera-free `--source detector-demo` supplies pixels + landmarks for calibration.
+  The original automatic demo/replay and standalone component tools still work.
+- `face_mouse_profile_v1` stores detector fits, Processing config and preview speed.
+  Loading requires a fresh selected face and matching source kind; it disarms
+  preview and clears tongue validation. No pictures, raw training pixels, IDs or
+  armed state are persisted. App coordinates; lane algorithms stay independent.
+- 127 tests passed: 66 Vision (local-model blank-image smoke included), 36 Processing,
+  18 integration, 7 tooling. Dependency-free run passed with 32 optional skips.
+- Generated pixel calibration reaches independent left/right clicks, scroll and
+  pointer output. Tests cover profile round trips/malformed files, fresh tongue
+  checks, stale/selected-face loss, calibration disarming and single-worker restart.
+- The 490-frame automatic demo accepted 490/490 at about 30 Hz, observed all four
+  actions, reported no source error and ended with disabled neutral output.
+- Native combined UI inspection covers selected synthetic face, embedded calibration
+  controls and plots. No human-camera accuracy claim or real OS event test.
+- Read [the complete workflow/profile guide](README.md). Remaining work is live
+  accuracy/refinement and an agreed emulator adapter, not a second tester to launch.
+
+## Earlier integration checkpoint (historical)
+
+
 ## Behavior
 
 App combines the local Vision and Processing branches into one native Python/Tk

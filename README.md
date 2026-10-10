@@ -4,21 +4,26 @@ A hackathon prototype for controlling a computer through a consumer webcam and
 comfortable facial movements. The pipeline separates measurement, personalized
 signal processing, and device output so three teammates can develop independently.
 
-**Repository status:** native mouse MVP integrating Vision and Processing. All
-four mouse behaviors work with synthetic/replay signals in the simulated desktop.
-A separate native detector lab now adds independent live eye calibration,
-calibrated head Y, and experimental tongue appearance segmentation. Real-person
-accuracy testing and connection of these new detectors to Processing/Drivers remain
-the next steps. See [the detector runbook](Vision/DETECTION_LAB.md).
+**Repository status:** one native mouse lab with live detector calibration and
+Processing in the same window. Independent eyes, head Y and experimental tongue
+measurements feed the existing scopes and simulated mouse. Saved local profiles
+keep detector fits and mouse settings together. Live accuracy validation and the
+real Drivers connection remain pending.
 
-## Test live detection first
+## Calibrate and test in one window
 
 ```bash
-Vision/.venv/bin/python -m Vision.lab --camera --model Vision/.local/face_landmarker.task
+# Interactive fake face: calibrate, then open Live lab.
+Vision/.venv/bin/python -m App --source detector-demo
+
+# Same workflow using the camera.
+Vision/.venv/bin/python -m App --source camera --model Vision/.local/face_landmarker.task
 ```
 
-Use `--demo` instead for generated pixels/landmarks. See [setup and calibration
-instructions](Vision/DETECTION_LAB.md). This detector window sends no mouse output.
+Follow [the unified workflow and saved-profile guide](App/README.md).
+The [detector runbook](Vision/DETECTION_LAB.md) specifies measurements and thresholds.
+Optional camera dependencies/model setup are in [Vision setup](Vision/README.md).
+The standalone component tools are for developers; App requires no second program.
 
 ## Run the combined native lab
 

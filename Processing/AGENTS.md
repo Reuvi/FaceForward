@@ -22,7 +22,10 @@ and lane documentation here. Put shared-change requests in `interface-requests/`
 - Implement calibration transforms, smoothing, per-signal confidence gates, dead
   zones, sensitivity curves, button dwell/debounce, and axis-to-velocity mappings.
 - Persist local user/device profiles; keep detector parameters separate from device
-  mappings. Coordinate any shared profile format with integration before adopting it.
+  mappings. The adopted `face_mouse_profile_v1` is documented in
+  `../Contracts/MOUSE_MVP.md`: Processing owns storage/top-level validation,
+  Vision owns detector validation, App owns fresh selected-face binding and disarming.
+  Coordinate further shared profile changes with integration.
 - Buttons are states, not repeated clicks. Use elapsed milliseconds for dwell; a
   frame count must not change behavior when sampling rate changes.
 - Only process the explicitly selected subject/profile. Invalid or stale required

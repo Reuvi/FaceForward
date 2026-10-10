@@ -139,10 +139,15 @@ Changes to shared semantics also need the contract and integration guide updated
 The main chat authorized `work/reuvi/integration/vision-calibration-detectors`
 from `dcd2e74` to implement native detector calibration in `Vision/**`, its tests,
 shared docs and CI. [The detector runbook](../Vision/DETECTION_LAB.md) records the
-new independent eyes, head Y and experimental tongue segmentation. It is separate
-from Processing/Drivers. Its next acceptance step is real-person measurement and
-false-positive testing; a later, explicitly coordinated task can connect it.
-The first three rows below now refer to validation/refinement of that implementation.
+new independent eyes, head Y and experimental tongue segmentation.
+
+The main chat then authorized `work/reuvi/integration/unified-calibration-lab`
+from `b712a73`: App now embeds the same calibration view, drives it from one source
+worker and feeds valid values to Processing. Profiles combine detector fits and
+mouse settings, bind only after fresh explicit face selection and require new
+tongue checks. [App's guide](../App/README.md) is the user workflow. The driver is
+still disconnected. Human accuracy/false-positive validation remains pending.
+The first three rows below refer to validation/refinement of that implementation.
 
 ## Next increments: candidates, not active assignments
 
@@ -153,7 +158,7 @@ The first three rows below now refer to validation/refinement of that implementa
 | Tongue measurement | Vision | Actual centroid detector supplying mouth-relative X/Y, occlusion/absence invalidation, recorded accuracy limits |
 | Per-person transfer tuning | Processing | Comparable synthetic/then-live traces, saved settings, dwell and motion behavior, unchanged public signal meanings |
 | Mouse emulator adapter agreement | Drivers with integration | Exact accepted message/example, units/signs, event transitions, timing and release-all/watchdog behavior |
-| Connect first validated detector | Integration after Vision handoff | Raw → valid measurement → processed state visible in the lab, deterministic regression test plus explicit live observations |
+| Validate connected detectors | Vision + Processing in the main chat | Synthetic integration is tested; collect real-person raw → valid measurement → processed-state evidence and tune thresholds |
 | Connect emulator | Integration after driver agreement | Synthetic pipeline first; bounded real movement and stop/release checks only in explicit driver mode |
 
 Serialize overlapping Vision work or claim different files first. A candidate is

@@ -27,4 +27,6 @@ jobs:
       - name: Install local Vision runtime dependencies
         run: python3 -m pip install -r Vision/requirements.txt
       - name: Test image measurements, calibration, and worker lifecycle
-        run: python3 -m unittest discover -s tests/vision -v
+        run: |
+          python3 -m unittest discover -s tests/vision -v
+          python3 -m unittest discover -s tests/integration -v

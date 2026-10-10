@@ -1,13 +1,12 @@
 # Mouse MVP engineering guide
 
-**Detector increment (October 10, 2026):** live calibration now has its own native
-`Vision.lab`. See [the detector runbook](../Vision/DETECTION_LAB.md) for eye, head
-and tongue measurements/tests. The combined App/Processing behavior documented
-below remains the earlier baseline; the new detectors have not been wired into it.
+**Unified lab update (October 10, 2026):** detector calibration is now a tab in
+`App`, using its single source. Calibrated eyes/head/tongue feed the existing lab.
+Start with [App's workflow and profile guide](../App/README.md); see
+[the detector runbook](../Vision/DETECTION_LAB.md) for measurements and limitations.
 
-This describes the implementation integrated on October 10, 2026, at runtime
-baseline `481fd34` (integration code in `8e9eaa6`). It explains what the application
-does today. Future features are identified explicitly. Use the
+This describes the October 10, 2026 mouse implementation, including the unified
+calibration/profile increment built from `b712a73`. Future features are identified explicitly. Use the
 [testing guide](TESTING_GUIDE.md) alongside the app and the
 [coordination hub](COORDINATION.md) when assigning or handing off work.
 
@@ -24,20 +23,21 @@ personal setup wizard remain future work.
 
 | Layer | Engineered and available | Still needed |
 | --- | --- | --- |
-| Vision | Synthetic/replay sources, camera capture, local face landmarks, up to two tracked faces, anatomical eye/iris geometry, overlay, calibration primitives, SignalFrame output | Live calibration collection and validated measurement quality; calibrated head movement; actual tongue detector |
+| Vision | Synthetic/replay/camera sources, two-face tracking, raw geometry, live independent eye and head calibration, experimental tongue segmentation, explicit measurement validity | Real-person accuracy and quality-gate validation, lighting/occlusion repeatability |
 | Processing | Both input adapters, independent eye timers, interpolation, dead zones, response curves, smoothing, acceleration limits, decaying jump boost, freshness checks, configurable settings | Tuning against real users and detector noise; agreed emulator serialization |
 | Native lab | Combined source controls, explicit subject selection, raw diagnostics, five processing scopes, simulated desktop, settings import/export, trace CSV | Full user setup flow and real device feedback |
 | Drivers connection | A named provisional output object and documented integration boundary | Connection to the teammate's emulator, final units/transport, actual OS input tests |
 
-The complete four-action pipeline works with **synthetic input**. The integrated
-camera path currently emits invalid control measurements while exposing real
-landmarks and raw eye ratios. Seeing an overlay does not mean a live click or
-tongue signal is available. No actual OS mouse events are emitted by this app.
+The complete four-action pipeline passes synthetic pixel → calibration → Processing
+tests. Camera mode uses the same workbench with live image/landmark evidence;
+measurements stay invalid until fitted and quality requirements pass. Human accuracy
+has not yet been established. No actual OS mouse events are emitted by this app.
 
 ## 2. Architecture and ownership
 
 ```text
-Vision worker: demo / NDJSON replay / explicit camera + model
+Vision worker: SignalFrame demo / replay OR camera + model / synthetic pixels
+    │ pixel sources pass through LabRuntime.ingest → DetectorWorkbench first
     │ SignalFrame v1; optional raw observations + latest preview image
     ▼
 App.MouseSession.deliver(frame)
@@ -171,7 +171,10 @@ The face reference uses eye centers and a nose origin. These local frames reduce
 dependence on image translation, scale, and roll; they are not a 3D pose solution.
 The existing `tongue_ratios()` can transform a real centroid into mouth-relative
 X/Y using mouth width and opening height. It rejects an out-of-mouth centroid.
-It does not detect a tongue, and no current camera path supplies that centroid.
+It does not detect a tongue itself. The new calibrated path instead uses
+`Vision/tongue.py`: mouth crop, small LAB color-prototype model, morphology and
+candidate centroid. See the [detector runbook](../Vision/DETECTION_LAB.md) for
+actual measurements, training, gates and fresh validation requirements.
 
 [calibration.py](../Vision/calibration.py) provides in-memory fitting primitives:
 each target needs at least five finite observations. A median/MAD outlier rule
@@ -197,10 +200,19 @@ not a biometric identity; visually similar replacements need real-world testing.
 [pipeline.py](../Vision/pipeline.py) binds eye calibration to an explicit session
 and subject, and clears it on loss, ambiguity, restart, or assessor failure.
 
-The missing bridge is a live collection flow plus a validated per-eye quality
-assessor and deliberate binding. App currently constructs an unbound pipeline,
-so none of these primitives silently enable live controls. Processing's neutral
-button is a separate operation and cannot supply this bridge.
+App's camera and detector-demo now use `DetectorWorkbench` for live collection,
+quality gates and explicit binding. The legacy pipeline/calibration primitives
+remain available, but App uses the workbench's independent lid classifier and
+head/tongue fits. Processing's neutral button adjusts device mapping only.
+
+App embeds `DetectionLab` with a bridge to the same runtime. No second Vision
+worker starts; calibrated dictionaries pass to `Lab.ingest` with original capture
+time. Calibration commands/captures disarm Processing. Versioned detector fits are
+validated by `Vision/presets.py`; `Processing/mouse/profiles.py` owns bounded reads
+and private atomic writes. App binds only to the fresh selected face and resets
+Processing on load. Saved profiles omit selection/armed state, images/training
+samples and tongue validation. Repeating absent/visible checks is mandatory.
+See [the profile format and lifecycle](../App/README.md#saved-face--mouse-profiles).
 
 ## 4. Independent eye state machines
 
@@ -337,7 +349,9 @@ unknown keys are rejected, and inversion flags must be booleans. The desktop
 exports `{config, runtime}`; the core profile may also be a bare config object.
 `App --config` loads **Processing config only** and keeps App's input ownership;
 it does not load exported lab speed/source settings. UI imports can apply runtime
-settings, but a conflicting mock source is rejected in App.
+settings while preserving App's source and selected face. Use the source tab for
+face selection and combined profile loading; its source-kind check prevents mixing
+synthetic and camera profiles.
 
 **Calibrate current neutral** copies current valid pointer/scroll positions into
 Processing center settings and resets the processor. It does not fit eye

@@ -1,13 +1,13 @@
 # Vision development
 
-**New detector-only lab:** `Vision/.venv/bin/python -m Vision.lab --camera`
-provides live independent eye calibration, head Y (position or pitch), and
-experimental tongue appearance segmentation with a visible mask and validation
-exercises. Use `--demo` for generated pixels/landmarks. Read
-[DETECTION_LAB.md](DETECTION_LAB.md) for exact measurements, calibration, settings,
-test evidence, and remaining real-person accuracy work. These new detections are
-not yet connected to Processing/Drivers. The source CLI and App camera path
-described below retain their uncalibrated baseline.
+**Unified calibration and mouse lab:** run `Vision/.venv/bin/python -m App --source camera`
+with `--model Vision/.local/face_landmarker.task`, or use `--source detector-demo`
+for generated pixels/landmarks. Select the face, use **Detection calibration**, then
+inspect the same measurements in **Live lab**. [App's guide](../App/README.md)
+explains the shared stream, profile save/load and mouse workflow.
+[DETECTION_LAB.md](DETECTION_LAB.md) specifies the algorithms, units and live testing.
+The optional `Vision.lab` developer entry point reuses that calibration view but
+runs without Processing. The source CLI described below remains uncalibrated.
 
 This is the first runnable slice of [the measurement plan](vision.md): synthetic
 and NDJSON replay, explicit OpenCV camera capture, MediaPipe landmarks, conservative
@@ -15,12 +15,6 @@ two-face association, a reference overlay, and in-memory eye/gaze calibration.
 It produces SignalFrame v1 dictionaries or newline-delimited JSON. No Processing
 or Drivers imports are required. Python 3.10+ is required; tested with Python
 3.12.5 on Apple Silicon macOS.
-
-**Integration is now available:** run `python3 -m App` for Vision → Processing in
-one native lab. [App's runbook](../App/README.md) documents the synthetic four-action
-demo, replay, camera/raw-ratio view, subject selection, and remaining live detector
-work. The source camera path below remains uncalibrated. This integration does
-not add a head/tongue detector or invent valid camera controls.
 
 ## Native, local runtime
 
@@ -183,7 +177,8 @@ watchdog; the integration lifecycle is still to be agreed.
   detector's centroid. It rejects degenerate mouth geometry and out-of-mouth
   positions. Nothing currently detects or supplies that centroid.
 
-Calibration is memory-only. The pipeline clears its binding on loss, ambiguous
+The legacy pipeline binding is memory-only. App can save the new detector fits in
+a versioned local profile, then explicitly load them for a currently selected face. The pipeline clears its binding on loss, ambiguous
 reassociation, a long gap, or session change. Reacquisition requires a deliberate
 new binding. A bystander cannot inherit the missing person's binding. The
 geometric tracker is conservative but not a biometric identity verifier; a
@@ -196,9 +191,9 @@ otherwise the affected gaze axis is invalid. Default positional normalization
 rejects out-of-range values. Small endpoint clipping is available only through
 an explicit calibration tolerance.
 
-These Python types are local implementation details, not a shared profile
-schema. See [the integration proposal](interface-requests/runtime-calibration.md)
-before adopting cross-lane imports.
+The legacy types above remain local APIs. The adopted detector preset and combined
+profile format are defined in [the MVP contract](../Contracts/MOUSE_MVP.md) and
+[App's profile guide](../App/README.md#saved-face--mouse-profiles).
 
 ## Status against the plan
 
@@ -206,14 +201,15 @@ before adopting cross-lane imports.
 | --- | --- |
 | Capture/replay and timing | Implemented; mocked capture failures and replay timing tested |
 | Landmarks, association, overlay | Implemented; official model blank-image smoke check passed; live faces untested |
-| Binary eyes and calibrated gaze | Geometry, calibration, explicit binding, and synthetic tests implemented; live calibration collection/quality validation pending |
-| Calibrated head pitch/yaw | Pending canonical-model/intrinsics integration and pose/sign checks; signals invalid |
-| Tongue detection | Continuous geometry tested; no validated detector; signals invalid |
+| Independent binary eyes | Live collection and per-eye threshold/quality gates implemented; real-person accuracy pending |
+| Calibrated gaze | Legacy fitting primitives exist; current App calibration does not emit gaze |
+| Head Y | Image-position or transform-pitch calibration implemented; live range/sign/repeatability testing pending; head X invalid |
+| Tongue detection | Experimental color segmentation and validation implemented; real-person false positives/recall pending |
 | SignalFrame emitter | Complete v1 records; native App/Processing integration implemented |
 
 No camera, real face recording, or OS input was used during initial Vision verification.
 The later integration checks are recorded in [App's handoff](../App/HANDOFF.md) and
 [the shared MVP runbook](../App/README.md).
 No real-world accuracy, false-activation, pose-range, or end-to-end latency claim
-has been established. Next steps are live calibration collection and quality
-evaluation, pose estimation, and a separately validated tongue detector.
+has been established. Next steps are real-person quality/accuracy evaluation,
+per-person tuning and the emulator handoff.

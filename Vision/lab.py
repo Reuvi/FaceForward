@@ -13,13 +13,16 @@ from .lab_runtime import LabRuntime
 
 
 class DetectionLab:
-    def __init__(self, root, args):
+    def __init__(self, root, args, *, runtime=None, container=None, visible=None):
         self.root, self.args = root, args
-        self.runtime = LabRuntime()
+        self.embedded = container is not None
+        self.visible = visible
+        self.runtime = runtime if runtime is not None else LabRuntime()
         self.photos = {}
-        root.title("Vision Detection Lab — calibration only / no mouse output")
-        root.geometry("1230x910")
-        root.minsize(1100, 830)
+        if not self.embedded:
+            root.title("Vision Detection Lab — calibration only / no mouse output")
+            root.geometry("1230x910")
+            root.minsize(1100, 830)
         self.source = tk.StringVar(value="Synthetic demo" if args.demo else "Camera")
         self.subject = tk.StringVar()
         self.status = tk.StringVar(value="Start a source; then explicitly select your face.")
@@ -28,17 +31,21 @@ class DetectionLab:
         self.eye_details = tk.StringVar()
         self.head_details = tk.StringVar()
         self.tongue_details = tk.StringVar()
-        outer = ttk.Frame(root, padding=10)
+        outer = ttk.Frame(container if self.embedded else root, padding=10)
         outer.pack(fill="both", expand=True)
         bar = ttk.Frame(outer)
         bar.pack(fill="x")
-        ttk.Label(bar, text="DETECTION LAB", font=("Arial",16,"bold")).pack(side="left", padx=(0,20))
-        ttk.Combobox(bar, textvariable=self.source, values=("Camera","Synthetic demo"), state="readonly", width=17).pack(side="left")
-        ttk.Button(bar, text="Start", command=self.start).pack(side="left", padx=5)
-        ttk.Button(bar, text="Stop / clear", command=self.runtime.stop).pack(side="left")
-        self.subject_box = ttk.Combobox(bar, textvariable=self.subject, state="readonly", width=17)
-        self.subject_box.pack(side="left", padx=(20,5))
-        ttk.Button(bar, text="Select face", command=lambda:self.call("select",self.subject.get())).pack(side="left")
+        self.subject_box = None
+        if self.embedded:
+            ttk.Label(bar, text="Calibrate the selected Vision source. Then open Live lab.").pack(side="left")
+        else:
+            ttk.Label(bar, text="DETECTION LAB", font=("Arial",16,"bold")).pack(side="left", padx=(0,20))
+            ttk.Combobox(bar, textvariable=self.source, values=("Camera","Synthetic demo"), state="readonly", width=17).pack(side="left")
+            ttk.Button(bar, text="Start", command=self.start).pack(side="left", padx=5)
+            ttk.Button(bar, text="Stop / clear", command=self.runtime.stop).pack(side="left")
+            self.subject_box = ttk.Combobox(bar, textvariable=self.subject, state="readonly", width=17)
+            self.subject_box.pack(side="left", padx=(20,5))
+            ttk.Button(bar, text="Select face", command=lambda:self.call("select",self.subject.get())).pack(side="left")
         ttk.Button(bar, text="Export trace CSV", command=self.export).pack(side="right")
         ttk.Label(outer,textvariable=self.source_status).pack(anchor="w",pady=5)
         body = ttk.Frame(outer)
@@ -64,9 +71,9 @@ class DetectionLab:
             ttk.Label(self.sliders,text=label,width=17).grid(row=row,column=0,sticky="w")
             ttk.Scale(self.sliders,from_=0,to=1,variable=var,command=lambda _:self.update_demo()).grid(row=row,column=1,sticky="ew")
         self.sliders.columnconfigure(1,weight=1)
-        self.scope=tk.Canvas(left,height=220,bg="#14202c",highlightthickness=0)
+        self.scope=tk.Canvas(left,height=180 if self.embedded else 220,bg="#14202c",highlightthickness=0)
         self.scope.pack(fill="x",pady=6)
-        ttk.Label(left,textvariable=self.metrics,justify="left",wraplength=620,font=("Menlo",10)).pack(anchor="w")
+        ttk.Label(left,textvariable=self.metrics,justify="left",wraplength=620,font=("Menlo",9 if self.embedded else 10)).pack(anchor="w")
         tabs=ttk.Notebook(right); tabs.pack(fill="both",expand=True)
         eye=self.tab(tabs,"1 Eyes")
         self.text(eye,"Each eye learns its own open/closed threshold. Look forward, keep the face still, and capture each target. A countdown gives you time to pose. Both eyes can classify as closed independently.")
@@ -103,7 +110,8 @@ class DetectionLab:
         self.text(settings,"Edit tunables below. Applying clears all calibration and face selection. Saving stores these tunables only; no face profile or images. head_mode is position or pitch. Measurements and defaults are documented in Vision/DETECTION_LAB.md.")
         self.settings=tk.Text(settings,width=48,height=26,font=("Menlo",10))
         self.settings.pack(fill="both",expand=True,pady=5)
-        self.settings.insert("1.0",json.dumps(DetectionConfig().to_dict(),indent=2))
+        self.displayed_config = self.runtime.snapshot()["config"]
+        self.settings.insert("1.0",json.dumps(self.displayed_config,indent=2))
         row=ttk.Frame(settings);row.pack(fill="x")
         ttk.Button(row,text="Apply settings",command=self.apply_settings).pack(side="left")
         ttk.Button(row,text="Load JSON",command=self.load_settings).pack(side="left")
@@ -111,9 +119,10 @@ class DetectionLab:
         bottom=ttk.Frame(outer);bottom.pack(fill="x",pady=(8,0))
         ttk.Label(bottom,textvariable=self.status,wraplength=1030,justify="left").pack(side="left",fill="x",expand=True)
         ttk.Button(bottom,text="Cancel capture",command=lambda:self.call("cancel")).pack(side="right")
-        root.protocol("WM_DELETE_WINDOW",self.close)
+        if not self.embedded:
+            root.protocol("WM_DELETE_WINDOW",self.close)
         self.tick()
-        if args.demo or args.camera:
+        if not self.embedded and (args.demo or args.camera):
             root.after(150,self.start)
 
     def tab(self,tabs,title):
@@ -194,17 +203,25 @@ class DetectionLab:
         return "—" if value is None else f"{value:.3f}"
 
     def tick(self):
+        if self.visible is not None and not self.visible():
+            self.root.after(200,self.tick)
+            return
         state=self.runtime.snapshot()
+        if state["config"] != self.displayed_config:
+            self.displayed_config = state["config"]
+            self.settings.delete("1.0","end")
+            self.settings.insert("1.0",json.dumps(self.displayed_config,indent=2))
         self.status.set(state["notice"])
         frame=state["frame"] or {"faces":[]}
         subjects=[f["subject_id"] for f in frame["faces"]]
-        self.subject_box.configure(values=subjects)
-        if self.subject.get() not in subjects:
-            self.subject.set(subjects[0] if subjects else "")
+        if self.subject_box is not None:
+            self.subject_box.configure(values=subjects)
+            if self.subject.get() not in subjects:
+                self.subject.set(subjects[0] if subjects else "")
         timing=state["timing"]
         self.source_status.set(f"{state['source']}   |   selected: {state['selected'] or 'none'}   |   " +
             "   ".join(f"{k}: {v:.1f}" for k,v in timing.items()))
-        self.show_image(self.preview,"preview",state["preview"],(480,360))
+        self.show_image(self.preview,"preview",state["preview"],(320,240) if self.embedded else (480,360))
         self.show_image(self.mouth,"mouth",state["mouth"],(256,192),frozen=state["frozen"])
         signals=next((f["signals"] for f in frame["faces"] if f["subject_id"]==state["selected"]),{})
         eye_lines=[]
@@ -229,15 +246,18 @@ class DetectionLab:
     def draw_scope(self,rows,selected,generation,head_mode):
         canvas=self.scope;canvas.delete("all")
         width=max(400,canvas.winfo_width())
+        height=max(180,canvas.winfo_height())
+        band=(height-16)/3
         specs=[("Raw eye ratio: left cyan / right orange (0–0.4)",(("left_raw","#6ed7fe"),("right_raw","#ffa663")),0,.4),
                ("Raw head Y: " + ("image fraction (0–1)" if head_mode=="position" else "pitch degrees (−45–45)"),(("head_raw","#b18bff"),),0 if head_mode=="position" else -45,1 if head_mode=="position" else 45),
                ("Normalized: head purple / tongue X green / Y yellow (0–1)",(("head_y","#b18bff"),("tongue_x","#75e3a8"),("tongue_y","#f2d66f")),0,1)]
         start=rows[0]["timestamp_ms"] if rows else 0
         span=max(1,rows[-1]["timestamp_ms"]-start) if rows else 1
         for index,(label,series,low,high) in enumerate(specs):
-            top=5+index*68
+            top=5+index*band
+            bottom=top+band-10
             canvas.create_text(8,top,text=label,fill="white",anchor="nw",font=("Arial",9))
-            canvas.create_line(10,top+58,width-10,top+58,fill="#45515d")
+            canvas.create_line(10,bottom,width-10,bottom,fill="#45515d")
             for key,color in series:
                 points=[]
                 for row in rows:
@@ -245,9 +265,9 @@ class DetectionLab:
                     if value is None:
                         if len(points)>=4: canvas.create_line(*points,fill=color,width=2)
                         points=[];continue
-                    points.extend((10+(row["timestamp_ms"]-start)/span*(width-20),top+58-(max(low,min(high,value))-low)/(high-low)*35))
+                    points.extend((10+(row["timestamp_ms"]-start)/span*(width-20),bottom-(max(low,min(high,value))-low)/(high-low)*(band-33)))
                 if len(points)>=4: canvas.create_line(*points,fill=color,width=2)
-        canvas.create_text(width-8,218,text=f"{span/1000:.1f}s of capture time; connecting lines are display only",fill="#aab8c8",anchor="se",font=("Arial",9))
+        canvas.create_text(width-8,height-2,text=f"{span/1000:.1f}s of capture time; connecting lines are display only",fill="#aab8c8",anchor="se",font=("Arial",9))
 
     def close(self):
         self.runtime.close();self.root.destroy()

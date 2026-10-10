@@ -15,6 +15,10 @@ The native MVP is implemented: read `README.md` and `Contracts/MOUSE_MVP.md`.
 to `Lab.ingest`. `IntegratedDesktop` extends the existing Tk lab. Keep input,
 processing, and drawing clocks independent; no browser/JS/HTTP transport. Stop,
 EOF, and errors must call `Lab.disconnect` immediately. Preserve explicit subject
-selection and source ownership. The demo tests four mouse outputs; camera mode
-exposes raw diagnostics with invalid controls until calibration/detectors exist.
+selection and source ownership. Camera and detector-demo use Vision's externally
+driven `LabRuntime.ingest`; never start its worker inside App. Embed the same
+calibration view and preserve source/subject when changing tabs. Versioned profiles
+combine separately validated detector and Processing settings; loading requires
+fresh explicit selection, disarms preview and clears tongue validation. Collection
+also disarms preview. Preserve invalid controls until each detector is calibrated.
 Do not report synthetic success as live detector accuracy or driver completion.

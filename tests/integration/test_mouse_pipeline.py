@@ -3,6 +3,7 @@
 from copy import deepcopy
 from dataclasses import replace
 import unittest
+import importlib.util
 from unittest.mock import patch
 
 from App.mouse_runtime import MouseSession
@@ -141,6 +142,7 @@ class PipelineTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.lab.settings({"runtime": {"source": "mock"}})
 
+    @unittest.skipUnless(all(importlib.util.find_spec(n) for n in ("cv2", "numpy")), "Install Vision requirements for camera adapter")
     def test_camera_adapter_exposes_raw_ratios_without_fabricated_controls(self):
         clock = self.clock
         observation = Observation(Box(0.1, 0.1, 0.3, 0.4), (), eyes={"left": EyeRatios(0.42, -0.02, 0.24)})

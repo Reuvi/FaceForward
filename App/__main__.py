@@ -10,13 +10,13 @@ from .mouse_runtime import MouseSession
 
 def main():
     parser = argparse.ArgumentParser(description="Native Vision + Processing mouse MVP")
-    parser.add_argument("--source", choices=("demo", "replay", "camera"), default="demo")
+    parser.add_argument("--source", choices=("demo", "replay", "camera", "detector-demo"), default="demo")
     parser.add_argument("--replay", help="SignalFrame NDJSON file")
     parser.add_argument("--model", default="Vision/.local/face_landmarker.task", help="local MediaPipe model")
     parser.add_argument("--camera-id", type=int, default=0)
     parser.add_argument("--fps", type=float, default=30)
     parser.add_argument("--config", type=Path, help="Processing JSON settings")
-    parser.add_argument("--subject", help="explicit subject for replay/camera (demo selects its known fixture)")
+    parser.add_argument("--subject", help="explicit replay subject (camera calibration requires selection in the UI)")
     parser.add_argument("--no-preview", action="store_true", help="skip camera overlay drawing")
     parser.add_argument("--headless", action="store_true", help="bounded pipeline smoke check without Tk")
     parser.add_argument("--frames", type=int, default=120, help="headless source frame limit")
@@ -32,7 +32,7 @@ def main():
             session.start(options.source, path=options.replay, fps=options.fps,
                           model=options.model, camera_id=options.camera_id,
                           preview=False, count=options.frames)
-            if options.subject:
+            if options.subject and options.source == "replay":
                 session.lab.settings({"runtime": {"subject_id": options.subject}})
             session.lab.action({"action": "arm"})
             left = right = pointer = scroll = False

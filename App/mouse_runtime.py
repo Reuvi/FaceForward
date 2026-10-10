@@ -2,6 +2,7 @@
 
 from collections import deque
 from dataclasses import asdict
+from pathlib import Path
 import threading
 import time
 
@@ -20,7 +21,8 @@ class MouseSession:
 
     All state locks are acquired session → lab. Frames/diagnostics handed to this
     class must not be mutated afterwards. Preview retains one PPM image in memory.
-    Live camera measurements remain invalid without Vision calibration/quality.
+    Camera and detector-demo share one selected-face calibration workbench.
+    Uncalibrated channels remain invalid; output is the simulated mouse only.
     """
 
     def __init__(self, lab=None, *, clock=monotonic_ms):
@@ -44,13 +46,119 @@ class MouseSession:
         self.inference_ms = None
         self.generation = 0
         self.closed = False
+        self.detector_runtime = None
+        self.profile_label = "Unsaved calibration"
+        self.profile_binding = None
 
     def select_subject(self, subject_id):
         with self.lock:
             available = {face["subject_id"] for face in (self.frame or {}).get("faces", [])}
             if subject_id not in available:
                 raise ValueError("Select a subject present in the latest Vision frame")
+            if self.mode in ("camera", "detector-demo"):
+                self.ensure_detector_runtime().command("select", subject_id)
+                self.profile_binding = None
             self.lab.settings({"runtime": {"subject_id": subject_id}})
+
+    def ensure_detector_runtime(self):
+        """Lazily load optional image dependencies, with the session's single lock."""
+        with self.lock:
+            if self.detector_runtime is None:
+                from Vision.lab_runtime import LabRuntime
+                self.detector_runtime = LabRuntime(clock=self.clock, lock=self.lock)
+            return self.detector_runtime
+
+    def detector_command(self, name, *args):
+        allowed = {"collect", "cancel", "freeze_mouth", "mark_tongue", "fit_tongue", "reset_tongue", "configure"}
+        if name not in allowed:
+            raise ValueError("Unsupported calibration command")
+        with self.lock:
+            if self.mode not in ("camera", "detector-demo"):
+                raise ValueError("Choose Camera or Detector demo in Vision source first")
+            runtime = self.ensure_detector_runtime()
+            self.lab.disconnect("Calibration changed; start preview again when ready")
+            result = runtime.command(name, *args)
+            validation_only = name == "collect" and args and args[0] in ("validate_absent", "validate_visible")
+            if name not in ("freeze_mouth", "cancel") and not validation_only:
+                self.profile_label = "Modified calibration — save profile to keep it"
+                self.profile_binding = None
+            return result
+
+    def detector_state(self):
+        with self.lock:
+            runtime = self.ensure_detector_runtime()
+            state = runtime.snapshot()
+            if self.mode not in ("camera", "detector-demo"):
+                state["notice"] = "Choose Camera or Detector demo on the Vision source tab to calibrate"
+            if state["selected"] is None and self.mode in ("camera", "detector-demo"):
+                self.lab.disconnect("Select a face and calibrate or load a profile")
+            state["source"] = self.status
+            return state
+
+    def deliver_detection(self, captured, observations, *, inference_ms=0, preview=True):
+        """One captured image feeds both calibration diagnostics and Processing."""
+        with self.lock:
+            observations = list(observations)
+            runtime = self.ensure_detector_runtime()
+            core = runtime.workbench
+            previous_selected, collecting = core.selected, core.job is not None
+            previous_preview = runtime.preview
+            frame = runtime.ingest(captured, observations, inference_ms=inference_ms, preview=preview)
+            if previous_selected is not None and core.selected is None:
+                self.lab.disconnect("Selected detector track lost; select and reload or recalibrate")
+            if collecting or core.job is not None or core.selected is None:
+                self.lab.disconnect("Preview stopped for calibration; select a face and start when ready")
+            raw = {
+                face["subject_id"]: {
+                    "eyes": {name: asdict(ratios) for name, ratios in observation.eyes.items()},
+                    "head_reference": asdict(observation.head_reference) if observation.head_reference else None,
+                    "box": asdict(observation.box),
+                }
+                for face, observation in zip(frame["faces"], observations)
+            }
+            ppm = None
+            if preview and runtime.preview is not None and runtime.preview is not previous_preview:
+                import cv2
+                ok, encoded = cv2.imencode(".ppm", cv2.resize(runtime.preview, (480, 360)))
+                if ok:
+                    ppm = encoded.tobytes()
+            forwarded = dict(frame, diagnostic_only=False)
+            self.deliver(forwarded, observations=raw, preview=ppm, inference_ms=inference_ms)
+            return forwarded
+
+    def save_profile(self, path):
+        from Processing.mouse.profiles import FORMAT, write_profile
+        with self.lock:
+            if self.mode not in ("camera", "detector-demo"):
+                raise ValueError("Profiles require Camera or Detector demo calibration")
+            core = self.ensure_detector_runtime().workbench
+            self._expire_detector()
+            detector = core.export_calibration()
+            state = self.lab.state()
+            data = {"format": FORMAT, "source_kind": "camera" if self.mode == "camera" else "synthetic",
+                    "detector": detector, "processing": state["config"],
+                    "preview": {key: state["runtime"][key] for key in ("pointer_speed", "scroll_speed")}}
+            write_profile(path, data)
+            self.profile_label = Path(path).name
+            self.profile_binding = (core.session, core.selected, core.generation)
+
+    def load_profile(self, path):
+        from Processing.mouse.profiles import read_profile
+        from Vision.presets import decode_preset
+        data = read_profile(path)
+        decode_preset(data["detector"])
+        with self.lock:
+            kind = "camera" if self.mode == "camera" else "synthetic" if self.mode == "detector-demo" else None
+            if data["source_kind"] != kind:
+                raise ValueError("Profile source does not match. Camera and synthetic profiles are separate.")
+            core = self.ensure_detector_runtime().workbench
+            self._expire_detector()
+            # This checks selection, freshness and idle state before any mutation.
+            core.load_calibration(data["detector"])
+            self.lab.settings({"config": data["processing"],
+                               "runtime": dict(data["preview"], subject_id=core.selected, source="external")})
+            self.profile_label = Path(path).name
+            self.profile_binding = (core.session, core.selected, core.generation)
 
     def deliver(self, frame, *, observations=None, preview=None, inference_ms=None):
         """Synchronous public handoff, also usable with injected clocks in tests."""
@@ -76,10 +184,22 @@ class MouseSession:
             self.accepted += int(result["accepted"])
             return result
 
+    def _expire_detector(self):
+        if self.mode in ("camera", "detector-demo") and self.detector_runtime is not None:
+            core = self.detector_runtime.workbench
+            selected = core.selected
+            core.expire()
+            if selected is not None and core.selected is None:
+                self.lab.disconnect("Detector input stale; select and reload or recalibrate")
+                self.profile_binding = None
+                if core.frame is not None:
+                    self.frame = dict(core.frame, diagnostic_only=False)
+
     def state(self):
         with self.lock:
+            self._expire_detector()
             span = self.times[-1] - self.times[0] if len(self.times) > 1 else 0
-            age = self.clock() - self.received_at if self.received_at is not None else None
+            age = self.clock() - self.frame["timestamp_ms"] if self.frame is not None else None
             running = self.thread is not None and self.thread.is_alive() and not self.stop_event.is_set()
             return {"mode": self.mode, "status": self.status, "error": self.error,
                     "running": running, "generation": self.generation,
@@ -87,12 +207,20 @@ class MouseSession:
                     "preview": self.preview, "preview_id": self.preview_id,
                     "received": self.received, "accepted": self.accepted,
                     "age_ms": age, "inference_ms": self.inference_ms,
+                    "profile_label": self.profile_label,
+                    "profile_bound": self._profile_bound(),
                     "actual_hz": (len(self.times) - 1) * 1000 / span if span > 0 else 0}
+
+    def _profile_bound(self):
+        if self.detector_runtime is None:
+            return False
+        core = self.detector_runtime.workbench
+        return core.selected is not None and self.profile_binding == (core.session, core.selected, core.generation)
 
     def start(self, mode="demo", *, path=None, fps=30, camera_id=0, model=None,
               preview=True, count=None):
-        if mode not in ("demo", "replay", "camera"):
-            raise ValueError("source must be demo, replay, or camera")
+        if mode not in ("demo", "replay", "camera", "detector-demo"):
+            raise ValueError("source must be demo, replay, camera, or detector-demo")
         if mode == "replay" and not path:
             raise ValueError("Choose a SignalFrame NDJSON replay file")
         if mode == "camera" and not model:
@@ -109,6 +237,14 @@ class MouseSession:
                 raise RuntimeError("Session is closed")
             if self.thread is not None and self.thread.is_alive():
                 raise ValueError("Stop the current source and wait for it to close before restarting")
+            if mode in ("camera", "detector-demo"):
+                self.ensure_detector_runtime()
+            if self.detector_runtime is not None:
+                self.detector_runtime.workbench.disconnect("Source changed; select and calibrate or load a profile")
+                self.detector_runtime.preview = None
+                self.detector_runtime.preview_due = 0
+                self.detector_runtime.previous_timestamp = None
+            self.profile_binding = None
             self.stop_event.clear()
             self.mode, self.status, self.error = mode, "Starting " + mode, None
             self.frame, self.preview, self.observations = None, None, {}
@@ -135,6 +271,8 @@ class MouseSession:
                 self.status = "Synthetic Vision demo" if mode == "demo" else "Vision " + mode
             if mode == "camera":
                 self._camera(camera_id, model, fps, preview, count)
+            elif mode == "detector-demo":
+                self._detector_demo(fps, preview, count)
             else:
                 records = mouse_demo_records(count=count, fps=fps) if mode == "demo" else read_ndjson(path)
                 for index, frame in enumerate(replay(records, clock=self.clock, sleeper=self._wait)):
@@ -156,55 +294,56 @@ class MouseSession:
                     reason = "Vision source stopped"
                 self.status = reason
                 self.lab.disconnect(reason)
+                if self.detector_runtime is not None:
+                    self.detector_runtime.workbench.disconnect(reason)
+                    self.detector_runtime.preview = None
 
     def _camera(self, camera_id, model, fps, preview, count):
-        # Optional dependencies are imported only for explicit camera mode.
         from Vision.capture import OpenCVCamera
         from Vision.landmarks import MediaPipeDetector
-        from Vision.overlay import render_overlay
-        from Vision.pipeline import VisionPipeline
-
-        pipeline = VisionPipeline()
-        last_preview = float("-inf")
+        self.ensure_detector_runtime()
         index = 0
-        # Validate/load the model before acquiring the camera.
-        with MediaPipeDetector(model) as detector, OpenCVCamera(camera_id, fps=fps, clock=self.clock) as camera:
+        with MediaPipeDetector(model, include_pose=True) as detector, OpenCVCamera(camera_id, fps=fps, clock=self.clock) as camera:
             while not self.stop_event.is_set() and (count is None or index < count):
                 captured = camera.read()
                 started = time.perf_counter()
                 observations = detector.detect(captured)
-                frame = pipeline.process(captured, observations)
                 inference_ms = (time.perf_counter() - started) * 1000
-                raw = {
-                    face["subject_id"]: {
-                        "eyes": {name: asdict(ratios) for name, ratios in observation.eyes.items()},
-                        "head_reference": asdict(observation.head_reference) if observation.head_reference else None,
-                        "box": asdict(observation.box),
-                    }
-                    for face, observation in zip(frame["faces"], observations)
-                }
-                ppm = None
-                now = self.clock()
-                if preview and now - last_preview >= 100:
-                    import cv2
-                    image = render_overlay(captured.bgr, observations, frame,
-                                           caption="Uncalibrated camera diagnostics")
-                    image = cv2.resize(image, (480, 360))
-                    ok, encoded = cv2.imencode(".ppm", image)
-                    if ok:
-                        ppm = encoded.tobytes()
-                    last_preview = now
                 with self.lock:
                     if self.stop_event.is_set():
                         raise SourceStopped()
-                    self.deliver(frame, observations=raw, preview=ppm, inference_ms=inference_ms)
+                    self.deliver_detection(captured, observations, inference_ms=inference_ms, preview=preview)
                 index += 1
+
+    def _detector_demo(self, fps, preview, count):
+        from Vision.capture import CapturedImage
+        from Vision.demo_detection import demo_image
+        from Vision.signals import CaptureSession
+        runtime = self.ensure_detector_runtime()
+        session = CaptureSession(self.clock)
+        index = 0
+        while not self.stop_event.is_set() and (count is None or index < count):
+            started = time.perf_counter()
+            with self.lock:
+                controls = dict(runtime.demo_controls)
+            bgr, observations = demo_image(**controls)
+            captured = CapturedImage(session.stamp(), bgr)
+            with self.lock:
+                if self.stop_event.is_set():
+                    raise SourceStopped()
+                self.deliver_detection(captured, observations, preview=preview)
+            index += 1
+            self._wait(max(0, 1/fps-(time.perf_counter()-started)))
 
     def stop(self):
         with self.lock:
             self.stop_event.set()
             self.status = "Stopping Vision source" if self.thread and self.thread.is_alive() else "Vision source stopped"
             self.lab.disconnect("Vision source stopped")
+            if self.detector_runtime is not None:
+                self.detector_runtime.workbench.disconnect("Source stopped; select and reload or recalibrate")
+                self.detector_runtime.preview = None
+            self.profile_binding = None
 
     def close(self):
         if self.closed:

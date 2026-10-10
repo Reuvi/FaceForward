@@ -17,9 +17,11 @@ from .workbench import DetectorWorkbench
 
 
 class LabRuntime:
-    def __init__(self, config=None):
-        self.lock = RLock()
-        self.workbench = DetectorWorkbench(config)
+    def __init__(self, config=None, *, clock=monotonic_ms, lock=None):
+        self.clock = clock
+        self.lock = lock if lock is not None else RLock()
+        self.workbench = DetectorWorkbench(config, clock=clock)
+        self.previous_timestamp = None
         self.stop_event = Event()
         self.worker = None
         self.source = "Stopped"
@@ -49,7 +51,7 @@ class LabRuntime:
                 else:
                     detector = stack.enter_context(MediaPipeDetector(model, include_pose=True))
                     camera = stack.enter_context(OpenCVCamera(camera_id, fps=fps))
-                previous = None
+                self.previous_timestamp = None
                 while not self.stop_event.is_set():
                     started = perf_counter()
                     if demo:
@@ -66,18 +68,7 @@ class LabRuntime:
                     with self.lock:
                         if self.stop_event.is_set():
                             break
-                        processing_start = perf_counter()
-                        frame = self.workbench.process(captured, observations)
-                        self.timing = {
-                            "sample_hz": 1000 / (frame["timestamp_ms"] - previous) if previous is not None and frame["timestamp_ms"] > previous else 0,
-                            "inference_ms": inference_ms,
-                            "features_ms": (perf_counter()-processing_start)*1000,
-                            "age_ms": monotonic_ms()-frame["timestamp_ms"],
-                        }
-                        previous = frame["timestamp_ms"]
-                        if monotonic_ms() >= self.preview_due:
-                            self.preview = self._preview(captured.bgr, observations, frame)
-                            self.preview_due = monotonic_ms() + 100  # 10 Hz drawing; sampling is separate.
+                        self.ingest(captured, observations, inference_ms=inference_ms)
                     if demo:
                         self.stop_event.wait(max(0, 1/fps - (perf_counter()-started)))
         except Exception as exc:
@@ -90,6 +81,26 @@ class LabRuntime:
                 if not self.source.startswith("Error"):
                     self.source = "Stopped"
                     self.workbench.disconnect()
+
+    def ingest(self, captured, observations, *, inference_ms=0, preview=True):
+        """Externally driven path: process one capture without starting a worker."""
+        with self.lock:
+            observations = list(observations)
+            started = perf_counter()
+            frame = self.workbench.process(captured, observations)
+            timestamp = frame["timestamp_ms"]
+            previous = self.previous_timestamp
+            self.timing = {
+                "sample_hz": 1000/(timestamp-previous) if previous is not None and timestamp > previous else 0,
+                "inference_ms": inference_ms,
+                "features_ms": (perf_counter()-started)*1000,
+                "age_ms": self.clock()-timestamp,
+            }
+            self.previous_timestamp = timestamp
+            if preview and self.clock() >= self.preview_due:
+                self.preview = self._preview(captured.bgr, observations, frame)
+                self.preview_due = self.clock() + 100
+            return frame
 
     def _preview(self, bgr, observations, frame):
         image = bgr.copy()

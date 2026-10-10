@@ -1,49 +1,48 @@
 # Native detection lab: calibration, measurements, and test procedure
 
-Implemented October 10, 2026 on `work/reuvi/integration/vision-calibration-detectors`,
-from `dcd2e74`. This is the detector-only increment requested in the main chat.
-It samples live images, learns per-session calibration, and displays measurements.
-**It does not connect to Processing, move the mouse, or send driver events.**
-The existing `python -m App` camera path is still the older uncalibrated path.
+The main application now embeds this calibration view inside the original
+Processing lab. One source supplies both views; calibrate first, then use **Live
+lab** for the simulated mouse. The detector implementation originated in the
+`vision-calibration-detectors` increment; `unified-calibration-lab` connects it.
+No real driver events are sent. Real-person accuracy remains to be measured.
 
-## Open it
+## Open it in the shared app
 
-From the repository root, using the private environment described in
-[Vision setup](README.md#install-the-optional-camera-dependencies):
+From the repository root, after [Vision setup](README.md#install-the-optional-camera-dependencies):
 
 ```bash
-# Window opens with the camera OFF; choose a source and click Start.
-Vision/.venv/bin/python -m Vision.lab
-
-# Generated pixels AND generated landmarks. No camera or face ML is used.
-Vision/.venv/bin/python -m Vision.lab --demo
-
-# Explicitly start the local camera with the local MediaPipe model.
-Vision/.venv/bin/python -m Vision.lab --camera \
+Vision/.venv/bin/python -m App --source detector-demo
+Vision/.venv/bin/python -m App --source camera \
   --model Vision/.local/face_landmarker.task --camera-id 0 --fps 30
 ```
 
-Requires Python 3.10+, Tk, and `Vision/requirements.txt`. Tested on Python 3.12.5,
-Apple Silicon macOS, MediaPipe 0.10.35, OpenCV 4.13.0. Tk is provided by the Python
-installation, not pip. Use a camera-enabled terminal/Python host if macOS requests
-camera access. Stop any other app using this camera first. There is no browser,
-server, remote inference, or model download at runtime.
+Requires Python 3.10+, Tk and `Vision/requirements.txt`; tested on Python 3.12.5,
+Apple Silicon macOS, MediaPipe 0.10.35 and OpenCV 4.13.0. Tk comes with Python,
+not pip. Stop other camera consumers before camera mode. Inference stays local.
 
-1. Start the source. Face boxes receive session-local `subject-*` IDs.
-2. Choose the ID belonging to you and click **Select face**. Selection is explicit
-   even with one face; a second person is never automatically chosen.
-3. Work through **1 Eyes**, **2 Head Y**, then **3 Tongue**. The other channels can
-   remain uncalibrated while testing one channel.
-4. Watch the bottom status: prepare countdown → usable/rejected sample counts →
-   accepted/rejected calibration. Default capture is 1 second preparation, followed
-   by 1.8 seconds of samples. Hold the target through the entire collection.
-5. **Stop / clear** disables measurements and clears calibration. Settings changes,
-   selecting a face again, tracking loss, stale input, or a new source session also
-   clear it. Recalibrate deliberately after any of those events.
+1. On **Vision source & raw signals**, choose your session-local ID and press
+   **Use selected subject**; even one face must be selected deliberately.
+2. Open **Detection calibration** and work through **1 Eyes**, **2 Head Y** and
+   **3 Tongue**. Each channel can be tested while others remain uncalibrated.
+3. Watch prepare countdown → usable/rejected counts → fit result. Default capture
+   is one second preparation plus 1.8 seconds sampling; hold the entire target.
+4. Keep preview stopped while inspecting detections. To test the mapping, open
+   **Live lab**, center/open, then **Start preview**. Calibration changes disarm it.
+5. Use **Save active profile** on the source tab to save fits plus Processing settings.
+   After stop/loss/restart, select again and **Load profile for face**. Tongue needs
+   fresh absent/visible checks. See [profile semantics](../App/README.md#saved-face--mouse-profiles).
+
+For isolated Vision development only, `python -m Vision.lab --demo` or
+`python -m Vision.lab --camera --model Vision/.local/face_landmarker.task` opens the
+same view with its own source worker and no Processing. With neither flag it opens
+with camera off. Its **Select face**, **Stop / clear**, and source controls replace
+App's source tab. Its tunables export is not a full profile; use App for profiles.
+Do not launch both camera entry points together.
 
 The preview is unmirrored: **your left eye is on the image's right**. Anatomical
-labels never depend on display orientation. The demo checkboxes/sliders affect
-only the synthetic source; they cannot override camera measurements.
+labels never depend on display orientation. Fake checkboxes/sliders affect only
+the synthetic source. Selection, fitting, model/mask logic and all units below are
+shared by the embedded and standalone views.
 
 ## 1. Independent eye calibration
 
@@ -248,8 +247,9 @@ tongue candidate/area, validation flags, normalized outputs, validity and reason
 It saves no images. Raw geometry can remain visible when quality fails; inspect
 quality/valid flags before interpreting it. Historical trace rows survive Stop;
 current measurements do not. Trace export is explicit, and real traces must stay
-out of Git. Settings save/load is explicit; learned calibration and frozen images
-are session memory only. Real camera video recording/replay is not implemented.
+out of Git. Settings save/load handles tunables only. App's separate Save active
+profile persists fitted parameters; frozen images and raw training pixels remain
+in session memory. Real camera video recording/replay is not implemented.
 
 Stop clears outputs immediately. A still-stopping camera worker blocks another
 start until it exits; closing waits at most two seconds for backend cleanup.
@@ -271,8 +271,9 @@ python3 -m unittest discover -s tests/integration -v
 python3 -m unittest discover -s tests/tooling -v
 ```
 
-Verification: **66 Vision tests, 34 Processing tests, 9 integration tests, and
-7 tooling tests passed (116 total)**. The Vision count includes 21 new detector
+Detector-only checkpoint: **66 Vision tests, 34 Processing tests, 9 integration
+tests and 7 tooling tests passed (116 total)**. The unified update passes **127**
+(66 Vision, 36 Processing, 18 integration, 7 tooling), including the local model. The Vision count includes 21 new detector
 tests and the real local-model blank-frame smoke. Native UI inspection covered
 selection, independent eye capture/classification and the synthetic tongue
 freeze/mark/fit/validation workflow. No physical camera or real OS input was used.
@@ -291,7 +292,7 @@ only. It excludes neural inference, capture, tracking, frame construction, UI,
 and OS output. It cannot establish live FPS. The older `Vision.benchmark` measures
 a different geometry/pipeline path and should not be compared as an end-to-end test.
 
-Before connecting to Processing, test a real person in steady and changed lighting.
+Before treating the detectors as reliable, test a real person in steady and changed lighting.
 For each eye, repeat open/closed targets at least ten times and record errors and
 invalid frames; include ordinary blinks and both eyes closed. For head Y, record
 neutral spread and repeatability of up/down. For tongue, inspect masks during at
@@ -306,16 +307,16 @@ and latency. Automated synthetic success does not supply these human measurement
 - `tongue.py`: mouth geometry, color training, segmentation and candidate centroid.
 - `workbench.py`: subject/session-bound live collection, independent fits and validity.
 - `lab_runtime.py`: single source worker, lifecycle, preview and bounded trace export.
-- `lab.py`: native Tk calibration/inspection window.
+- `lab.py`: reusable native calibration view; embedded in App or standalone.
+- `presets.py`: versioned fitted-parameter validation/serialization; App coordinates storage.
 - `demo_detection.py`: labeled synthetic pixels/landmarks and manual fake inputs.
 - `landmarks.py`: optional MediaPipe facial transform extraction; default legacy API unchanged.
 
-No shared schema keys were renamed. The workbench uses v1 measurement conventions
-and adds `diagnostic_only: true` to its internal frame; that label is **not** an
-access-control mechanism. It has no Processing/Drivers imports or forwarding path.
-`gaze_x/y` and `head_x` remain invalid here. Future integration must explicitly
-review detector quality, selected subject, head mode, lifecycle, eye polarity,
-and the emulator adapter format. Do not wire it into the old App automatically.
+No SignalFrame keys were renamed. The workbench marks its internal diagnostics
+`diagnostic_only: true`; that label is not an access-control mechanism. App explicitly
+forwards a copy to Processing after coordinating source/subject/calibration and
+sets that diagnostic flag false. Vision has no Processing/Drivers imports.
+`gaze_x/y` and `head_x` remain invalid. The emulator format is still pending.
 
 Primary references: [MediaPipe Face Landmarker Python](https://developers.google.com/edge/mediapipe/solutions/vision/face_landmarker/python)
 for the local VIDEO task and optional transform;
