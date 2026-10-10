@@ -311,15 +311,17 @@ class WorkbenchTests(unittest.TestCase):
 class RuntimeTests(unittest.TestCase):
     def test_scope_snapshot_keeps_bounded_seeds_for_long_unknown_intervals(self):
         from unittest.mock import patch
-        from Vision.eye_scope import binary_runs
+        from Vision.eye_scope import binary_runs, scope_samples
+        from LabUI.traces import trace_runs
         runtime=LabRuntime()
         for timestamp in range(0,10001,100):
             runtime.workbench.trace.append(dict(timestamp_ms=timestamp,subject_id="one",
                 calibration_generation=1,left_closed_bit=1 if timestamp==0 else None,
-                right_closed_bit=0 if timestamp==500 else None))
+                right_closed_bit=0 if timestamp==500 else None,
+                left_squint=.6 if timestamp==1000 else None))
         with patch.object(runtime.workbench,"state",return_value={"selected":"one","generation":1}):
             rows=runtime.snapshot()["trace"]
-        self.assertEqual(len(rows),83)  # 81 visible captures + two original seed rows
+        self.assertEqual(len(rows),84)  # 81 visible captures + three original seed rows
         self.assertEqual([row["timestamp_ms"] for row in rows[:2]],[0,500])
         runs=binary_runs(rows,"left_closed_bit","one",1,250,start=2000)
         self.assertEqual(len(runs),1)
@@ -327,6 +329,12 @@ class RuntimeTests(unittest.TestCase):
         self.assertEqual(runs[0][1][0],(2000,1))
         self.assertEqual(runs[0][1][-1],(10000,1))
         self.assertIsNone(rows[-1]["left_closed_bit"])
+        features=trace_runs(scope_samples(rows,"left_squint","one",1),max_gap=250,start=2000)
+        self.assertEqual(len(features),1)
+        self.assertTrue(features[0][0])
+        self.assertEqual(features[0][1][0],(2000,.6))
+        self.assertEqual(features[0][1][-1],(10000,.6))
+        self.assertTrue(all(value==.6 for _,value in features[0][1]))
         with patch.object(runtime.workbench,"state",return_value={"selected":"one","generation":2}):
             rows=runtime.snapshot()["trace"]
         self.assertEqual(len(rows),81)

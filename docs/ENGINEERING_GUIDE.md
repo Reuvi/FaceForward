@@ -1,5 +1,9 @@
 # Mouse MVP engineering guide
 
+> Current calibrated camera eye workflow: [Eye calibration/testing guide](EYE_CALIBRATION_GUIDE.md).
+> It supersedes eye dwell controls and Detection research instructions below.
+> The historical raw/mock/replay examples retain their original timed behavior.
+
 Current single-user update: calibrated camera/demo attaches the sole face automatically,
 keeps calibration through motion/loss and same-source restart, and supports saved-file
 loading while tracking is paused. Earlier explicit-selection/loss-reset descriptions

@@ -11,6 +11,34 @@ profile compatibility, App wiring/UI, their tests and shared documentation.
 Contract: `Contracts/EYE_INTENT.md`, committed before implementation. This supersedes
 the default research/dwell workflow below; Drivers remain unchanged.
 
+Completed implementation:
+- One 21-step full-screen guide: geometry, labeled blinks/relaxed movements,
+  three training winks per side, then separate checks with two new winks per side.
+  Existing rest/capture sounds and capture-timestamp boundaries remain.
+- Eight same-eye appearance features train independent bounded logistic models.
+  Missing/overlapping evidence fails the affected eye. No duration/speed or
+  opposite-eye feature; no camera click dwell, release delay or cooldown.
+- Additive per-capture `eye_intent_v1`; raw eye polarity and driver output unchanged.
+  Unknown numeric input holds previous with known=false; output releases.
+  Actual fresh opening is required after arming/unknown before activation.
+- Removed App's research tab/session/worker work. Added wink scopes, supporting
+  feature/ratio graphs, trace fields, per-eye check counts and hidden legacy timing
+  controls. Research modules remain for developer tests/old-profile validation.
+- New profile/preset v3 stores checked wink parameters, without images or raw
+  training vectors. Old v1/v2 load other settings but require the new eye guide.
+- Current operator/engineering guide: [EYE_CALIBRATION_GUIDE.md](EYE_CALIBRATION_GUIDE.md).
+
+Validation: 223 tests across Vision (96, including local MediaPipe blank-image
+smoke), Processing (69), integration (51, including eight opt-in native Tk checks)
+and tooling (7). Relevant tests were rerun after model, graph and UI corrections.
+The original headless 490-frame mouse demo accepted all frames, observed all four
+actions and ended released. Ruff F checks, diff whitespace and integration scope
+checks pass. A synthetic two-eye classification microbenchmark measured ~4 µs per
+capture over 10,000 iterations on this machine; it excludes feature extraction,
+camera/MediaPipe and UI. This is not a camera FPS or human-accuracy claim.
+Pending: real-person blink/wink testing, representative lighting/pose robustness,
+then head/tongue calibration testing and the driver's final format.
+
 ## Current single-user lifecycle change (October 10)
 
 Reuvi requests one subject instead of simultaneous people, preservation of

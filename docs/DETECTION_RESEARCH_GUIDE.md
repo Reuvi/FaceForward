@@ -1,5 +1,9 @@
 # Detection research lab — implementation and testing guide
 
+> Historical developer reference: Detection research has been removed from the
+> active App. Blink/wink training now belongs to the unified eye guide, with
+> per-frame appearance states and no duration gate. See [EYE_CALIBRATION_GUIDE.md](EYE_CALIBRATION_GUIDE.md).
+
 This is the implemented companion to [the reliability design](DETECTION_RELIABILITY_PLAN.md).
 Open **Detection research** in the existing native App window. It shares the selected
 face, capture worker and saved profile with Detection calibration. It is not another

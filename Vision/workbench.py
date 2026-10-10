@@ -4,7 +4,8 @@ from collections import deque
 from dataclasses import asdict, dataclass, field, replace
 from .calibration import AxisCalibration, EyeCalibration
 from .features import DetectionConfig, analyze_features
-from .guided_eyes import GuidedEyes
+from .wink_guide import EyeCalibrationFlow
+from .wink_model import NAMES, measure as measure_winks, score as wink_score, classify as classify_wink
 from .pipeline import VisionPipeline
 from .signals import SINGLE_SUBJECT, invalid, make_face, measurement, monotonic_ms
 from .tongue import TongueModel, TongueResult, mouth_crop, sample_colors
@@ -42,6 +43,9 @@ class DetectorWorkbench:
         self.eye_guide = None
         self.samples = {}
         self.eyes = {}
+        self.winks = {}
+        self.wink_vectors = {}
+        self.wink_readings = {}
         self.head = None
         self.positives, self.negatives = [], []
         self.tongue_model = None
@@ -54,6 +58,8 @@ class DetectorWorkbench:
     def _clear_calibration(self):
         self.samples.clear()
         self.eyes.clear()
+        self.winks.clear()
+        self.wink_readings.clear()
         self.head = None
         self.job = None
         self.eye_guide = None
@@ -73,10 +79,15 @@ class DetectorWorkbench:
         self.selected = None
         self.observations = {}
         self.features = {}
+        self.wink_vectors = {}
+        self.wink_readings = {}
         self.reasons = {}
         self.notice = reason
         if self.frame is not None:
             self.frame = dict(self.frame, faces=[make_face(f["subject_id"]) for f in self.frame["faces"]])
+            if "eye_intent" in self.frame:
+                self.frame["eye_intent"]=dict(self.frame["eye_intent"],
+                    left=dict(value=None,known=False,state="unknown"),right=dict(value=None,known=False,state="unknown"))
 
     def reset_calibration(self):
         self._clear_calibration()
@@ -113,18 +124,28 @@ class DetectorWorkbench:
         return encode_preset(self)
 
     def load_calibration(self, data):
-        from .presets import decode_preset
+        from .presets import decode_preset, decode_winks
         self._require_idle()
         config, eyes, head, tongue = decode_preset(data)
+        winks = decode_winks(data)
         self.expire()
         self._clear_calibration()
         self._invalidate("left_eye_open", "right_eye_open", "head_y", "tongue_x", "tongue_y")
         self.config, self.eyes, self.head, self.tongue_model = config, eyes, head, tongue
+        self.winks = winks
         self.pipeline.tracker.max_gap_ms = config.stale_ms
-        self.notice = "Profile loaded for single user. Recheck eyes/head; repeat tongue ABSENT and VISIBLE checks."
+        self.notice = ("Profile loaded. Recheck wink scopes; repeat tongue ABSENT and VISIBLE checks."
+                       if winks else "Profile loaded. Run eye calibration to learn blinks versus winks; legacy eye closure cannot click.")
 
     def _invalidate(self, *keys):
         if self.frame:
+            if "eye_intent" in self.frame:
+                intent=dict(self.frame["eye_intent"])
+                for side in ("left","right"):
+                    if side+"_eye_open" in keys:
+                        intent[side]=dict(value=None,known=False,state="unknown")
+                        self.wink_readings.pop(side,None)
+                self.frame=dict(self.frame,eye_intent=intent)
             faces = []
             for face in self.frame["faces"]:
                 values = dict(face["signals"])
@@ -141,6 +162,7 @@ class DetectorWorkbench:
         if target.startswith("validate_") and self.tongue_model is None:
             raise ValueError("Fit the tongue appearance model first")
         if target.startswith(("left_", "right_")):
+            self.winks.pop(target.split("_")[0], None)
             self.eyes.pop(target.split("_")[0], None)
             self._invalidate(target.split("_")[0] + "_eye_open")
         if target.startswith("head_"):
@@ -175,12 +197,13 @@ class DetectorWorkbench:
                 raise ValueError("Rest between steps must be 0–30 seconds") from exc
             self.config = replace(self.config, eye_rest_ms=rest_ms)
         self.eyes.clear()
+        self.winks.clear()
         for target in list(self.samples):
             if target.startswith(("left_", "right_")):
                 del self.samples[target]
         self._invalidate("left_eye_open", "right_eye_open")
         self.generation += 1
-        self.eye_guide = GuidedEyes(self.config)
+        self.eye_guide = EyeCalibrationFlow(self.config)
         self.notice = "Guided eyes: follow the dot with eyes comfortably open"
 
     def present_eye_step(self, index, phase=None):
@@ -342,12 +365,15 @@ class DetectorWorkbench:
             self.selected = SINGLE_SUBJECT
             self.observations = current_observations
         self.features = {}
+        self.wink_vectors = {}
+        self.wink_readings = {}
         self.crop = None
         self.tongue = TongueResult()
         self.reasons = {}
         if self.selected:
             observation = self.observations[self.selected]
             self.features = analyze_features(captured.bgr, observation, self.config)
+            self.wink_vectors = measure_winks(observation,self.features)
             self.crop, mouth_reason = mouth_crop(captured.bgr, observation, self.config)
             if self.crop is not None and self.features["face"].quality > 0 and self.tongue_model is not None:
                 self.tongue = self.tongue_model.detect(self.crop, self.config)
@@ -357,9 +383,10 @@ class DetectorWorkbench:
                 self.tongue.reason = self.features["face"].reason
             self._collect_frame(frame["timestamp_ms"])
             if self.eye_guide and self.eye_guide.active:
-                self.eye_guide.feed(frame["timestamp_ms"], self.features)
+                self.eye_guide.feed(frame["timestamp_ms"], self.features, self.wink_vectors)
+                self.eyes = dict(self.eye_guide.fits)
                 if not self.eye_guide.active:
-                    self.eyes = dict(self.eye_guide.fits)
+                    self.winks = dict(self.eye_guide.models)
                     self.notice = self.eye_guide.report
             values = {}
             for side in ("left", "right"):
@@ -396,6 +423,20 @@ class DetectorWorkbench:
             frame["faces"] = [make_face(face["subject_id"], values if face["subject_id"] == self.selected else {})
                               for face in frame["faces"]]
         frame["diagnostic_only"] = True
+        intent = dict(format="eye_intent_v1",subject_id=SINGLE_SUBJECT,
+                      **{key:frame[key] for key in ("session_id","sequence","timestamp_ms")})
+        signals = frame["faces"][0]["signals"] if frame["faces"] else {}
+        for side in ("left","right"):
+            raw = signals.get(side+"_eye_open",{})
+            model, vector = self.winks.get(side), self.wink_vectors.get(side)
+            score = wink_score(model,vector) if model else None
+            opened = raw.get("valid") and raw.get("value")==1
+            bit = 0 if opened else classify_wink(model,vector) if model else None
+            intent[side] = dict(value=bit,known=bit is not None,
+                                state="open" if opened else "wink" if bit==1 else "blink" if bit==0 else "unknown")
+            self.wink_readings[side] = dict(intent[side],score=score,features=vector,
+                                           calibrated=model is not None)
+        frame["eye_intent"] = intent
         self.frame = frame
         self._record()
         return frame
@@ -424,6 +465,11 @@ class DetectorWorkbench:
             row[key + "_valid"] = item.get("valid", False)
             row[key + "_confidence"] = item.get("confidence", 0)
         for side in ("left", "right"):
+            reading = self.wink_readings.get(side,{})
+            row[side+"_wink_bit"] = reading.get("value")
+            row[side+"_wink_score"] = reading.get("score")
+            for index,key in enumerate(NAMES):
+                row[side+"_"+key] = reading["features"][index] if reading.get("features") else None
             calibration = self.eyes.get(side)
             row[side + "_closed_limit_raw"] = calibration.closed_limit if calibration else None
             row[side + "_open_limit_raw"] = calibration.open_limit if calibration else None
@@ -439,6 +485,8 @@ class DetectorWorkbench:
         self.expire()
         return {"frame": self.frame, "selected": self.selected, "notice": self.notice,
                 "scope_subject": SINGLE_SUBJECT,
+                "wink_readings": dict(self.wink_readings),
+                "wink_models": {side:model["report"] for side,model in self.winks.items()},
                 "features": {k: asdict(v) for k, v in self.features.items()}, "reasons": dict(self.reasons),
                 "eyes": {k: asdict(v) for k, v in self.eyes.items()}, "head": asdict(self.head) if self.head else None,
                 "samples": {k: len(v) for k, v in self.samples.items()},

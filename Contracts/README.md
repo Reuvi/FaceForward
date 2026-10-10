@@ -83,7 +83,8 @@ See [`examples/control-frame.json`](examples/control-frame.json).
 | `buttons` | Full state for `left_click`, `right_click`, `delete`, `insert`, `speech_to_text` |
 | `axes` | Full state for `pointer_x`, `pointer_y`, `scroll_y` |
 
-Processing emits button values `0` or `1` after dwell/debounce. The driver's manual
+Processing emits button values `0` or `1`. Calibrated camera wink samples follow
+[EYE_INTENT.md](EYE_INTENT.md) without dwell/debounce; legacy raw/replay retain timers. The driver's manual
 test input also accepts intermediate values; its initial down threshold is `>= 0.5`.
 Keep that adapter threshold separate from per-person gesture thresholds.
 
@@ -124,4 +125,6 @@ invalid, disable all output. Never reuse a last active sample indefinitely.
 Future gamepad controls should extend/version the contract deliberately. Do not
 reuse pointer-axis keys with different meanings in another lane.
 
-The additive [local detection research interface](RESEARCH_LAB.md) defines selected-face scalar features, experimental ordered preview events and profile v2. It preserves the original SignalFrame and mouse-preview contracts.
+The current [eye intent interface](EYE_INTENT.md) defines sampled wink states and
+profile v3. The older [research contract](RESEARCH_LAB.md) is retained for legacy
+utilities/profile v2; its UI/runtime is no longer part of App.

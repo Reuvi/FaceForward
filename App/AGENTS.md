@@ -23,7 +23,13 @@ driven `LabRuntime.ingest`; never start its worker inside App. Embed the same
 calibration view and preserve source/subject when changing tabs. Versioned profiles
 combine separately validated detector and Processing settings; loading works while
 stopped/without a face, disarms preview and clears tongue
-validation. Same-source restart preserves learned detector/research fits; switching
+validation. Same-source restart preserves learned detector/wink fits; switching
 source kind or explicit Reset all calibration clears them. Never auto-arm on return.
 Collection also disarms preview. Preserve invalid controls until each detector is calibrated.
 Do not report synthetic success as live detector accuracy or driver completion.
+
+The active App has one preview and no Detection research tab/session. Embed the
+complete blink/wink guide in Detection calibration. Read `../Contracts/EYE_INTENT.md`.
+Hide legacy eye timer controls in App; legacy component/replay formats retain them.
+Save profile v3 without research; accept validated v1/v2 files without reviving their
+research runtime. Never restore old event models as frame classifiers.

@@ -7,7 +7,6 @@ import threading
 import time
 
 from Processing.mouse.controller import Lab
-from .research_runtime import ResearchSession
 from Vision.mouse_demo import SUBJECT, mouse_demo_records
 from Vision.signals import SINGLE_SUBJECT, monotonic_ms, validate_frame
 from Vision.sources import read_ndjson, replay
@@ -50,7 +49,6 @@ class MouseSession:
         self.detector_runtime = None
         self.profile_label = "Unsaved calibration"
         self.profile_binding = None
-        self.research = ResearchSession(clock)
 
     def select_subject(self, subject_id):
         with self.lock:
@@ -61,7 +59,6 @@ class MouseSession:
                 self.ensure_detector_runtime().command("select", subject_id)
                 return  # Already attached automatically; preserve the user's fits.
             self.lab.settings({"runtime": {"subject_id": subject_id}})
-            self.research.reset_person()
 
     def ensure_detector_runtime(self):
         """Lazily load optional image dependencies, with the session's single lock."""
@@ -82,9 +79,6 @@ class MouseSession:
             self.lab.disconnect("Calibration changed; start preview again when ready",
                                 clear_eye_history=name in ("start_eye_guide", "configure", "collect", "fit_tongue", "reset_tongue", "reset_calibration"))
             result = runtime.command(name, *args)
-            self.research.stop("Detector calibration changed")
-            if name in ("start_eye_guide", "configure", "reset_calibration"):
-                self.research.reset_person()
             validation_only = name == "collect" and args and args[0] in ("validate_absent", "validate_visible")
             if name not in ("freeze_mouth", "cancel", "present_eye_step") and not validation_only:
                 self.profile_label = "Modified calibration — save profile to keep it"
@@ -116,17 +110,14 @@ class MouseSession:
                 frame = runtime.ingest(captured, observations, inference_ms=inference_ms, preview=preview)
             except Exception:
                 self.lab.disconnect("Invalid detector capture; calibration retained")
-                self.research.stop("Invalid detector capture")
                 raise
             with self.lab.lock:
                 if self.lab.runtime["subject_id"] != SINGLE_SUBJECT:
                     self.lab.settings({"runtime": {"subject_id": SINGLE_SUBJECT}})
             if previous_session is not None and previous_session != core.session:
                 self.lab.disconnect("Camera restarted; calibration retained")
-                self.research.restart_source()
             elif previous_timestamp is not None and frame["timestamp_ms"] - previous_timestamp > core.config.stale_ms:
                 self.lab.disconnect("Capture gap; calibration retained")
-                self.research.stop("Capture gap")
             if collecting or core.calibrating or core.selected is None:
                 self.lab.disconnect("Preview paused: calibrating or face unavailable; calibration retained")
             raw = {
@@ -145,16 +136,10 @@ class MouseSession:
                     ppm = encoded.tobytes()
             forwarded = dict(frame, diagnostic_only=False)
             self.deliver(forwarded, observations=raw, preview=ppm, inference_ms=inference_ms)
-            from Vision.research_features import feature_frame
-            with self.lab.lock:
-                snapshot = self.lab.snapshot
-            self.research.source_kind = self.mode
-            self.research.observe(forwarded,feature_frame(core),snapshot,
-                                  core.eye_guide.state(self.clock()) if core.eye_guide else None,core.calibrating)
             return forwarded
 
     def save_profile(self, path):
-        from Processing.mouse.profiles import FORMAT_V2, write_profile
+        from Processing.mouse.profiles import FORMAT_V3, write_profile
         with self.lock:
             if self.mode not in ("camera", "detector-demo"):
                 raise ValueError("Profiles require Camera or Detector demo calibration")
@@ -162,10 +147,9 @@ class MouseSession:
             self._expire_detector()
             detector = core.export_calibration()
             state = self.lab.state()
-            data = {"format": FORMAT_V2, "source_kind": "camera" if self.mode == "camera" else "synthetic",
+            data = {"format": FORMAT_V3, "source_kind": "camera" if self.mode == "camera" else "synthetic",
                     "detector": detector, "processing": state["config"],
-                    "preview": {key: state["runtime"][key] for key in ("pointer_speed", "scroll_speed")},
-                    "research": self.research.profile()}
+                    "preview": {key: state["runtime"][key] for key in ("pointer_speed", "scroll_speed")}}
             write_profile(path, data)
             self.profile_label = Path(path).name
             self.profile_binding = (self.mode, core.generation)
@@ -188,8 +172,6 @@ class MouseSession:
             core.load_calibration(data["detector"])
             self.lab.settings({"config": data["processing"],
                                "runtime": dict(data["preview"], subject_id=SINGLE_SUBJECT, source="external")})
-            if "research" in data:self.research.load_profile(data["research"])
-            else:self.research.reset_person()
             self.profile_label = Path(path).name
             self.profile_binding = (self.mode, core.generation)
 
@@ -224,7 +206,6 @@ class MouseSession:
             core.expire()
             if selected is not None and core.selected is None:
                 self.lab.disconnect("Detector input stale; calibration retained")
-                self.research.stop("Detector input stale")
                 if core.frame is not None:
                     self.frame = dict(core.frame, diagnostic_only=False)
 
@@ -292,10 +273,6 @@ class MouseSession:
             self.received_at = self.inference_ms = None
             self.times.clear()
             self.generation += 1
-            if changed_source:
-                self.research.reset_person()
-            else:
-                self.research.restart_source()
             subject = SINGLE_SUBJECT if mode in ("camera", "detector-demo") else SUBJECT if mode == "demo" else "select-a-subject"
             self.lab.settings({"runtime": {"source": "external", "subject_id": subject}})
             self.thread = threading.Thread(
@@ -338,7 +315,6 @@ class MouseSession:
                     reason = "Vision source stopped"
                 self.status = reason
                 self.lab.disconnect(reason)
-                self.research.stop(reason)
                 if self.detector_runtime is not None:
                     self.detector_runtime.workbench.disconnect(reason)
                     self.detector_runtime.preview = None
@@ -385,7 +361,6 @@ class MouseSession:
             self.stop_event.set()
             self.status = "Stopping Vision source" if self.thread and self.thread.is_alive() else "Vision source stopped"
             self.lab.disconnect("Vision source stopped")
-            self.research.stop("Vision source stopped")
             if self.detector_runtime is not None:
                 self.detector_runtime.workbench.disconnect("Source stopped; calibration retained")
                 self.detector_runtime.preview = None
@@ -400,4 +375,3 @@ class MouseSession:
             self.closed = True
             self.preview = None
         self.lab.close()
-        self.research.close()

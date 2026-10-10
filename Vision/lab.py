@@ -9,7 +9,7 @@ from tkinter import filedialog, messagebox, ttk
 import cv2
 
 from .eye_view import EyeGuidePanel
-from .eye_scope import draw_eye_scope, scope_samples
+from .eye_scope import draw_eye_scope, draw_feature_scope, scope_samples
 from LabUI.traces import darker, trace_runs
 from .features import DetectionConfig
 from .lab_runtime import LabRuntime
@@ -62,6 +62,10 @@ class DetectionLab:
         self.preview.configure(width=0,height=0,text="Camera is off",fg="white",pady=150)
         self.eye_scope=tk.Canvas(left,height=180,bg="#14202c",highlightthickness=0)
         self.eye_scope.pack(fill="x",pady=6)
+        self.eye_scope_mode=tk.StringVar(value="Wink samples")
+        self.eye_scope_picker=ttk.Combobox(left,textvariable=self.eye_scope_mode,state="readonly",
+            values=("Wink samples","Left facial features","Right facial features","Eye ratios"))
+        self.eye_scope_picker.pack(fill="x")
         self.scope=tk.Canvas(left,height=180 if self.embedded else 220,bg="#14202c",highlightthickness=0)
         self.scope.pack(fill="x",pady=6)
         ttk.Label(left,textvariable=self.metrics,justify="left",wraplength=620,font=("Menlo",9 if self.embedded else 10)).pack(anchor="w")
@@ -218,7 +222,15 @@ class DetectionLab:
                 eye_lines.append(f"closed ≤ {cal['closed_limit']:.3f} | open ≥ {cal['open_limit']:.3f}")
             elif cal:
                 eye_lines.append("Legacy threshold — run guide for open-pose coverage")
-            eye_lines.append(state['reasons'].get(side,'Waiting for face')+"\n")
+            reading=state.get("wink_readings",{}).get(side,{})
+            eye_lines.append("Wink: "+reading.get("state","unknown")+"; "+("calibrated" if side in state.get("wink_models",{}) else "needs blink/wink training"))
+            if reading.get("features"):
+                v=reading["features"]
+                eye_lines.append(f"Blink {v[1]:.2f} · squint {v[2]:.2f} · cheek {v[3]:.2f} · brow {v[4]:.2f}")
+            report=state.get("wink_models",{}).get(side)
+            if report:
+                eye_lines.append(f"Check: {report['wink_recognized']}/{report['wink_frames']} wink frames; {report['false_wink_frames']} false ON")
+            eye_lines.append("")
         self.eye_details.set("\n".join(eye_lines))
         head=state["features"].get("head",{})
         self.head_details.set(f"Mode: {state['config']['head_mode']}\nRaw: {self.fmt(head.get('value'))}\nNormalized Y: {self.fmt(signals.get('head_y',{}).get('value'))}\nQuality: {head.get('quality',0):.2f}\n{state['reasons'].get('head','Waiting for face')}\n\nCalibration: {state['head']}\nSamples: " + str({k:v for k,v in state['samples'].items() if k.startswith('head')}))
@@ -226,7 +238,15 @@ class DetectionLab:
         self.tongue_details.set(f"{'FROZEN — click tissue' if state['frozen'] else 'LIVE crop / green candidate mask'}\n{state['reasons'].get('tongue','Waiting for face')}\nCandidate: {state['candidate']}\nPixels: {state['tongue_pixels']}\n" + "\n".join(f"{k}: {'PASS' if v['passed'] else 'FAIL'} ({v['detected_fraction']:.0%}, n={v['samples']})" for k,v in val.items()))
         self.metrics.set("\n".join(f"{k:16} {self.fmt(signals.get(k,{}).get('value'))}   {'valid' if signals.get(k,{}).get('valid') else 'unavailable'}" for k in ("left_eye_open","right_eye_open","head_y","tongue_x","tongue_y")))
         draw_eye_scope(self.eye_scope,state)
-        self.draw_scope(state["trace"],state["scope_subject"],state["generation"],state["config"]["head_mode"],state["config"]["stale_ms"])
+        if self.calibration_tabs.select()==str(self.eye_tab):
+            self.eye_scope_picker.configure(state="readonly")
+            if self.eye_scope_mode.get()=="Wink samples":
+                draw_eye_scope(self.scope,state,intent=True)
+            else:
+                draw_feature_scope(self.scope,state,self.eye_scope_mode.get())
+        else:
+            self.eye_scope_picker.configure(state="disabled")
+            self.draw_scope(state["trace"],state["scope_subject"],state["generation"],state["config"]["head_mode"],state["config"]["stale_ms"])
         self.root.after(100,self.tick)
 
     def draw_scope(self,rows,selected,generation,head_mode,stale_ms):

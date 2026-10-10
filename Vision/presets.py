@@ -11,6 +11,12 @@ from .tongue import TongueModel
 
 LEGACY_ALGORITHM = "lid-gap-head-y-lab-color-v1"
 ALGORITHM = "guided-lid-gap-head-y-lab-color-v2"
+WINK_ALGORITHM = "frame-wink-eye-head-tongue-v3"
+
+
+def decode_winks(data):
+    from .wink_model import validate_models
+    return validate_models(data["winks"]) if data.get("version")==3 else {}
 
 
 def _keys(value, expected, name):
@@ -20,16 +26,18 @@ def _keys(value, expected, name):
 
 def decode_preset(data):
     """Validate completely before the workbench changes any active state."""
-    _keys(data, ("version", "algorithm", "settings", "eyes", "head", "tongue"), "Detector preset")
+    fields=("version", "algorithm", "settings", "eyes", "head", "tongue")
+    if isinstance(data,dict) and data.get("version")==3:fields+=("winks",)
+    _keys(data, fields, "Detector preset")
     if (type(data["version"]) is not int
-            or (data["version"], data["algorithm"]) not in ((1, LEGACY_ALGORITHM), (2, ALGORITHM))):
+            or (data["version"], data["algorithm"]) not in ((1, LEGACY_ALGORITHM), (2, ALGORITHM), (3,WINK_ALGORITHM))):
         raise ValueError("Unsupported detector preset version or algorithm")
     config = DetectionConfig.from_dict(data["settings"])
     if not isinstance(data["eyes"], dict) or set(data["eyes"]) - {"left", "right"}:
         raise ValueError("Unknown eye preset")
     eyes = {}
     for side, values in data["eyes"].items():
-        fields = ("closed", "opened", "threshold") + (("closed_limit", "open_limit") if data["version"] == 2 else ())
+        fields = ("closed", "opened", "threshold") + (("closed_limit", "open_limit") if data["version"] >= 2 else ())
         _keys(values, fields, side + " eye")
         fit = EyeCalibration(**values)
         if fit.opened > .65 or fit.opened - fit.closed < config.eye_separation:
@@ -65,11 +73,14 @@ def decode_preset(data):
         tongue = TongueModel(*centers, values["radius"], values["margin"], {"restored": True})
     if not eyes and head is None and tongue is None:
         raise ValueError("Profile needs at least one fitted detector")
+    winks=decode_winks(data)
+    if set(winks)-set(eyes):raise ValueError("Wink model requires matching eye geometry")
     return config, eyes, head, tongue
 
 
 def encode_preset(core):
-    result = {"version": 2, "algorithm": ALGORITHM, "settings": core.config.to_dict(),
+    result = {"version": 3, "algorithm": WINK_ALGORITHM, "settings": core.config.to_dict(),
+              "winks": core.winks,
               "eyes": {side: {name: getattr(fit, name) for name in ("closed", "opened", "threshold", "closed_limit", "open_limit")}
                        for side, fit in core.eyes.items()},
               "head": asdict(core.head) if core.head else None, "tongue": None}

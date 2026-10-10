@@ -61,6 +61,9 @@ class Sample:
     scroll: object
     left_known: bool = True
     right_known: bool = True
+    appearance_intent: bool = False
+    left_reopened: bool = False
+    right_reopened: bool = False
 
     def __post_init__(self):
         for side in ("left", "right"):
@@ -121,5 +124,27 @@ def decode(frame, config, subject_id):
         return value == 0 if value in (0, 1) else None
 
     x, y = measurement(config.pointer_source + "_x"), measurement(config.pointer_source + "_y")
+    if "eye_intent" in frame:
+        intent=frame["eye_intent"]
+        if (not isinstance(intent,dict) or set(intent)!={"format","session_id","sequence","timestamp_ms","subject_id","left","right"}
+                or intent.get("format")!="eye_intent_v1" or type(intent.get("sequence")) is not int
+                or not finite(intent.get("timestamp_ms"))
+                or any(intent.get(k)!=frame[k] for k in ("session_id","sequence","timestamp_ms"))
+                or intent.get("subject_id")!=subject_id):
+            raise ValueError("Wink sample does not match the current capture/subject")
+        bits=[]
+        for side in ("left","right"):
+            item=intent.get(side)
+            if not isinstance(item,dict) or set(item)!={"value","known","state"} or type(item["known"]) is not bool:
+                raise ValueError("Invalid wink sample")
+            valid = (item["known"] and finite(item["value"]) and item["value"] in (0,1)
+                     and item["state"] in (("wink",) if item["value"] else ("open","blink")))
+            unknown = not item["known"] and item["value"] is None and item["state"]=="unknown"
+            if not (valid or unknown):raise ValueError("Inconsistent wink sample")
+            bits.append(bool(item["value"]) if valid else None)
+        return Sample(session,sequence,timestamp,subject_id,*bits,
+                      (x,y) if x is not None and y is not None else None,measurement("head_y"),
+                      appearance_intent=True,left_reopened=measurement("left_eye_open")==1,
+                      right_reopened=measurement("right_eye_open")==1)
     return Sample(session, sequence, timestamp, subject_id, eye("left_eye_open"), eye("right_eye_open"),
                   (x, y) if x is not None and y is not None else None, measurement("head_y"))

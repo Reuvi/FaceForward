@@ -31,9 +31,17 @@ class EyeGate:
         self.open_since = None
         self.progress = 0.0
 
-    def sample(self, closed, timestamp, *, known=True):
+    def sample(self, closed, timestamp, *, known=True, appearance_intent=False, reopened=False):
         if not known or closed is None:
             self.reset()
+            return
+        if appearance_intent:
+            # A classified frame is already an intentional state. Never apply the
+            # legacy closure dwell or release delay to it. Blink OFF is not proof
+            # of reopening after loss; require fresh anatomical open evidence.
+            if reopened and not closed:self.ready=True
+            self.down=bool(closed and self.ready)
+            self.progress=float(self.down)
             return
         if not closed:
             self.closed_since = None
@@ -251,8 +259,10 @@ class MouseProcessor:
         self.pointer.push(sample.pointer, sample.timestamp_ms)
         self.scroll.push(sample.scroll, sample.timestamp_ms)
         if self.armed:
-            self.left.sample(sample.left_closed, sample.timestamp_ms, known=sample.left_known)
-            self.right.sample(sample.right_closed, sample.timestamp_ms, known=sample.right_known)
+            self.left.sample(sample.left_closed, sample.timestamp_ms, known=sample.left_known,
+                             appearance_intent=sample.appearance_intent,reopened=sample.left_reopened)
+            self.right.sample(sample.right_closed, sample.timestamp_ms, known=sample.right_known,
+                              appearance_intent=sample.appearance_intent,reopened=sample.right_reopened)
         return {"accepted": True, "reason": "Sample accepted"}
 
     def tick(self, now_ms):

@@ -11,9 +11,11 @@ from .tracking import Box
 
 
 def demo_image(*, left_closed=False, right_closed=False, head=0.5,
-               tongue=False, tongue_x=0.5, tongue_y=0.5, left_ratio=None, right_ratio=None):
+               tongue=False, tongue_x=0.5, tongue_y=0.5, left_ratio=None, right_ratio=None,
+               natural_blink=False):
     """Anatomical right is image-left. Head value shifts Y and supplies a fake pitch."""
     offset = (head - 0.5) * 80
+    if natural_blink:left_closed=right_closed=True
     bgr = np.full((480, 640, 3), (65, 65, 65), dtype=np.uint8)
     cv2.ellipse(bgr, (320, int(240 + offset)), (155, 195), 0, 0, 360, (145, 175, 200), -1)
     # Fine skin texture makes focus gates meaningful in generated image tests.
@@ -57,8 +59,9 @@ def demo_image(*, left_closed=False, right_closed=False, head=0.5,
     for side in ('left','right'):
         ratio = left_ratio if side == 'left' else right_ratio
         closed = (left_closed if side == 'left' else right_closed) if ratio is None else ratio < .08
-        for name, value in (('eyeBlink',.95 if closed else .08),('eyeSquint',.65 if closed else .05),
-                            ('cheekSquint',.45 if closed else .04),('browDown',.3 if closed else .03),
+        effort = closed and not natural_blink
+        for name, value in (('eyeBlink',.95 if closed else .08),('eyeSquint',.65 if effort else .05),
+                            ('cheekSquint',.45 if effort else .04),('browDown',.3 if effort else .03),
                             ('mouthSmile',.05),('eyeWide',.1)):
             observation.expressions[name+side.title()] = value
     observation.expressions.update(browInnerUp=.05,jawOpen=.3)

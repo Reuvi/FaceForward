@@ -1,5 +1,9 @@
 # Local detection research interface v1
 
+> Historical developer reference: Detection research has been removed from the
+> active App. Blink/wink training now belongs to the unified eye guide, with
+> per-frame appearance states and no duration gate. See [EYE_INTENT.md](EYE_INTENT.md).
+
 This coordinated integration increment adds experiments alongside the existing mouse
 MVP. SignalFrame v1, raw eye polarity and mouse_preview_v0 are unchanged.
 

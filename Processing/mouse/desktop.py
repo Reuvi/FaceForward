@@ -45,6 +45,7 @@ class Scope(ttk.Frame):
     def __init__(self, parent, title, keys, limits=(0, 1)):
         super().__init__(parent, style="Panel.TFrame", padding=(9, 7))
         self.keys = keys
+        self.channels = [2 if key.endswith("_out") else min(index,2) for index,key in enumerate(keys)]
         self.limits = limits
         label(self, title, style="Small.TLabel").pack(anchor="w")
         self.canvas = tk.Canvas(self, background=BG, height=106, highlightthickness=0)
@@ -75,7 +76,7 @@ class Scope(ttk.Frame):
                                    fill=MUTED, font=("Menlo", 8))
             self.lines = [canvas.create_line(0, 0, 0, 0, fill=color, width=2 if index == 2 else 1.3,
                                              dash=(3, 3) if index == 1 else ())
-                          for index, color in enumerate((BLUE, AMBER, GREEN)[:len(self.keys)])]
+                          for index in self.channels for color in ((BLUE, AMBER, GREEN)[index],)]
         if not rows:
             for line in self.lines:
                 canvas.itemconfigure(line, state="hidden")
@@ -103,11 +104,12 @@ class Scope(ttk.Frame):
         canvas.delete("gap-run")
         for channel, runs in enumerate(channel_runs):
             canvas.itemconfigure(self.lines[channel], state="hidden")
-            color = (BLUE, AMBER, GREEN)[channel]
+            style = self.channels[channel]
+            color = (BLUE, AMBER, GREEN)[style]
             for unknown, points in runs:
                 canvas.create_line(*points, fill=darker(color) if unknown else color,
-                                   width=2 if channel == 2 else 1.3,
-                                   dash=(3, 3) if channel == 1 else (), tags="gap-run")
+                                   width=2 if style == 2 else 1.3,
+                                   dash=(3, 3) if style == 1 else (), tags="gap-run")
 
 
 
@@ -283,6 +285,7 @@ class DesktopLab:
         self.freeze_button = self.button(scope_header, "Freeze scope", self.freeze)
         self.freeze_button.pack(side="right", padx=(6, 12))
         for text, color in (("Output", GREEN), ("Interpolation / dwell", AMBER), ("Raw samples", BLUE)):
+            if getattr(self,"appearance_eyes",False) and text=="Interpolation / dwell":text="Axis interpolation"
             label(scope_header, "— " + text, foreground=color, font=("Helvetica Neue", 9)).pack(side="right", padx=7)
         charts = ttk.Frame(self.live); charts.grid(row=2, column=0, columnspan=2, sticky="nsew")
         charts.rowconfigure((0, 1), weight=1)
@@ -297,6 +300,9 @@ class DesktopLab:
                                       ("Right eye → right click (independent)", ("right_raw", "right_dwell", "right_out"))))):
             parent.rowconfigure(0, weight=1)
             for index, (title, keys) in enumerate(specs):
+                if getattr(self,"appearance_eyes",False) and keys[0] in ("left_raw","right_raw"):
+                    title=title.replace("eye", "eye input")
+                    keys=(keys[0],keys[2])
                 parent.columnconfigure(index, weight=1, uniform="scope")
                 scope = Scope(parent, title, keys); scope.grid(row=0, column=index, sticky="nsew", padx=(0, 6 if index < len(specs) - 1 else 0))
                 self.scopes.append(scope)
@@ -305,7 +311,7 @@ class DesktopLab:
         toolbar = ttk.Frame(self.settings_page); toolbar.pack(fill="x")
         for text, command in (("Apply settings", self.apply_settings), ("Export JSON", self.export_settings), ("Import JSON", self.import_settings)):
             self.button(toolbar, text, command).pack(side="left", padx=(0, 8))
-        label(self.settings_page, "Applying settings stops the preview and resets filters. Center inputs, then start again. Each eye has its own timings.",
+        label(self.settings_page, "Applying settings stops preview. Camera wink states use facial calibration, with no duration threshold." if getattr(self,"appearance_eyes",False) else "Applying settings stops the preview and resets filters. Center inputs, then start again. Each eye has its own timings.",
               foreground=MUTED, wraplength=1200).pack(anchor="w", pady=12)
         groups = ttk.Frame(self.settings_page); groups.pack(fill="both", expand=True)
         specs = [
@@ -322,6 +328,9 @@ class DesktopLab:
                 ("config.right_eye.dwell_ms", "Right dwell ms", None), ("config.right_eye.release_ms", "Right release ms", None)],
              "1 = closed by default. Short closures do not click. Long closures hold the corresponding button. No combined-eye suppression. Each eye must first be open."),
         ]
+        if getattr(self,"appearance_eyes",False):
+            specs[1]=("Independent wink samples", [],
+                      "Train blinks and winks in Detection calibration. A recognized wink stays ON while held and turns OFF on reopening. No dwell or release delay. Legacy raw demos/replays retain their original timing.")
         for axis in ("pointer", "scroll"):
             fields = [(f"config.{axis}.{key}", text, kind) for key, text, kind in (
                 ("deadzone", "Dead zone", None), ("hysteresis", "Activation margin", None), ("exponent", "Response exponent", None),

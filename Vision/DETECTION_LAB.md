@@ -60,7 +60,11 @@ Between poses, the screen says **REST** and hides the dot. Blink, close your eye
 or relax your gaze naturally; these frames do not enter calibration. Set **Rest
 between steps (seconds)** before Start/Restart: the default is 3 seconds, with
 0–30 seconds supported (0 skips rest). The setting is saved with the active profile.
-There are six rests, so the default sequence takes about 40 seconds.
+This is only the seven-step geometry portion. It is followed automatically by
+natural blink/relaxed-face captures, three wink attempts per eye and separate
+checks with two new winks per eye. The whole guide is 21 steps, about 2½ minutes.
+See [current eye calibration instructions](../docs/EYE_CALIBRATION_GUIDE.md) before
+testing. Collection times schedule samples; they never gate runtime wink ON/OFF.
 
 | Cue | Action |
 | --- | --- |
@@ -165,21 +169,24 @@ does **not** mean the eye is classified closed or that a button stays down.
 Analog scopes use the same dark-hold convention. For raw geometry, a failing image
 quality gate counts as unknown for plotting, while the numeric/CSV raw value remains
 available as diagnostic evidence. The renderer can seed a hold from retained history
-before the left edge of the graph (at most eight extra original rows in a snapshot,
+before the left edge of the graph (at most twenty extra original rows in a snapshot,
 from the existing bounded 9,000-row history). It never modifies a capture or adds
 synthetic control samples. Stopping capture freezes its historical time axis.
 
 After calibration, look around while keeping eyes open, then test open/open,
 closed/open, open/closed and closed/closed. Both closures classify independently.
-Brief blinks can appear as short `1` pulses here; click dwell/release debounce belongs
-to Processing. An uncertain eye immediately becomes invalid and releases that eye's
-processed button without suppressing the other eye. No detector hysteresis is used.
+Brief blinks appear as `1` pulses in the anatomical scope. The separate calibrated
+wink classifier uses surrounding facial features to keep recognized natural blinks
+OFF in the wink scope. Processing follows this per-frame intent without dwell or
+release debounce. Unknown intent releases only the affected button. No detector
+hysteresis or temporal wink feature is used.
 If an open pose still shows closed, export a trace and restart with representative
 comfortable poses; the learned ratio bands cannot resolve every occlusion or gaze angle.
 
-New detector presets use version 2 with the two per-eye raw limits. Version 1 presets
-still load with their original single threshold; the UI requests guided recalibration
-for open-pose coverage. The detector preset remains compatible; the combined App now writes `face_mouse_profile_v2` with an additive research section and still reads v1.
+New detector presets use version 3 with geometry and independently checked wink
+models. Version 1/2 presets remain readable but need the new guide to enable wink
+buttons. The combined App saves `face_mouse_profile_v3` without research settings;
+v1/v2 files remain readable. See the [profile guide](../docs/EYE_CALIBRATION_GUIDE.md#save-load-and-maintain).
 The legacy per-eye `collect()` API remains for developer regression tests, not UI use.
 
 ## 2. Vertical head movement
@@ -420,7 +427,8 @@ and latency. Automated synthetic success does not supply these human measurement
 - `lab.py`: reusable native calibration view; embedded in App or standalone.
 - `presets.py`: versioned fitted-parameter validation/serialization; App coordinates storage.
 - `demo_detection.py`: labeled synthetic pixels/landmarks; fake inputs remain a developer API.
-- `guided_eyes.py`: capture-timed seven-step sequence, independent pose fits and reopen checks.
+- `guided_eyes.py`: geometry stage; `wink_guide.py`: the complete 21-step guide.
+- `wink_model.py`: independent per-frame facial appearance features, models and fresh checks.
 - `eye_view.py`: temporary full-screen target, sound cues and guide lifecycle; no inference on Tk.
 - `eye_scope.py` and `../LabUI/traces.py`: shared display-only unknown holds; no changes to measurement validity.
 - `landmarks.py`: optional MediaPipe facial transform extraction; default legacy API unchanged.
@@ -459,4 +467,9 @@ output at EOF. Human testing of the wider target positions is still required.
 
 ## Research measurements in the combined App
 
-App now requests MediaPipe expression coefficients alongside the existing local landmarks/pose. `research_features.py` exposes selected-face, quality-gated scalar measurements and `gaze_research.py` owns optional calibrated viewport regression. The standalone detector remains a component tool. Use **App → Detection research** for labeled blink/wink trials, supporting-feature scopes, model comparisons and gaze target collection. See [Detection research guide](../docs/DETECTION_RESEARCH_GUIDE.md); none of these synthetic checks establish real-person accuracy.
+App requests MediaPipe expression coefficients alongside landmarks/pose. The active
+Eyes guide consumes same-eye blink, squint, cheek, brow and wide coefficients plus
+normalized geometry. It emits `eye_intent` alongside the unchanged raw eye signals.
+The old Detection research UI/runtime is no longer attached to App. Its feature and
+gaze modules remain developer utilities; synthetic checks do not establish live
+accuracy. See [the current eye guide](../docs/EYE_CALIBRATION_GUIDE.md).

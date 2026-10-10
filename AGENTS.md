@@ -35,7 +35,7 @@ only; preserve null/invalid observations and immediate control release. The curr
 user-requested eye exception is an explicit previous-value Processing input
 with known=false on every unknown capture (0 only before any history).
 Raw/calibration data and dark graph holds remain separate. See
-Contracts/RESEARCH_LAB.md. Never feed a plotted hold into control.
+Contracts/EYE_INTENT.md. Never feed a plotted hold into control.
 
 Guided eyes now have configurable rest intervals (default 3 seconds), separate rest,
 ready and capture cues, and phase-aware prompt acknowledgments. Rest/preparation
@@ -111,6 +111,17 @@ can use an integration branch with the affected owners coordinated.
   Instructions and the scope checker are coordination
   aids, not a filesystem sandbox or a guarantee of conflict-free merges.
 
-## Detection research handoff
+## Current eye calibration contract
 
-The unified App also hosts `Detection research`; read `docs/DETECTION_RESEARCH_GUIDE.md` and `Contracts/RESEARCH_LAB.md` before touching it. Vision owns scalar observations/gaze regression; Processing owns gestures/models/mappings; App owns trials, joining, profiles and UI. Keep independent eyes as the default, strict policy explicit, gaze positions separate from relative velocity, graph-held unknowns display-only, and training/validation trials separate. Research profile v2 is additive; preserve v1 loading, disarmed profile loads and fresh gaze validation. Do not claim live accuracy from synthetic tests.
+Read `Contracts/EYE_INTENT.md` and `docs/EYE_CALIBRATION_GUIDE.md`. Detection research
+is removed from the unified App; its retained modules are legacy/developer code.
+One full-screen guide collects independent eye geometry, natural blink/wink
+appearances and separate check windows. Same-eye facial features classify each
+captured frame. No duration/speed, opposite-eye gate, dwell or release delay may
+control the calibrated wink path. ON persists while a wink is recognized; open or
+recognized blink is OFF; unknown is held numeric input with known=false and released
+output. Actual reopening re-arms an eye after unknown. Keep raw anatomical eye
+fields unchanged and emit the additive `eye_intent` sample for every capture.
+New combined profiles are v3, detector presets v3, with checked appearance models;
+old v1/v2 files load but require new wink calibration. Tests with synthetic faces
+are software checks, not measured human accuracy. Preserve head/tongue behavior.

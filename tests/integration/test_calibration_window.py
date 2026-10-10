@@ -170,6 +170,9 @@ class SingleUserWindowTests(unittest.TestCase):
             ui = IntegratedDesktop(root, session, options)
         self.addCleanup(lambda: None if ui.closed else ui.close())
         root.update()
+        self.assertNotIn("Detection research",[ui.notebook.tab(t,"text") for t in ui.notebook.tabs()])
+        self.assertNotIn("config.left_eye.dwell_ms",ui.setting_vars)
+        self.assertNotIn("config.right_eye.release_ms",ui.setting_vars)
         self.assertEqual(ui.replay_selection.winfo_manager(), "")
         session.mode = "replay"
         ui.refresh_vision(); root.update()
@@ -192,3 +195,14 @@ class SingleUserWindowTests(unittest.TestCase):
             self.assertFalse(session.lab.processor.armed)
             ui.refresh_vision()
             self.assertIn("saved calibration active", ui.profile_text.get())
+            from Vision.capture import CapturedImage
+            from Vision.demo_detection import demo_image
+            from Vision.signals import Envelope
+            image,observations=demo_image()
+            for sequence in range(3):
+                session.deliver_detection(CapturedImage(Envelope("scope-test",sequence,session.clock()),image),observations,preview=False)
+            ui.notebook.select(ui.calibration_page);root.update()
+            for mode in ui.calibration_ui.eye_scope_picker["values"]:
+                ui.calibration_ui.eye_scope_mode.set(mode)
+                ui.calibration_ui.tick();root.update()
+                self.assertTrue(ui.calibration_ui.scope.find_all())

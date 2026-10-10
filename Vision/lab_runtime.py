@@ -94,9 +94,20 @@ class LabRuntime:
             guide = self.workbench.eye_guide
             controls = dict(self.demo_controls)  # Available to developer scripts only.
             if guide and guide.active:
-                ratio = .25 if guide.resting else {"center": .25, "left": .21, "right": .22, "up": .28,
-                         "down": .14, "closed": .04, "reopen": .25}[guide.step[0]]
-                controls.update(left_ratio=ratio, right_ratio=ratio*.94)
+                state=guide.state(self.clock())
+                if state.get("wink_training"):
+                    controls.update(left_closed=False,right_closed=False,natural_blink=False)
+                    if state["phase"]=="capture":
+                        elapsed=self.clock()-state["capture_start_ms"]
+                        duration=state["capture_end_ms"]-state["capture_start_ms"]
+                        if state["name"]=="blinks":
+                            controls["natural_blink"] = .2 <= (elapsed/(duration/4))%1 < .45
+                        elif state["name"] in ("left","right"):
+                            controls[state["name"]+"_closed"] = .2<=elapsed/duration<.75
+                else:
+                    ratio = .25 if state["resting"] else {"center": .25, "left": .21, "right": .22, "up": .28,
+                             "down": .14, "closed": .04, "reopen": .25}[guide.step[0]]
+                    controls.update(left_ratio=ratio, right_ratio=ratio*.94)
             elif guide and not controls:
                 # Independent holds and simultaneous closure exercise the two scopes.
                 phase = (self.clock()/1000) % 8
@@ -168,7 +179,9 @@ class LabRuntime:
             # interval can then retain its last display height after that capture
             # leaves the 8-second view, without sending the full history to Tk.
             needed = {"left_raw", "right_raw", "head_raw", "left_closed_bit", "right_closed_bit",
-                      "head_y", "tongue_x", "tongue_y"}
+                      "head_y", "tongue_x", "tongue_y", "left_wink_bit", "right_wink_bit"}
+            needed.update(side+"_"+key for side in ("left","right")
+                          for key in ("blink","squint","cheek","brow","wink_score"))
             cutoff = self.workbench.trace[-1]["timestamp_ms"]-8000 if self.workbench.trace else 0
             scope_subject = state.get("scope_subject", state["selected"])
             for row in reversed(self.workbench.trace):

@@ -101,12 +101,16 @@ Calibration collection and changes disarm the simulated preview. Tab changes do
 not restart capture or arm output. Leaving an active guided eye sequence cancels it;
 completed fits survive tab changes. The real driver is not wired.
 
-`face_mouse_profile_v1` contains `format`, `source_kind` (`camera` or `synthetic`),
-`detector`, `processing`, and `preview`. Detector section version 2 uses algorithm
-`guided-lid-gap-head-y-lab-color-v2`, DetectionConfig settings, separate eye fits, a head fit,
-and optional tongue color prototypes/radius/margin. Processing is MouseConfig;
-preview contains pointer/scroll speeds. No subject/session IDs, raw pixel samples,
-images, live validation pass flags, arming state, or driver permissions are saved.
+`face_mouse_profile_v3` contains `format`, `source_kind` (`camera` or `synthetic`),
+`detector`, `processing`, and `preview`; v1/v2 remain readable. Detector section
+version 3 uses `frame-wink-eye-head-tongue-v3`, DetectionConfig, separate eye geometry
+and checked per-frame wink models, a head fit and optional tongue color parameters.
+Processing is MouseConfig; preview contains pointer/scroll speeds. No images, raw
+training vectors, arming state or live tongue validation flags are saved. Wink
+check counts are persisted with the fitted model. Old research/event models are
+not frame classifiers and are not used by App. Old detector v1/v2 profiles need
+new wink calibration before closures can activate buttons. See
+[EYE_INTENT.md](EYE_INTENT.md) for the additive sampled intent and no-dwell path.
 Processing owns atomic local JSON persistence and its settings validation; Vision
 owns detector preset validation/export/import; App validates/binds both together.
 
@@ -126,7 +130,7 @@ continues to mean transfer settings, not a complete detector profile.
 
 ### Guided eye calibration increment
 
-The Eyes tab starts one sequence: five open poses (center, left, right, up, down),
+The geometry stage starts with five open poses (center, left, right, up, down),
 both eyes gently closed, then a fresh reopen check. Each eye fits and validates
 independently; no both-eye veto is introduced. Per-eye fits serialize `closed`,
 `opened`, `threshold`, `closed_limit`, `open_limit`. The latter two are raw lid-gap /
@@ -137,7 +141,8 @@ polarity remains 1=open, while the dedicated scope/CSV closed bit is 1=closed.
 
 Version 1 detector presets with algorithm `lid-gap-head-y-lab-color-v1` and three
 original eye fields still load. They keep the original single-boundary behavior
-until recalibrated. The containing `face_mouse_profile_v1` format is unchanged.
+until recalibrated, but cannot activate camera wink buttons without the new
+appearance guide. New combined files use v3; legacy formats remain readable.
 No training poses, images, sound state or guide progress are persisted.
 
 Vision exposes `start_eye_guide`, `present_eye_step(index)` and `cancel` through

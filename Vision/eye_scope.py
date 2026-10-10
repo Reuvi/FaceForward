@@ -24,7 +24,34 @@ def binary_runs(rows, key, selected, generation, stale_ms, start=None):
                       step=True, max_gap=stale_ms, start=start)
 
 
-def draw_eye_scope(canvas, state):
+def draw_feature_scope(canvas, state, mode):
+    """Inspect the same captured features that train the per-eye classifier."""
+    canvas.delete("all")
+    width,height=max(320,canvas.winfo_width()),max(180,canvas.winfo_height())
+    rows=state["trace"]
+    start=(rows[-1]["timestamp_ms"] if rows else 0)-8000
+    if mode=="Eye ratios":
+        series=(("left_raw","left","#6ed7fe"),("right_raw","right","#ffa663"))
+        title,maximum="Lid gap / eye width · 0–0.5",.5
+    else:
+        side="left" if mode.startswith("Left") else "right"
+        series=tuple((side+"_"+key,key,color) for key,color in (
+            ("blink","#6ed7fe"),("squint","#ffa663"),("cheek","#75e3a8"),
+            ("brow","#d6a1ff"),("wink_score","#ffffff")))
+        title,maximum=side.title()+" appearance · 0–1 (score is not a probability)",1
+    canvas.create_text(8,5,text=title,fill="white",anchor="nw",font=("Arial",10))
+    for index,(key,label,color) in enumerate(series):
+        canvas.create_text(8+index*(width-16)/len(series),25,text=label,fill=color,anchor="nw",font=("Arial",9))
+        for unknown,segment in trace_runs(scope_samples(rows,key,state["scope_subject"],state["generation"]),
+                                           max_gap=state["config"]["stale_ms"],start=start):
+            points=[]
+            for timestamp,value in segment:
+                points.extend((10+(timestamp-start)/8000*(width-20),height-25-max(0,min(maximum,value))/maximum*(height-75)))
+            canvas.create_line(*points,fill=darker(color) if unknown else color,width=2)
+    canvas.create_text(width-8,height-3,text="Last 8 s · dark = unknown hold · Export trace CSV for samples",fill="#adbbcc",anchor="se",font=("Arial",9))
+
+
+def draw_eye_scope(canvas, state, *, intent=False):
     canvas.delete("all")
     w,h=max(320,canvas.winfo_width()),max(180,canvas.winfo_height())
     rows=state["trace"]
@@ -35,15 +62,17 @@ def draw_eye_scope(canvas, state):
     for i,(side,color) in enumerate((("left","#6ed7fe"),("right","#ffa663"))):
         top=8+i*(h-22)/2
         bottom=top+(h-22)/2-10
-        item=signals.get(side+"_eye_open",{})
-        value=item.get("value") if item.get("valid") else None
-        label=("OPEN · 0" if value==1 else "CLOSED · 1" if value==0 else "UNKNOWN · held trace")
-        canvas.create_text(8,top,text=f"{side.upper()} anatomical eye — {label}",fill=color if value is not None else "#adbbcc",anchor="nw",font=("Arial",11,"bold"))
-        for bit,title in ((1,"1 closed"),(0,"0 open")):
+        item=state.get("wink_readings",{}).get(side,{}) if intent else signals.get(side+"_eye_open",{})
+        value=item.get("value") if item.get("known" if intent else "valid") else None
+        label=(("WINK · 1" if value==1 else "OPEN / BLINK · 0" if value==0 else "UNKNOWN · held trace") if intent else
+               "OPEN · 0" if value==1 else "CLOSED · 1" if value==0 else "UNKNOWN · held trace")
+        name="wink output" if intent else "anatomical eye"
+        canvas.create_text(8,top,text=f"{side.upper()} {name} — {label}",fill=color if value is not None else "#adbbcc",anchor="nw",font=("Arial",11,"bold"))
+        for bit,title in ((1,"1 wink" if intent else "1 closed"),(0,"0 off" if intent else "0 open")):
             y=bottom-bit*(bottom-top-30)
             canvas.create_text(8,y,text=title,fill="#adbbcc",anchor="w",font=("Arial",9))
             canvas.create_line(65,y,w-10,y,fill="#354555")
-        for unknown, segment in binary_runs(rows,side+"_closed_bit",state.get("scope_subject",state["selected"]),state["generation"],state["config"]["stale_ms"],start):
+        for unknown, segment in binary_runs(rows,side+("_wink_bit" if intent else "_closed_bit"),state.get("scope_subject",state["selected"]),state["generation"],state["config"]["stale_ms"],start):
             points=[]
             for t,bit in segment:
                 points.extend((65+(t-start)/8000*(w-75),bottom-bit*(bottom-top-30)))

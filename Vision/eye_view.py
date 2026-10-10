@@ -145,11 +145,11 @@ class EyeGuidePanel:
         self.rest_seconds = tk.StringVar(value="3")
         self.rest_seen = None
         self.title = tk.StringVar(value="Calibrate eyes in one guided pass")
-        self.instruction = tk.StringVar(value="Start opens a full-screen guide. Follow the dot comfortably.\nThen close gently and reopen at the sound.")
+        self.instruction = tk.StringVar(value="One guide: eye shapes, gentle blinks, left/right winks, then fresh checks.\nRest and sound cues separate each movement.")
         self.progress = tk.StringVar(value=CUE_LEGEND)
         ttk.Label(parent,textvariable=self.title,font=("Arial",17,"bold"),wraplength=465).pack(anchor="w",pady=(4,8))
         ttk.Label(parent,textvariable=self.instruction,font=("Arial",13),wraplength=465,justify="left").pack(anchor="w",pady=(0,8))
-        self.target = tk.Canvas(parent,height=190,bg="#14202c",highlightthickness=0)
+        self.target = tk.Canvas(parent,height=100,bg="#14202c",highlightthickness=0)
         self.target.pack(fill="x")
         ttk.Label(parent,textvariable=self.progress,font=("Arial",11),wraplength=465,justify="left").pack(anchor="w",pady=8)
         rest_row=ttk.Frame(parent);rest_row.pack(fill="x",pady=(0,6))
@@ -211,9 +211,15 @@ class EyeGuidePanel:
                 self.sounds.play("cancel")
             self.event=None
             self.title.set("Calibration stopped — open your eyes" if self.aborted else "Calibrate eyes in one guided pass")
-            self.instruction.set("Wait until your face is visible, then Start again." if self.aborted else "Start opens a full-screen guide. Follow the dot comfortably.\nThen close gently and reopen at the sound.")
+            self.instruction.set("Wait until your face is visible, then Start again." if self.aborted else "One guide: eye shapes → blinks/winks → fresh checks.\nBegin each wink with eyes open, then wink after the capture tone.")
             self.progress.set(CUE_LEGEND)
             self.target.create_text(w/2,h/2,text="Look at the camera, then press Start",fill="#c2d0df",font=("Arial",14))
+            if state.get("wink_models") and not self.aborted:
+                self.title.set("Wink calibration ready")
+                self.instruction.set("Check natural blinks and held winks in the scopes. Restart to learn a new calibration.")
+                self.progress.set("Checked eye models: "+", ".join(state["wink_models"]))
+                self.target.delete("all")
+                self.target.create_text(w/2,h/2,text="WINK = 1 · OPEN / BLINK = 0",fill="#75e3a8",font=("Arial",16,"bold"))
             return
         self.aborted=False
         event=(state["generation"],guide["index"],guide["active"],guide["phase"])
@@ -226,14 +232,16 @@ class EyeGuidePanel:
             self.sounds.play("close" if cue=="closed" else cue)
         if not guide["active"]:
             self.dismiss_fullscreen()
-            self.title.set("Eyes ready — try looking around" if guide["passed"]==2 else "Calibration needs another pass")
-            self.instruction.set("Watch each eye’s 0 / 1 scope. Look in different directions, then close one eye at a time.")
+            self.title.set("Wink calibration ready" if guide["passed"]==2 else "Check each eye’s calibration result")
+            self.instruction.set("Watch eye closure and wink output separately. Natural blinks should leave wink output at 0.")
             self.progress.set(guide["report"])
-            self.target.create_text(w/2,h/2,text="OPEN = 0     CLOSED = 1\n\nDark = unknown, last value held",fill="#75e3a8",font=("Arial",16,"bold"),justify="center")
+            self.target.create_text(w/2,h/2,text="WINK = 1     OPEN / BLINK = 0\n\nNo minimum wink duration\nDark = unknown, last value held",fill="#75e3a8",font=("Arial",16,"bold"),justify="center")
             return
-        self.title.set(f"Rest before step {guide['index']+1} / {guide['total']}" if guide["resting"] else f"Step {guide['index']+1} / {guide['total']} — {guide['name'].upper()}")
-        self.instruction.set(guide["instruction"] + ("\nThe next sound will tell you to get ready." if guide["resting"] else f"\nOpen at TWO HIGH TONES (about {guide['closed_duration_ms']/1000:.0f}s)." if guide["name"]=="closed" else "\nKeep your eyes comfortably open; do not squint."))
-        stage="Rest — no samples" if guide["resting"] else "Get ready" if guide["preparing"] else "Sampling — hold this pose"
+        self.title.set(f"Rest before step {guide['index']+1} / {guide['total']}" if guide["resting"] else f"Step {guide['index']+1} / {guide['total']} — {guide.get('stage', 'Eye shape')} · {guide['name'].upper()}")
+        self.instruction.set(guide["instruction"] + ("\nThe next sound will tell you to get ready." if guide["resting"] else
+            "\nBegin with eyes open. Perform the movement AFTER three high capture tones." if guide.get("wink_training") else
+            f"\nOpen at TWO HIGH TONES (about {guide['closed_duration_ms']/1000:.0f}s)." if guide["name"]=="closed" else "\nKeep your eyes comfortably open; do not squint."))
+        stage="Rest — no samples" if guide["resting"] else "Get ready" if guide["preparing"] else "Sampling — follow the instruction"
         self.progress.set(f"{stage}: {guide['remaining_ms']/1000:.1f}s\nUsable frames: left {guide['samples']['left']}  /  right {guide['samples']['right']}")
         if guide["resting"]:
             self.target.create_text(w/2,h/2,text="REST YOUR EYES\nBlink or close naturally\nNo samples recorded",fill="#75e3a8",font=("Arial",17,"bold"),justify="center")

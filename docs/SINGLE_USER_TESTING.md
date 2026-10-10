@@ -40,12 +40,12 @@ synthetic and cannot be loaded into live camera mode.
 
 ## What survives
 
-| Event | Completed detector/research fits | Active capture and preview |
+| Event | Completed detector/wink fits | Active capture and preview |
 | --- | --- | --- |
 | Large geometric movement, face still usable | Kept | Normal detection continues |
 | Missing face, stale capture or invalid frame | Kept | Capture cancelled; output paused/released |
 | Face returns | Kept; automatically reused | Detection resumes; preview needs Start |
-| Stop / same-source restart | Kept, including completed research trials | Unfinished work cancelled; fresh tongue/gaze validation needed on restart |
+| Stop / same-source restart | Kept | Unfinished work cancelled; fresh tongue validation needed on restart |
 | Load saved JSON | Replaced by file contents | Disarmed; fresh tongue/gaze checks needed |
 | Switch source kind / apply detector Settings | Cleared in memory | Recalibrate or load matching profile |
 | Settings → Reset all calibration | Cleared in memory; saved files unchanged | Recalibrate or load a profile |
@@ -78,3 +78,7 @@ loss/recovery, held unknowns, safe rearming, stale gaps, interrupted calibration
 restart, source changes, and saved-file loading before any capture. They establish
 lifecycle behavior, not real-person recognition accuracy; use the camera steps above
 to evaluate your own calibration.
+
+For the current blink/wink training sequence and saved v3 models, use the
+[eye calibration guide](EYE_CALIBRATION_GUIDE.md). Detection research is no longer
+in the app; independent wink models share this same single-user lifecycle.

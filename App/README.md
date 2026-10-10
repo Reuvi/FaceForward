@@ -48,23 +48,14 @@ The requested FPS takes effect on source start; actual Hz and capture age are sh
 1. On **Vision source & raw signals**, start Camera or Detector demo. Your face
    attaches automatically as **single-user**. No face selection is needed. The app
    assumes one operator; it does not identify people.
-2. Open **Detection calibration → 1 Eyes**. Set **Rest between steps (seconds)**
-   (default 3; 0–30 supported), press **Test sound**, then **Start eye
-   calibration**. A temporary full-screen native window opens. Follow the dot with
-   eyes naturally open through five positions across the screen.
-   Four low tones and a **REST** screen separate the poses: blink or relax freely;
-   no calibration samples are collected. A rising pair announces the next open
-   pose; three high tones mean sampling has begun. The default sequence is about 40 seconds.
-   Close both gently at the descending tones, reopen at two high tones, and wait
-   for three rising completion tones. Each eye is fitted independently. Watch
-   separate binary scopes: **0 open, 1 closed; darker segments hold the last known
-   value while the current reading is unknown**. This is display only. The popup
-   closes automatically when finished; **Escape** or **Cancel calibration** exits
-   early and returns to the same lab window.
-   After closing, the reopen cue comes before the next rest, so you can relax
-   immediately. Capture continues during rest and the mouse preview stays stopped.
-   Use **Restart eye calibration** to discard bad eye samples and repeat.
-   Focus on this eye test before proceeding to head/tongue.
+2. Open **Detection calibration → 1 Eyes**, set rest time, try **Test sound**,
+   then **Start eye calibration**. The temporary full-screen guide covers open
+   poses, gentle closed/reopen geometry, natural blinks, three winks per eye,
+   then separate checks with new blinks and two winks per eye. Rest and sound cues
+   separate movements. The 21-step flow takes about 2½ minutes at default timings.
+   Follow [the eye testing guide](../docs/EYE_CALIBRATION_GUIDE.md) for exact cues,
+   acceptance rules, measurements and troubleshooting. Restart discards bad eye
+   training without clearing head/tongue fits. Focus on eyes before proceeding.
 3. In **2 Head Y**, capture NEUTRAL, UP, DOWN. Default measurement is vertical
    position of the nose bridge divided by image height. For nodding, choose
    `head_mode: "pitch"` in detector Settings **before** calibrating; it
@@ -79,24 +70,26 @@ The requested FPS takes effect on source start; actual Hz and capture age are sh
 6. Open **Live lab**, return your head/tongue to neutral and open both eyes, then
    press **Start preview**. Existing scopes show input, intermediate processing,
    and output. Mouse movement, scroll and click counters occur inside the lab.
-7. Use **Transfer settings** for click dwell, dead zones, smoothing, sensitivity,
+7. Use **Transfer settings** for motion dead zones, smoothing, sensitivity,
    acceleration and preview speed. Apply changes and start preview again. Use
    **Save active profile** in the source tab to save the applied settings and fits.
 
 Unknown detector observations and graph/CSV evidence stay invalid. The explicit
 Processing eye input holds its previous numeric value with known=false on every unknown captured
-frame; that flag cancels eye timers and never counts as intentional reopening.
+frame; that flag releases the affected output and never counts as intentional reopening.
 A new source/person/profile/calibration starts each eye at 0 until a known value arrives.
 A dark held trace is not a new measurement or a continued button press. Channels with no prior known
 value stay blank; source/subject resets start a new history.
 
 The preview is unmirrored: your left eye appears on the image's right. Both eye
-classifiers and both Processing timers stay independent. Holding both can activate
-both; short closures are filtered separately by each dwell threshold.
+classifiers stay independent. A recognized wink is ON while held and OFF on
+reopening; recognized natural blinks stay OFF. There is no duration gate or release
+delay in the calibrated camera path. Following arming or unknown, an actual open
+eye is required before that eye can activate. Both intentional winks can activate.
 
 | Channel | Detector measurement | Processing result |
 | --- | --- | --- |
-| Left/right eye | Separate dimensionless lid-gap/width ratios → binary `*_eye_open` (`1=open`, `0=closed`) | Independent button states after dwell/release debounce |
+| Left/right eye | Anatomical `*_eye_open` unchanged; added `eye_intent` from independent calibrated facial appearance | Per-frame wink states: 1 while held, 0 for open/blink; no dwell |
 | Head Y | Image-height fraction or pitch degrees → calibrated `[0,1]`: up 0, neutral .5, down 1 | Smoothed scroll velocity; .5 means stopped |
 | Tongue X/Y | Color candidate centroid in the mouth frame; X toward anatomical right, Y down | Relative pointer velocity; .5 means stopped per output axis |
 
@@ -110,7 +103,7 @@ in [the detector runbook](../Vision/DETECTION_LAB.md). Transfer functions are in
 ### Camera-free calibration exercise
 
 In `detector-demo`, press **Start eye calibration** in
-Detection calibration. The generated pixels and landmarks follow all seven steps
+Detection calibration. The generated pixels and landmarks follow all 21 steps
 without manual switches; after completion the fixture cycles left, right and both
 closures. Start preview to inspect the resulting clicks in Live lab. This exercises
 wiring, not real-face accuracy. Mock checkboxes/sliders are removed from calibration; the old mock eye checkboxes
@@ -126,16 +119,17 @@ while stopped or while your face is unavailable. A left-eye-only profile is vali
 
 | Saved section | Contents |
 | --- | --- |
-| `format`, `source_kind` | `face_mouse_profile_v2` (v1 readable); camera or synthetic |
-| `detector` | Version/algorithm, detector settings, independent eye fits including raw closed/open uncertainty limits, head mode and three-point fit, optional tongue color prototypes/radius/margin |
-| `processing` | Applied mouse mapping, dwell, thresholds, smoothing, response and acceleration settings |
+| `format`, `source_kind` | `face_mouse_profile_v3` (v1/v2 readable); camera or synthetic |
+| `detector` | Version/algorithm, detector settings, independent eye fits including raw closed/open uncertainty limits and appearance models/check counts, head mode and three-point fit, optional tongue color prototypes/radius/margin |
+| `processing` | Applied motion settings; legacy raw/replay eye settings retained but bypassed for camera wink samples |
 | `preview` | Simulated pointer and scroll speed |
 
 It does **not** save pictures, raw training pixels, sample traces, tracking IDs,
-selection, validation pass flags, armed state, or driver permission. Local files
+selection, live tongue validation flags, armed state, or driver permission. Local files
 are written atomically with private file permissions. They are not committed.
-Detector presets now use version 2; version 1 is accepted with its original single
-eye threshold. Recalibrate legacy eye profiles to add open-pose coverage.
+Detector presets now use version 3. Version 1/2 files restore geometry and other
+settings but require the new eye guide before camera wink buttons are available.
+New files omit research settings, images and raw wink training vectors.
 Saving does not activate anything; it records the current applied configuration.
 
 To reuse: choose/start the matching Camera or Detector demo source, then click
@@ -147,9 +141,9 @@ repeat tongue ABSENT and VISIBLE checks under current lighting. If those fail,
 recollect tongue training. Loaded color prototypes do not retain training samples.
 
 Head motion, brief loss, stale frames, Stop source and restart of the same source
-retain your completed eye/head/tongue and research fits in memory. Detection resumes
+retain your completed eye/wink/head/tongue fits in memory. Detection resumes
 when the face returns; click **Start preview** separately to resume mouse testing.
-An unfinished calibration capture is cancelled. Restart requires fresh tongue/gaze
+An unfinished calibration capture is cancelled. Restart requires fresh tongue
 checks but keeps their models. Changing source kind, applying detector Settings,
 or **Detection calibration → Settings → Reset all calibration** clears the fits.
 Closing the app clears memory: save a JSON first and load it next time.
@@ -224,8 +218,12 @@ message format, units, transport and OS output remain the next Drivers handoff.
 See [the adopted contract](../Contracts/MOUSE_MVP.md) and
 [main chat coordination](../docs/COORDINATION.md) before changing those boundaries.
 
-## Detection research in this window
+## Current eye workflow
 
-The **Detection research** tab shares this capture worker and selected profile. It adds temporal blink/wink recognition, feature and duration graphs, labeled trials, optional event models, alternative gestures/dwell/head control and an optional gaze-calibration experiment. **Start research preview** runs these settings; header **Start preview** returns to the original preview. Stop/Escape stops both. See [Detection research guide](../docs/DETECTION_RESEARCH_GUIDE.md) for exact controls, measurements, limits and validation steps. Saved profiles now use v2 with an additive research section; existing v1 profiles remain readable.
-
-Eye input details: [every-frame held eye samples](../docs/DETECTION_RESEARCH_GUIDE.md#eye-input-update-unknown-holds-the-previous-input-every-frame). Unknown graph colors are unchanged; explicit numeric inputs/known flags appear in the research readout and exports.
+The separate Detection research tab and its per-frame runtime are removed. Useful
+blink/wink learning and checking now live in Detection calibration. Its lower scope
+selects wink samples, same-eye facial features or raw eyelid ratios; CSV export
+retains all eight features, model scores and capture timestamps. See the
+[eye testing guide](../docs/EYE_CALIBRATION_GUIDE.md) and
+[sampled intent contract](../Contracts/EYE_INTENT.md). Legacy research modules remain
+for developer tests and old-profile validation; they do not run in the active App.

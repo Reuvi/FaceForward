@@ -119,4 +119,8 @@ CI runs component/integration tests without camera dependencies. The optional
 model test is enabled with `VISION_MODEL_PATH`; see Vision's README. Scope CI
 checks lane ownership separately. Driver files have not been changed by this MVP.
 
-The same native app now includes **Detection research**: blink/wink timing and facial-feature graphs, labeled trials, optional classifiers, alternative mappings and calibrated gaze experiments. See [the complete testing/engineering guide](docs/DETECTION_RESEARCH_GUIDE.md). All output remains a simulated preview.
+The native app now learns **blinks versus intentional winks inside eye calibration**.
+A single full-screen guide trains and checks each eye independently. Recognized
+winks produce ON samples while held, with no duration threshold. Detection research
+has been removed from the app. See [the eye calibration/testing guide](docs/EYE_CALIBRATION_GUIDE.md).
+All output remains a simulated preview.
