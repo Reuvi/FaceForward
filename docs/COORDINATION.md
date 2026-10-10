@@ -1,6 +1,16 @@
 # Main chat and agent coordination hub
 
-## Current tongue-tip task
+## Current separate eye guides task
+
+Claim: Reuvi integration, `work/reuvi/integration/separate-eye-guides`, base
+`f4eb12c`. Authorized scope: Vision's eye geometry/appearance guides and rest UI,
+App command wiring, tests, shared contracts and documentation. Separate eye
+open/closed calibration from blink/wink training; retries of the latter retain
+geometry. Show a central rest countdown together with the next instruction.
+Contract first: [EYE_INTENT.md](../Contracts/EYE_INTENT.md). Keep one worker,
+independent sampled eye intent, saved fits and capture-timestamp gating.
+
+## Previous tongue-tip handoff (f4eb12c)
 
 Claim: Reuvi integration, `work/reuvi/integration/tongue-tip`, base `0123b8d`.
 Scope: Vision crop/color/tip estimator/calibration/profiles, App raw labels, shared
