@@ -50,8 +50,16 @@ def demo_image(*, left_closed=False, right_closed=False, head=0.5,
     cv2.fillPoly(bgr, [polygon], (35, 30, 40))
     cv2.rectangle(bgr, (290, int(cy-22)), (350, int(cy-14)), (195, 210, 220), -1)
     if tongue:
-        x, y = int(380-120*tongue_x), int(cy-30+60*tongue_y)
-        cv2.ellipse(bgr, (x, y), (15, 11), 0, 0, 360, (115, 100, 215), -1)
+        # Explicit attached capsule with a known rounded front edge. The older
+        # isolated ellipse could exercise a centroid but had no identifiable tip.
+        tip=np.array([320-120*1.6*(tongue_x-.5), cy+120*(.45+.8*(tongue_y-.5))])
+        base=np.array([320.,cy-4])
+        direction=tip-base;direction/=np.linalg.norm(direction)
+        radius=12
+        end=tip-direction*radius
+        cv2.line(bgr,tuple(np.round(base).astype(int)),tuple(np.round(end).astype(int)),(115,100,215),2*radius)
+        cv2.circle(bgr,tuple(np.round(end).astype(int)),radius,(115,100,215),-1)
+        cv2.circle(bgr,tuple(np.round(base).astype(int)),radius,(115,100,215),-1)
     angle = math.radians((head - 0.5)*40)
     rotation = ((1., 0., 0.), (0., math.cos(angle), -math.sin(angle)), (0., math.sin(angle), math.cos(angle)))
     observation = Observation(Box(165/640, (45+offset)/480, 310/640, 390/480), tuple(points), rotation=rotation)

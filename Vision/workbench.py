@@ -9,7 +9,7 @@ from .movement_guide import MovementGuide
 from .wink_model import NAMES, measure as measure_winks, score as wink_score, classify as classify_wink
 from .pipeline import VisionPipeline
 from .signals import SINGLE_SUBJECT, invalid, make_face, measurement, monotonic_ms
-from .tongue import TongueModel, TongueResult, mouth_crop, sample_colors
+from .tongue import TONGUE_MEASUREMENT, TongueModel, TongueResult, mouth_crop, sample_colors
 
 
 TARGETS = ("left_open", "left_closed", "right_open", "right_closed",
@@ -82,6 +82,8 @@ class DetectorWorkbench:
         self.movement_guide = None
         self.crop = self.frozen_crop = None
         self.tongue = TongueResult()
+        if self.tongue_model is not None:
+            self.tongue_model.reset_tracking()
         self.selected = None
         self.observations = {}
         self.features = {}
@@ -143,6 +145,8 @@ class DetectorWorkbench:
         self.tongue_range = tongue_range
         self.pipeline.tracker.max_gap_ms = config.stale_ms
         self.notice = "Profile loaded. Check live readings; output remains stopped."
+        if data["version"]<5 and data.get("tongue") is not None:
+            self.notice += " Old centroid tongue calibration removed; repeat appearance and tip range. Eyes/head retained."
         if tongue is not None:
             self.notice += (" Recheck saved tongue range." if tongue_range else
                             " Run tongue position guide to learn a personal range.")
@@ -283,7 +287,10 @@ class DetectorWorkbench:
             feature=self.features["head"]
             guide.feed(timestamp,(feature.value,),feature.quality>0)
         else:
-            guide.feed(timestamp,self.tongue.xy,self.crop is not None and self.features["face"].quality>0)
+            value=self.tongue.xy
+            if guide.steps[guide.index][0]=="absence":
+                value=(1,) if self.tongue.candidate_present else None
+            guide.feed(timestamp,value,self.crop is not None and self.features["face"].quality>0)
         if not guide.active:
             self.notice=guide.report
             if guide.passed:
@@ -400,7 +407,7 @@ class DetectorWorkbench:
         if target.startswith(("tongue_", "validate_")):
             if self.crop is not None and self.features["face"].quality > 0:
                 if len(job.values) < 512:
-                    job.values.append(int(self.tongue.xy is not None))
+                    job.values.append(int(self.tongue.candidate_present if target=="validate_absent" else self.tongue.xy is not None))
                 if target == "tongue_absent" and len(job.colors) < 12000:
                     job.colors.extend(sample_colors(self.crop)[::4].tolist())
                     job.colors = job.colors[:12000]
@@ -459,11 +466,13 @@ class DetectorWorkbench:
             self.wink_vectors = measure_winks(observation,self.features)
             self.crop, mouth_reason = mouth_crop(captured.bgr, observation, self.config)
             if self.crop is not None and self.features["face"].quality > 0 and self.tongue_model is not None:
-                self.tongue = self.tongue_model.detect(self.crop, self.config)
+                self.tongue = self.tongue_model.detect(self.crop, self.config, timestamp_ms=frame["timestamp_ms"])
             elif self.crop is None:
                 self.tongue.reason = mouth_reason
             elif self.features["face"].quality == 0:
                 self.tongue.reason = self.features["face"].reason
+            if self.tongue_model is not None and self.tongue.xy is None:
+                self.tongue_model.reset_tracking()
             self._collect_frame(frame["timestamp_ms"])
             self._guide_movement(frame["timestamp_ms"])
             if self.eye_guide and self.eye_guide.active:
@@ -504,7 +513,7 @@ class DetectorWorkbench:
                     if all(value is not None for value in xy):
                         values["tongue_x"] = measurement(xy[0], quality)
                         values["tongue_y"] = measurement(xy[1], quality)
-                        self.reasons["tongue"]="Calibrated personal tongue position"
+                        self.reasons["tongue"]="Calibrated tongue front-edge position"
                     else:
                         self.reasons["tongue"]="Outside calibrated tongue range"
                 else:
@@ -512,7 +521,8 @@ class DetectorWorkbench:
             frame["faces"] = [make_face(face["subject_id"], values if face["subject_id"] == self.selected else {})
                               for face in frame["faces"]]
         frame["diagnostic_only"] = True
-        frame["position_space"] = "personal_range_v1"
+        frame["position_space"] = "personal_tongue_tip_v1"
+        frame["tongue_measurement"] = TONGUE_MEASUREMENT
         intent = dict(format="eye_intent_v1",subject_id=SINGLE_SUBJECT,
                       **{key:frame[key] for key in ("session_id","sequence","timestamp_ms")})
         signals = frame["faces"][0]["signals"] if frame["faces"] else {}
@@ -535,7 +545,15 @@ class DetectorWorkbench:
         frame = self.frame
         signals = next((f["signals"] for f in frame["faces"] if f["subject_id"] == self.selected), {})
         row = {"session_id": frame["session_id"], "sequence": frame["sequence"], "timestamp_ms": frame["timestamp_ms"],
-               "position_space": frame["position_space"],
+               "position_space": frame["position_space"], "tongue_measurement": TONGUE_MEASUREMENT,
+               "tongue_raw_units": "mouth_widths",
+               "tongue_tip_x": self.tongue.xy[0] if self.tongue.xy else None,
+               "tongue_tip_y": self.tongue.xy[1] if self.tongue.xy else None,
+               "tongue_region_x": self.tongue.centroid[0] if self.tongue.centroid else None,
+               "tongue_region_y": self.tongue.centroid[1] if self.tongue.centroid else None,
+               "tongue_candidate_present": self.tongue.candidate_present,
+               "tongue_tip_extension": self.tongue.extension,
+               "tongue_tip_reason": self.tongue.reason,
                "subject_id": SINGLE_SUBJECT, "calibration_generation": self.generation, "head_mode": self.config.head_mode,
                "head_raw_units": "image_height_fraction" if self.config.head_mode == "position" else "degrees",
                "mouth_opening_ratio": self.crop.opening_ratio if self.crop else None,

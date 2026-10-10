@@ -14,7 +14,7 @@ TONGUE_TARGETS = (
 )
 
 
-def validate_range(value, config):
+def validate_range(value, config, *, bounds=(-.8, .8)):
     if value is None:
         return None
     if not isinstance(value, dict) or set(value) != {"x", "y"}:
@@ -30,7 +30,7 @@ def validate_range(value, config):
             raise ValueError("Invalid tongue range fields")
         fit = AxisCalibration(**fields)
         if (
-            not 0 <= fit.low < fit.center < fit.high <= 1
+            not bounds[0] <= fit.low < fit.center < fit.high <= bounds[1]
             or min(fit.center - fit.low, fit.high - fit.center)
             < config.tongue_position_separation
             or fit.endpoint_tolerance != config.endpoint_tolerance
@@ -252,7 +252,7 @@ class MovementGuide:
                 if name == "center"
                 else f"Move your tongue toward YOUR {name.upper()} comfortable limit"
             )
-            instruction += "; keep your mouth opening steady"
+            instruction += "; keep the front edge visible"
         return dict(
             kind=self.kind,
             index=self.index,

@@ -23,6 +23,8 @@ Vision/.venv/bin/python -m App --source camera --model Vision/.local/face_landma
 Follow [the unified workflow and saved-profile guide](App/README.md).
 The [head/tongue calibration guide](docs/MOVEMENT_CALIBRATION_GUIDE.md) covers guided
 position fitting, raw graphs on camera setup, shared readings and saved profiles.
+The [tongue-tip testing guide](docs/TONGUE_TIP_TESTING.md) explains the visible
+front-edge midpoint, overlays, raw units, and older-profile recalibration.
 The [tongue model plan](Vision/TONGUE_MODEL_PLAN.md) incorporates the supplied
 segmentation research and distinguishes the current color baseline from future models.
 The [detector runbook](Vision/DETECTION_LAB.md) specifies measurements and thresholds.

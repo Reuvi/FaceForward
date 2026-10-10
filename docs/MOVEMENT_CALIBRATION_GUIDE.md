@@ -25,13 +25,14 @@ The **Raw measurements** panel and bottom graphs show:
 | --- | --- |
 | Left/right eyelid gap / eye width | Dimensionless ratio; available before eye calibration |
 | Head Y | Nose-bridge image-height fraction, or pitch in degrees, selected in Head Y calibration |
-| Tongue centroid X/Y | Fractions of the mouth crop; available after appearance training, before personal range calibration |
+| Tongue front-edge midpoint X/Y | Signed mouth-width units about mouth midpoint; available after appearance training, before personal range calibration |
 | Eye facial coefficients | Choose Left/Right facial features in the raw graph selector; same-side blink, squint, cheek and brow scores, 0–1 |
 
 Tongue position cannot be measured before its appearance model exists. A blank
-centroid graph means unavailable, not centered. The candidate is experimental
+tip graph means unavailable, not centered. The candidate is experimental
 color segmentation and can mistake similarly colored tissue for tongue.
-Inspect the green candidate mask during calibration.
+Inspect the green mask, orange front boundary and cyan tip during calibration.
+See [tongue-tip testing](TONGUE_TIP_TESTING.md) for detailed steps and rejection reasons.
 
 The **Calibrated signals** subtab shows the actual SignalFrame values. These remain
 unavailable until the relevant calibration is ready. Raw values and calibrated
@@ -85,21 +86,20 @@ does not claim to fully disentangle them or correct camera perspective.
    about 46 seconds after appearance setup. It stops early with a reason if a
    collection or check fails. Recollect appearance if the absent check fails.
 
-The left position plane shows the **raw mouth centroid**. Its purple rectangle is
+The left position plane shows the **raw tongue tip in mouth widths**. Its purple rectangle is
 the learned personal range once fitted. The right plane shows **personal position**,
 with your learned neutral at (.5, .5). X increases toward your anatomical right;
 Y increases down. The camera preview is unmirrored, so the displayed camera image
 has the opposite horizontal appearance from this anatomical coordinate plot.
 The orange circle is a requested calibration target, not a detection.
 
-This tracks the visible region's centroid **inside the lips**, not the tongue tip.
-Tissue protruding outside that crop is excluded; range calibration cannot recover
-it. Changing mouth
-opening changes the raw Y reference; occlusion, saliva/reflections, lips/gums and
-lighting can still cause misses or false candidates. Comfortable positions must be
-distinct and repeatable. No absent or unreliable input is replaced with a fake
-center. Unknown intervals hold the last plot position in a darker color, while
-the actual signal stays null/invalid.
+The visible front-boundary midpoint is estimated from the color mask in a padded
+160×160 crop spanning 1.6 mouth widths. Both axes use mouth width; raw zero is the
+mouth-corner midpoint, and the plot covers −.8 to +.8. The crop includes protrusion,
+but lips covering the front, similar tissue colors, saliva/reflections, blur and
+lighting can still cause misses or false tips. Comfortable positions must expose
+a distinct, repeatable front edge. Unknown intervals hold the last plot position
+in a darker color while the actual tongue signal stays null/invalid.
 
 ## Inspect, retry, save
 
@@ -117,11 +117,11 @@ loss during normal tracking preserves completed calibration. Rest/preparation
 frames never train either range. Low tones mean rest, a rising pair means
 prepare, three high tones mean capture, and success/retry have separate cues.
 
-Save using **Save active profile** in the camera tab. Detector preset v4 adds
-`tongue_range`; the enclosing `face_mouse_profile_v3` remains readable by this
-App. Old detector v1/v2/v3 files still load, but without a tongue range you must
-run the new position guide before tongue X/Y becomes valid. Eye-model compatibility
-is unchanged.
+Save using **Save active profile** in the camera tab. Detector preset v5 records
+the color-tip measurement and its personal range; the enclosing
+`face_mouse_profile_v3` is unchanged. v1-v4 detector files load compatible
+eye/wink/head fits but discard old centroid-based tongue appearance/ranges.
+Repeat both tongue appearance and position calibration for those files.
 
 Loading works while stopped or without a face, and always leaves preview stopped.
 After loading or restarting the source, use **Recheck saved tongue range**:
@@ -150,7 +150,7 @@ These are transparent MVP checks, not validated human accuracy claims.
 | `min_samples` | 12 | Minimum usable distinct-timestamp samples |
 | `head_position_separation` | .02 | Minimum adjacent reference separation, image-height fraction |
 | `head_pitch_separation` | 3° | Minimum adjacent pitch separation |
-| `tongue_position_separation` | .04 | Minimum adjacent X/Y separation in mouth fractions |
+| `tongue_position_separation` | .04 | Minimum adjacent X/Y separation in mouth widths |
 | `position_check_tolerance` | .2 | Maximum normalized error in a fresh target check |
 | `endpoint_tolerance` | .05 | Small normalized overshoot clips to 0/1; larger overshoot is unavailable |
 

@@ -12,11 +12,14 @@ import cv2
 import numpy as np
 
 from .geometry import reference, sub
+from .tongue_tip import estimate_tip
 
 
 INNER_LIP = (78, 95, 88, 178, 87, 14, 317, 402, 318, 324,
              308, 415, 310, 311, 312, 13, 82, 81, 80, 191)
-CROP_WIDTH, CROP_HEIGHT = 128, 96
+CROP_WIDTH, CROP_HEIGHT = 160, 160
+CROP_SPAN = 1.6
+TONGUE_MEASUREMENT = "color_tip_mouth_width_v1"
 
 
 @dataclass
@@ -26,9 +29,20 @@ class MouthCrop:
     to_image: object
     opening_ratio: float
     width_px: float
+    inner_mask: object
+
+    @property
+    def mouth_pixels(self):
+        return (CROP_WIDTH - 1) / CROP_SPAN
+
+    def raw_point(self, pixel):
+        return tuple((float(v)/(CROP_WIDTH-1)-.5)*CROP_SPAN for v in pixel)
+
+    def crop_point(self, raw):
+        return tuple((float(v)/CROP_SPAN+.5)*(CROP_WIDTH-1) for v in raw)
 
     def image_point(self, xy):
-        point = self.to_image @ np.array([xy[0] * (CROP_WIDTH - 1), xy[1] * (CROP_HEIGHT - 1), 1.0])
+        point = self.to_image @ np.array([*self.crop_point(xy), 1.0])
         return tuple(float(v) for v in point)
 
 
@@ -51,19 +65,23 @@ def mouth_crop(bgr, observation, config):
     height, width = bgr.shape[:2]
     if not all(0 <= points[i][0] < width and 0 <= points[i][1] < height for i in INNER_LIP):
         return None, "Mouth is outside the image"
-    origin = np.array(frame.origin)
-    origin = origin - across * frame.width / 2 + down * float(np.dot(np.array(upper) - origin, down))
-    source = np.float32([origin, origin + across * frame.width, origin + down * mouth_height])
+    origin = np.array(frame.origin) - (across+down)*frame.width*CROP_SPAN/2
+    span = frame.width*CROP_SPAN
+    corners = [origin, origin+across*span, origin+down*span, origin+(across+down)*span]
+    if not all(0 <= point[0] < width and 0 <= point[1] < height for point in corners):
+        return None, "Expanded mouth crop is outside image; recenter or move farther away"
+    source = np.float32(corners[:3])
     dest = np.float32([[0, 0], [CROP_WIDTH - 1, 0], [0, CROP_HEIGHT - 1]])
     transform = cv2.getAffineTransform(source, dest)
     crop = cv2.warpAffine(bgr, transform, (CROP_WIDTH, CROP_HEIGHT))
     polygon = np.array([transform @ np.array([*points[i], 1.0]) for i in INNER_LIP], dtype=np.int32)
-    mask = np.zeros((CROP_HEIGHT, CROP_WIDTH), dtype=np.uint8)
-    cv2.fillPoly(mask, [polygon], 255)
-    mask = cv2.erode(mask, np.ones((3, 3), np.uint8), iterations=2)
-    if np.count_nonzero(mask) < 200:
+    inner = np.zeros((CROP_HEIGHT, CROP_WIDTH), dtype=np.uint8)
+    cv2.fillPoly(inner, [polygon], 255)
+    inner = cv2.erode(inner, np.ones((3, 3), np.uint8), iterations=1)
+    if np.count_nonzero(inner) < 200:
         return None, "Insufficient visible inner mouth"
-    return MouthCrop(crop, mask, cv2.invertAffineTransform(transform), ratio, frame.width), "Mouth region available"
+    mask = np.full_like(inner, 255)
+    return MouthCrop(crop, mask, cv2.invertAffineTransform(transform), ratio, frame.width, inner), "Expanded mouth region available"
 
 
 def color_features(bgr):
@@ -76,7 +94,7 @@ def sample_colors(crop, *, xy=None):
     mask = crop.mask > 0
     if xy is not None:
         x, y = xy
-        if not (math.isfinite(x) and math.isfinite(y) and 0 <= x <= 1 and 0 <= y <= 1):
+        if not (math.isfinite(x) and math.isfinite(y) and .04 <= x <= .96 and .04 <= y <= .96):
             raise ValueError("Choose a point inside the mouth image")
         cx, cy = round(x * (CROP_WIDTH - 1)), round(y * (CROP_HEIGHT - 1))
         patch = np.zeros_like(mask)
@@ -119,12 +137,21 @@ class TongueResult:
     reason: str = "Tongue model uncalibrated"
     mask: object = None
     area_fraction: float = 0
+    candidate_present: bool = False
+    centroid: object = None
+    attachment: object = None
+    edge: object = None
+    extension: float = 0
 
 
 class TongueModel:
     def __init__(self, positive, negative, radius, margin, report):
         self.positive, self.negative = positive, negative
         self.radius, self.margin, self.report = radius, margin, report
+        self.reset_tracking()
+
+    def reset_tracking(self):
+        self.last_tip = self.last_timestamp = None
 
     @classmethod
     def fit(cls, positives, negatives, margin=4):
@@ -150,7 +177,22 @@ class TongueModel:
         contrast = negative - positive
         return (positive <= self.radius) & (contrast >= self.margin), contrast
 
-    def detect(self, crop, config):
+    def detect(self, crop, config, *, timestamp_ms=None):
+        result = self._detect(crop, config)
+        if result.xy is None:
+            self.reset_tracking()
+            return result
+        if timestamp_ms is not None and self.last_timestamp is not None:
+            dt = (timestamp_ms-self.last_timestamp)/1000
+            if 0 < dt <= config.stale_ms/1000 and math.dist(result.xy,self.last_tip) > .12+config.tongue_tip_max_speed*dt:
+                result.xy, result.quality = None, 0
+                result.reason = "Tip jumped too far; waiting for a fresh supported edge"
+                self.reset_tracking()
+                return result
+        self.last_tip, self.last_timestamp = result.xy, timestamp_ms
+        return result
+
+    def _detect(self, crop, config):
         predicted, contrast = self.classify(color_features(crop.bgr))
         mask = ((predicted & (crop.mask > 0)) * 255).astype(np.uint8)
         kernel = np.ones((3, 3), np.uint8)
@@ -164,11 +206,15 @@ class TongueModel:
         best = candidates[0]
         fraction = float(stats[best, cv2.CC_STAT_AREA] / available)
         if fraction > config.tongue_max_area:
-            return TongueResult(reason="Candidate occupies too much of the mouth", mask=mask, area_fraction=fraction)
+            return TongueResult(reason="Candidate occupies too much of the mouth", mask=mask, area_fraction=fraction, candidate_present=True)
         if len(candidates) > 1 and stats[candidates[1], cv2.CC_STAT_AREA] > config.tongue_ambiguity * stats[best, cv2.CC_STAT_AREA]:
-            return TongueResult(reason="Multiple ambiguous tongue candidates", mask=mask, area_fraction=fraction)
+            return TongueResult(reason="Multiple ambiguous tongue candidates", mask=mask, area_fraction=fraction, candidate_present=True)
         selected = labels == best
         quality = float(min(1, np.median(contrast[selected]) / (3 * self.margin), fraction / (2 * config.tongue_min_area)))
-        x, y = centers[best]
-        return TongueResult((float(x / (CROP_WIDTH - 1)), float(y / (CROP_HEIGHT - 1))), quality,
-                            "Tongue appearance candidate", (selected * 255).astype(np.uint8), fraction)
+        estimate = estimate_tip((selected*255).astype(np.uint8), crop.inner_mask, crop.mouth_pixels, config)
+        return TongueResult(xy=crop.raw_point(estimate.point) if estimate.point else None,
+                            quality=min(quality,estimate.quality), reason=estimate.reason,
+                            mask=(selected*255).astype(np.uint8), area_fraction=fraction,
+                            candidate_present=True, centroid=crop.raw_point(centers[best]),
+                            attachment=crop.raw_point(estimate.attachment) if estimate.attachment else None,
+                            edge=estimate.edge, extension=estimate.extension)

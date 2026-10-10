@@ -94,23 +94,23 @@ class PixelTests(unittest.TestCase):
         for x,y in ((.35,.5),(.65,.5),(.5,.65)):
             result=model.detect(self.crop(tongue=True,tongue_x=x,tongue_y=y),self.config)
             self.assertIsNotNone(result.xy)
-            self.assertAlmostEqual(result.xy[0],x,delta=.025)
-            self.assertAlmostEqual(result.xy[1],y,delta=.025)
+            self.assertAlmostEqual(result.xy[0],1.6*(x-.5),delta=.035)
+            self.assertAlmostEqual(result.xy[1],.45+.8*(y-.5),delta=.025)
         shifted=self.crop(tongue=True,head=.8)
         result=model.detect(shifted,self.config)
-        self.assertAlmostEqual(result.xy[0],.5,delta=.02)
-        self.assertAlmostEqual(result.xy[1],.5,delta=.02)
+        self.assertAlmostEqual(result.xy[0],0,delta=.02)
+        self.assertAlmostEqual(result.xy[1],.45,delta=.02)
         center=shifted.image_point(result.xy)
         self.assertAlmostEqual(center[0],320,delta=2)
-        self.assertAlmostEqual(center[1],350,delta=2)
+        self.assertAlmostEqual(center[1],404,delta=2)
 
     def test_tongue_closed_mouth_and_ambiguous_components(self):
         bgr,obs=demo_image(tongue=True)
         points=list(obs[0].points);points[14]=points[13];obs[0].points=tuple(points)
         self.assertIsNone(mouth_crop(bgr,obs[0],self.config)[0])
         crop=self.crop()
-        cv2.ellipse(crop.bgr,(44,52),(10,9),0,0,360,(115,100,215),-1)
-        cv2.ellipse(crop.bgr,(84,52),(10,9),0,0,360,(115,100,215),-1)
+        cv2.ellipse(crop.bgr,(48,100),(15,14),0,0,360,(115,100,215),-1)
+        cv2.ellipse(crop.bgr,(112,100),(15,14),0,0,360,(115,100,215),-1)
         result=self.model().detect(crop,self.config)
         self.assertIsNone(result.xy)
         self.assertIn("ambiguous",result.reason)
@@ -125,8 +125,8 @@ class PixelTests(unittest.TestCase):
         self.assertIsNotNone(crop,reason)
         xy=model.detect(crop,self.config).xy
         self.assertIsNotNone(xy)
-        self.assertAlmostEqual(xy[0],.6,delta=.03)
-        self.assertAlmostEqual(xy[1],.55,delta=.03)
+        self.assertAlmostEqual(xy[0],.16,delta=.03)
+        self.assertAlmostEqual(xy[1],.49,delta=.03)
 
     def test_color_overlap_and_invalid_patch_rejected(self):
         pixels=sample_colors(self.crop(tongue=True),xy=(.5,.5))
@@ -198,11 +198,13 @@ class WorkbenchTests(unittest.TestCase):
         self.collect("validate_visible",tongue=True)
         self.assertFalse(self.feed(tongue=True)["tongue_x"]["valid"])  # Appearance alone is not a personal range.
         self.tongue_positions()
+        # An instantaneous synthetic jump may be unknown; measure a fresh held frame.
+        self.feed(left_closed=True,right_closed=True,tongue=True,tongue_x=.65,head=.675)
         signals=self.feed(left_closed=True,right_closed=True,tongue=True,tongue_x=.65,head=.675)
         self.assertEqual(signals["left_eye_open"]["value"],0)
         self.assertEqual(signals["right_eye_open"]["value"],0)
         self.assertAlmostEqual(signals["head_y"]["value"],.75)
-        self.assertAlmostEqual(self.core.tongue.xy[0],.65,delta=.025)
+        self.assertAlmostEqual(self.core.tongue.xy[0],.24,delta=.035)
         self.assertAlmostEqual(signals["tongue_x"]["value"],.875,delta=.05)
         self.assertTrue(signals["tongue_y"]["valid"])
         self.assertFalse(signals["gaze_x"]["valid"])

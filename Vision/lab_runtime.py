@@ -164,8 +164,14 @@ class LabRuntime:
                 if index < len(obs.points):
                     cv2.circle(image, tuple(round(v) for v in obs.points[index]), 2, color, -1)
         core = self.workbench
-        if core.crop is not None and core.tongue.xy is not None:
-            cv2.circle(image, tuple(round(v) for v in core.crop.image_point(core.tongue.xy)), 4, (255, 255, 0), -1)
+        if core.crop is not None:
+            if core.tongue.edge is not None:
+                for pixel in core.tongue.edge:
+                    cv2.circle(image,tuple(round(v) for v in core.crop.image_point(core.crop.raw_point(pixel))),1,(0,180,255),-1)
+            if core.tongue.attachment is not None:
+                cv2.circle(image,tuple(round(v) for v in core.crop.image_point(core.tongue.attachment)),3,(255,80,200),-1)
+            if core.tongue.xy is not None:
+                cv2.circle(image,tuple(round(v) for v in core.crop.image_point(core.tongue.xy)),4,(255,255,0),-1)
         cv2.putText(image, "Unmirrored | user's LEFT is image RIGHT", (8, h-12), cv2.FONT_HERSHEY_SIMPLEX, .48, (245,245,245), 1)
         return cv2.resize(image, (640, 480))
 
@@ -196,7 +202,7 @@ class LabRuntime:
                       "head_y", "tongue_x", "tongue_y", "left_wink_bit", "right_wink_bit"}
             needed.update(side+"_"+key for side in ("left","right")
                           for key in ("blink","squint","cheek","brow","wink_score"))
-            needed.update(("tongue_candidate_x","tongue_candidate_y"))
+            needed.update(("tongue_tip_x","tongue_tip_y"))
             cutoff = self.workbench.trace[-1]["timestamp_ms"]-8000 if self.workbench.trace else 0
             scope_subject = state.get("scope_subject", state["selected"])
             for row in reversed(self.workbench.trace):
@@ -219,7 +225,16 @@ class LabRuntime:
             if crop and not state["frozen"] and self.workbench.tongue.mask is not None:
                 mask = self.workbench.tongue.mask > 0
                 state["mouth"][mask] = (state["mouth"][mask]*.4 + (0,150,0)).astype("uint8")
+            if crop and not state["frozen"]:
+                tip=self.workbench.tongue
+                if tip.edge is not None:
+                    for pixel in tip.edge:cv2.circle(state["mouth"],tuple(round(v) for v in pixel),1,(0,180,255),-1)
+                for raw,color in ((tip.attachment,(255,80,200)),(tip.xy,(255,255,0))):
+                    if raw is not None:cv2.circle(state["mouth"],tuple(round(v) for v in crop.crop_point(raw)),3,color,-1)
             state["candidate"] = self.workbench.tongue.xy
+            state["tip_present"] = self.workbench.tongue.xy is not None
+            state["candidate_present"] = self.workbench.tongue.candidate_present
+            state["tip_reason"] = self.workbench.tongue.reason
             return state
 
     def export_trace(self, path):

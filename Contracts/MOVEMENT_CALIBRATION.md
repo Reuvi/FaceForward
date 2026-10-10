@@ -18,26 +18,25 @@ only head calibration. A guided neutral/up/down training pass is followed by new
 neutral/up/down checks. Up=0, neutral=.5, down=1 irrespective of pitch sign.
 Head X is reserved and remains unavailable.
 
-Tongue appearance remains experimental local color segmentation, with manual
-tongue-only marking. Raw candidate X/Y is the visible region centroid in a
-mouth-relative coordinate system, not the tongue tip or a verified tongue label.
-No candidate is fabricated before appearance training or while absent.
-A guided absent check precedes center/left/right/up/down captures and separate
-fresh position checks. Independent axis fits map comfortable endpoints to 0/1
-and the learned center to .5. Failed/missing/overlapping data cannot enable output.
+Tongue appearance remains experimental local color segmentation with manual
+tongue-only marking. The current measurement is the middle of its visible front
+boundary, using an expanded crop and mouth-width units on both axes; see
+[TONGUE_TIP.md](TONGUE_TIP.md). No tip is fabricated before appearance training,
+while absent, or when its edge is ambiguous. A guided absent check precedes
+center/left/right/up/down captures and separate fresh position checks. Independent
+axis fits map comfortable endpoints to 0/1 and learned center to .5.
 
-In the calibrated camera path, `tongue_x/y` now represent that learned personal
-range, instead of the earlier full-mouth coordinates. The unchanged raw mouth
-coordinates stay in `tongue_candidate_x/y` diagnostics. Emit additive
-`position_space: "personal_range_v1"` on calibrated frames to make that meaning
-explicit. These are positions, not mouse velocity demands; Processing mappings
-remain a later/device-specific stage. Generic legacy replay keeps its old schema.
+Calibrated frames emit `position_space: personal_tongue_tip_v1` and
+`tongue_measurement: color_tip_mouth_width_v1`. `tongue_x/y` are personal positions,
+not velocity. Raw tip coordinates are `tongue_tip_x/y` (also aliased by the older
+`tongue_candidate_x/y` diagnostic names). Region centroid remains debug-only.
+Generic legacy replay keeps its old schema.
 
-Detector preset v4 adds `tongue_range` and retains v1/v2/v3 loading. Combined
-profile v3 remains unchanged. Completed fits persist through brief loss and source
-restart; loading/restart require a fresh absent + five-position recheck of the saved range. Old profiles
-without a tongue movement range require the new position guide before tongue
-output can be valid. Stored ranges are never guessed from the full mouth.
+Detector preset v5 retains validated v1-v4 loading while discarding incompatible
+old tongue appearance/ranges; compatible eye/wink/head fits survive. Combined
+profile v3 is unchanged. Completed fits persist through brief loss and restart;
+loading/restart require a fresh absent + five-position recheck of a saved tip range.
+Old tongue fits require both appearance and range training again.
 
 Unknown numeric diagnostics remain null/invalid. Plot-only holds use darker
 versions of the original colors, with no invented measurements or control input.
@@ -47,7 +46,6 @@ Full source loss/cancel preserves completed fits and discards unfinished work.
 Synthetic tests establish behavior, not real-person detector accuracy.
 
 A later learned segmentation backend must explicitly version its coordinate space
-and calibration. The current raw domain excludes tongue protrusion outside the
-inner lips. Changing crop/scaling or centroid to tip requires a new coordinated
-contract; do not load current color-based ranges onto those new measurements.
+and calibration. Changing the current color-mask tip measurement or crop requires
+a coordinated contract and fresh calibration, even if both return X/Y.
 See [the tongue model evaluation plan](../Vision/TONGUE_MODEL_PLAN.md).

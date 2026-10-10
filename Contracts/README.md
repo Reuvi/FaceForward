@@ -1,5 +1,9 @@
 # Shared contracts — initial v1
 
+Current calibrated camera tongue semantics are defined in [TONGUE_TIP.md](TONGUE_TIP.md):
+visible front-edge midpoint, raw mouth-width units, personal 0–1 output, detector
+preset v5. The legacy generic v1 table below is unchanged for replay.
+
 These language-neutral messages are the starting agreement for independent work.
 The integration owner serializes changes here. The examples are synthetic data,
 not recordings, and are not a functioning pipeline or complete validation suite.
@@ -59,9 +63,9 @@ missing measurements: zero is a real extreme/closed state.
 | `head_x` | Comfortable left limit | Neutral head position | Comfortable right limit |
 | `head_y` | Comfortable up limit | Neutral head position | Comfortable down limit |
 
-For the current calibrated camera path, `position_space: "personal_range_v1"`
+For the current calibrated camera path, `position_space: "personal_tongue_tip_v1"`
 explicitly changes tongue endpoints to the user's learned comfortable limits and
-center to their learned neutral. Raw mouth fractions remain diagnostics. The table
+center to their learned neutral. Raw tip mouth-width units remain diagnostics. The table
 above remains the legacy replay meaning; see
 [MOVEMENT_CALIBRATION.md](MOVEMENT_CALIBRATION.md) for the coordinated override.
 

@@ -8,6 +8,7 @@ import unittest
 
 AVAILABLE = all(importlib.util.find_spec(name) for name in ("cv2", "numpy"))
 if AVAILABLE:
+    import cv2
     from App.mouse_runtime import MouseSession
     from Vision.calibration import EyeCalibration
     from Vision.capture import CapturedImage
@@ -32,10 +33,12 @@ class MovementIntegrationTests(unittest.TestCase):
         )
         self.feed()
 
-    def feed(self, *, blank=False, **controls):
+    def feed(self, *, blank=False, round_candidate=False, **controls):
         self.now += 25
         self.sequence += 1
         image, observations = demo_image(**controls)
+        if round_candidate:
+            cv2.circle(image, (320, 326), 22, (115, 100, 215), -1)
         return self.session.deliver_detection(
             CapturedImage(Envelope("movement", self.sequence, self.now), image),
             [] if blank else observations,
@@ -109,9 +112,10 @@ class MovementIntegrationTests(unittest.TestCase):
         guide = self.guide("tongue")
         self.assertTrue(guide.passed, guide.report)
         self.assertEqual(len(guide.steps), 11)
+        self.feed(tongue=True, tongue_x=0.6, tongue_y=0.4)
         frame = self.feed(tongue=True, tongue_x=0.6, tongue_y=0.4)
-        self.assertEqual(frame["position_space"], "personal_range_v1")
-        self.assertAlmostEqual(self.core.tongue.xy[0], 0.6, delta=0.02)
+        self.assertEqual(frame["position_space"], "personal_tongue_tip_v1")
+        self.assertAlmostEqual(self.core.tongue.xy[0], 0.16, delta=0.035)
         self.assertAlmostEqual(
             frame["faces"][0]["signals"]["tongue_x"]["value"], 0.75, delta=0.05
         )
@@ -132,7 +136,7 @@ class MovementIntegrationTests(unittest.TestCase):
             path = Path(directory) / "movement.json"
             self.session.save_profile(path)
             data = read_profile(path)
-            self.assertEqual(data["detector"]["version"], 4)
+            self.assertEqual(data["detector"]["version"], 5)
             self.session.load_profile(path)
             self.assertEqual(self.core.tongue_range, original)
             self.assertFalse(
@@ -144,20 +148,23 @@ class MovementIntegrationTests(unittest.TestCase):
                 self.feed(tongue=True)["faces"][0]["signals"]["tongue_x"]["valid"]
             )
             bad = deepcopy(data)
-            bad["detector"]["tongue_range"]["x"]["center"] = 0
+            bad["detector"]["tongue_range"]["x"]["center"] = 2
             write_profile(path, bad)
             with self.assertRaises(ValueError):
                 self.session.load_profile(path)
             self.assertEqual(self.core.tongue_range, original)
             legacy = deepcopy(data)
             legacy["detector"].pop("tongue_range")
+            legacy["detector"].pop("tongue_measurement")
             legacy["detector"].update(
                 version=3, algorithm="frame-wink-eye-head-tongue-v3"
             )
             write_profile(path, legacy)
             self.session.load_profile(path)
-            self.collect("validate_absent")
-            self.collect("validate_visible", tongue=True)
+            self.assertIsNone(self.core.tongue_model)
+            self.assertIn("centroid",self.core.notice)
+            with self.assertRaises(ValueError):
+                self.collect("validate_absent")
             self.assertIsNone(self.core.tongue_range)
             self.assertFalse(
                 self.feed(tongue=True)["faces"][0]["signals"]["tongue_x"]["valid"]
@@ -187,3 +194,36 @@ class MovementIntegrationTests(unittest.TestCase):
             "present_movement_step", 0, "prepare", self.core.generation
         )
         self.assertEqual(self.core.movement_guide.start_ms, self.now)
+
+    def test_ambiguous_color_region_cannot_pass_absence_check(self):
+        self.appearance()
+        self.feed(round_candidate=True)
+        self.assertTrue(self.core.tongue.candidate_present)
+        self.assertIsNone(self.core.tongue.xy)
+        self.assertFalse(self.guide("tongue", tongue=False, round_candidate=True).passed)
+        self.assertIn("Absent check failed", self.core.notice)
+        self.assertIsNone(self.core.tongue_range)
+
+    def test_tip_diagnostics_share_capture_and_export_null_without_centroid_fallback(self):
+        import csv
+        self.appearance()
+        self.feed(tongue=True)
+        source = self.session.state(include_detector=True)["detector"]
+        calibration = self.session.detector_state()
+        self.assertEqual(source["trace"], calibration["trace"])
+        raw = calibration["trace"][-1]
+        self.assertEqual(raw["tongue_measurement"], "color_tip_mouth_width_v1")
+        self.assertGreater(raw["tongue_tip_y"], raw["tongue_region_y"] + .1)
+        self.assertEqual(calibration["mouth"].shape[:2], (160,160))
+        self.feed(round_candidate=True)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)/"trace.csv"
+            self.runtime.export_trace(path)
+            with path.open() as stream:
+                last = list(csv.DictReader(stream))[-1]
+        self.assertEqual(last["sequence"], str(self.sequence))
+        self.assertEqual(last["tongue_tip_x"], "")
+        self.assertEqual(last["tongue_x"], "")
+        self.assertEqual(last["tongue_candidate_present"], "True")
+        self.assertNotEqual(last["tongue_region_x"], "")
+        self.assertNotEqual(last["tongue_tip_reason"], "")

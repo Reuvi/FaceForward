@@ -8,8 +8,56 @@ contracts/docs and tests. User authorized trying a visible-tip estimate with the
 current color segmentation. Contract first: [TONGUE_TIP.md](../Contracts/TONGUE_TIP.md).
 Keep eye/head fits, one capture stream, local execution and invalid-input release.
 
+Implementation handoff:
 
-## Current head/tongue calibration and raw views task
+- `Vision/tongue.py` uses the existing color model over a 160×160 padded crop,
+  including protrusion and negative examples on surrounding lips/skin.
+  `tongue_tip.py` selects a unique front edge attached to the mouth and reports
+  its middle anchored to an observed boundary pixel. Region centroid is debug-only.
+- Curved ends use local direction; ambiguous, clipped, short, unsupported and
+  sudden-jump tips are unavailable. Mask search has a fixed work bound. Rejected
+  tips still count as color candidates during absence checks.
+- Raw X/Y use signed mouth-width units, domain −.8 to +.8. Personal coordinates
+  still map comfortable limits to 0/1 and neutral to .5. Frames identify
+  `color_tip_mouth_width_v1` and `personal_tongue_tip_v1`.
+- The camera tab and calibration share tip graphs and original capture rows.
+  Overlays show green mask, orange front edge, cyan midpoint and purple attachment.
+  Exports include raw tip, debug region center, candidate presence and failure reason.
+  Unknown display holds remain dark; tongue controls remain invalid on unknown.
+- Detector preset v5 is inside unchanged combined profile v3. Validated v1-v4
+  profiles retain compatible eyes/winks/head but discard incompatible tongue
+  appearance/ranges. New saved tip ranges require rechecks after load/restart.
+- Test procedure and measurement details: [TONGUE_TIP_TESTING.md](TONGUE_TIP_TESTING.md).
+  Real camera detection accuracy, comfort and end-to-end latency remain unmeasured;
+  matching lip/gum colors and occluding lips can defeat the geometric estimate.
+  No new pretrained model, Processing transfer function or driver integration.
+
+
+
+Validation: **246 tests passed**: 109 Vision (including local MediaPipe blank-image
+smoke), 69 Processing, 61 integration (native Tk checks enabled), and 7 tooling.
+Synthetic masks cover straight/diagonal/curved/flat fronts, shape ambiguity,
+clipping, insufficient attachment, mouth-opening scale and sudden-jump rejection.
+Integration covers the full tongue guide, v4 migration preserving wink/head fits,
+failed absence on a region with an invalid tip, shared traces and CSV nulls.
+The 490-frame headless mouse demo accepted all frames, observed left/right/pointer/
+scroll, and released at EOF. Changed Python files pass Ruff F checks; whitespace
+and integration scope checks pass. A broader Ruff scan reported the pre-existing
+unused `Path` import in `tests/integration/test_research_lab.py`, left untouched.
+
+Commands: `VISION_MODEL_PATH=<local task file> Vision/.venv/bin/python -m unittest
+discover -s tests/vision -q`; `RUN_TK_TESTS=1 Vision/.venv/bin/python -m unittest
+discover -s tests/integration -q`; Processing/tooling `unittest discover`;
+`python3 -m App --headless --frames 490`; `python3 tools/check_scope.py --base
+0123b8d --lane integration`; `git diff --check`.
+
+500 synthetic frames in `Vision.benchmark_detection`: **6.24 ms mean / 7.09 ms p95**
+for selected-face feature extraction + mouth crop/color/tip work on this machine.
+This excludes capture, neural inference, tracking, frame construction, UI and OS
+output; it is not end-to-end performance or live accuracy evidence. Contract landed
+first in `f05d87d`; feature branch is retained when fast-forwarding main.
+
+## Previous head/tongue calibration and raw views handoff (0123b8d)
 
 Claim: Reuvi integration, `work/reuvi/integration/movement-calibration`, base
 `482fa65`. Authorized scope: Vision head/tongue calibration/UI/profiles, App's
@@ -259,7 +307,7 @@ The first three rows below refer to validation/refinement of that implementation
 | --- | --- | --- |
 | Live independent eye calibration and quality | Vision, then App handoff | Explicit selected-face collection; independent valid binary eyes; invalidation on poor visibility/loss; no bystander inheritance |
 | Head Y measurement | Vision | Calibrated continuous neutral/up/down values, orientation/quality evidence, invalid on loss; head-reference overlay alone does not count |
-| Tongue measurement | Vision | Actual centroid detector supplying mouth-relative X/Y, occlusion/absence invalidation, recorded accuracy limits |
+| Tongue measurement | Vision | Current color-tip detector supplies mouth-width X/Y and invalidates ambiguous/absent tips; see TONGUE_TIP.md for remaining live validation |
 | Per-person transfer tuning | Processing | Comparable synthetic/then-live traces, saved settings, dwell and motion behavior, unchanged public signal meanings |
 | Mouse emulator adapter agreement | Drivers with integration | Exact accepted message/example, units/signs, event transitions, timing and release-all/watchdog behavior |
 | Validate connected detectors | Vision + Processing in the main chat | Synthetic integration is tested; collect real-person raw → valid measurement → processed-state evidence and tune thresholds |

@@ -242,20 +242,21 @@ Use the visible mask and a separate live validation exercise to identify that.
    and the raw/personal position planes; no mouse transfer functions apply there.
 6. After loading a profile or restarting, use **Recheck saved tongue range** to
    check absent + five positions without fitting again. Older presets without a
-   range need the full guide. Recollect appearance if it detects non-tongue tissue.
+   tip range need the full guide. v1-v4 presets also require new appearance training.
+   Recollect appearance if it detects non-tongue tissue.
 
 Pipeline:
 
 ```text
 mouth corners + upper/lower inner lip
- → affine mouth crop, 128×96 pixels, anatomical X direction, downward Y
- → inner-lip polygon mask eroded by 2 pixels
- → weighted CIELAB features (0.35×L, a, b)
+ → affine padded mouth crop, 160×160 pixels, side length 1.6 mouth widths
+ → weighted CIELAB features (0.35×L, a, b) across the expanded crop
  → nearest positive vs negative color prototypes
  → distance/radius gate + 3×3 morphology
- → largest unambiguous connected component
- → centroid / mouth width and opening height
- → raw candidate X/Y → personal center/endpoints → fresh checks → personal X/Y
+ → largest unambiguous connected component attached to central inner mouth
+ → mask-distance front selection + local front-boundary fit
+ → midpoint of front edge / mouth width on both axes
+ → raw signed tip X/Y → personal center/endpoints → fresh checks → personal X/Y
 ```
 
 Training uses up to 4,000 positive pixels from marked patches and 12,000 negative
@@ -278,20 +279,19 @@ make tongue output valid without a fitted personal range.
 | --- | --- |
 | Mouth width | Distance between anatomical mouth corners 291 and 61, pixels |
 | Opening ratio | Projected inner-lip height / mouth width, dimensionless |
-| Candidate area | Connected-component pixels / eroded inner-mouth pixels, fraction |
-| Candidate X | Centroid column / 127; 0 user's left mouth corner, 1 user's right |
-| Candidate Y | Centroid row / 95; 0 upper inner-lip level, 1 lower inner-lip level |
+| Candidate area | Connected-component pixels / expanded-crop pixels, fraction |
+| Raw tip X | Signed anatomical horizontal displacement from mouth midpoint / mouth width |
+| Raw tip Y | Signed downward displacement from mouth midpoint / mouth width |
 | `tongue_x/y` | Personal range: 0/1 comfortable endpoints, .5 learned center; both appearance and fresh range checks required |
 
-X/Y refer to the visible region's **centroid, not the tongue tip**. The crop follows
-mouth translation, scale, and in-plane rotation. Mouth opening changes Y's scale;
-keep the opening fairly consistent while testing. Lips/teeth covering the tongue,
-a tongue extending outside the mouth domain, similar colors, changing lighting,
-and extreme pose can cause a miss or a false candidate. Tongue absence stays
-unavailable; it does not become a fake centered position. Calibration learns appearance and a personal movement range in separate stages.
-It cannot recover tissue outside the inner-lip crop or convert a centroid into a
-tongue tip. Read [the model evaluation plan](TONGUE_MODEL_PLAN.md) for the supplied
-segmentation research and the next detector comparison.
+X/Y estimate the **middle of the visible front boundary**. The square crop spans
+−.8 to +.8 mouth widths on both axes and follows mouth translation, scale and
+in-plane rotation. Color confusion, clipping, short/ambiguous or covered ends
+remain failure cases. The region centroid is debug-only; there is no fallback
+control point. A color candidate whose tip is rejected still fails an absence
+check. Read [tongue-tip testing](../docs/TONGUE_TIP_TESTING.md) for algorithm,
+overlay colors, new profile v5 migration and diagnostics. The
+[model evaluation plan](TONGUE_MODEL_PLAN.md) remains future work.
 
 ## Image gates and every tunable
 
@@ -313,7 +313,7 @@ Settings JSON contains only the following tunables, not learned face calibration
 | `eye_separation` | 0.015 | Minimum separation of retained open/closed raw ratio groups |
 | `endpoint_tolerance` | 0.05 | Allowed head/tongue normalized endpoint overshoot |
 | `movement_rest_ms` | 1500 | Rest between head/tongue guide steps |
-| `tongue_position_separation` | 0.04 | Minimum adjacent tongue reference separation, mouth fractions |
+| `tongue_position_separation` | 0.04 | Minimum adjacent tongue reference separation, mouth widths |
 | `position_check_tolerance` | 0.2 | Maximum normalized error in each fresh movement check |
 | `head_mode` | `position` | `position` or `pitch` |
 | `head_position_separation` | 0.02 | Minimum adjacent head-target image-height fraction separation |
@@ -321,9 +321,12 @@ Settings JSON contains only the following tunables, not learned face calibration
 | `min_mouth_px` | 28 | Minimum corner-to-corner mouth width, pixels |
 | `min_mouth_opening` | 0.07 | Minimum mouth opening / width ratio |
 | `tongue_margin` | 4 | Minimum negative-distance minus positive-distance in weighted Lab units |
-| `tongue_min_area` | 0.025 | Minimum component fraction of inner-mouth region |
+| `tongue_min_area` | 0.025 | Minimum component fraction of expanded crop |
 | `tongue_max_area` | 0.8 | Maximum component fraction |
 | `tongue_ambiguity` | 0.35 | Reject when second component exceeds this fraction of largest |
+| `tongue_tip_min_extension` | 0.10 | Minimum distance through mask from mouth seed, mouth widths |
+| `tongue_tip_fit_error` | 0.025 | Maximum front-edge RMS fitting error, mouth widths |
+| `tongue_tip_max_speed` | 6 | Mouth widths/sec; reject displacement > .12 + speed × dt |
 
 The face crop and each eye crop must be in bounds, bright enough, sharp enough,
 and not excessively clipped. Eye crops are centered on the corners, width 1.4×eye
@@ -433,7 +436,8 @@ and latency. Automated synthetic success does not supply these human measurement
 ## Module map and handoff
 
 - `features.py`: validated tunables, lid/head measurements, image-quality evidence.
-- `tongue.py`: mouth geometry, color training, segmentation and candidate centroid.
+- `tongue.py`: expanded mouth geometry, color training, segmentation and continuity.
+- `tongue_tip.py`: attached-mask front selection and boundary-midpoint estimate.
 - `movement_guide.py`: capture-timed head/tongue ranges and independent repeat checks.
 - `movement_view.py`: shared raw graphs, raw/personal position displays and guide cues.
 - `workbench.py`: subject/session-bound live collection, independent fits and validity.

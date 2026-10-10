@@ -103,11 +103,13 @@ completed fits survive tab changes. The real driver is not wired.
 
 `face_mouse_profile_v3` contains `format`, `source_kind` (`camera` or `synthetic`),
 `detector`, `processing`, and `preview`; v1/v2 remain readable. Detector section
-version 4 uses `personal-head-tongue-ranges-v4`, DetectionConfig, separate eye geometry
-and checked per-frame wink models, a head fit, optional tongue color parameters
-and `tongue_range`. Detector v1/v2/v3 remain readable; v3 retains wink fits but needs
-the new tongue range guide. See [MOVEMENT_CALIBRATION.md](MOVEMENT_CALIBRATION.md)
-for personal coordinates, shared raw diagnostics and guided movement checks.
+version 5 uses `color-tongue-tip-v5`, DetectionConfig, separate eye geometry
+and checked per-frame wink models, a head fit, optional tongue color parameters,
+`tongue_measurement: color_tip_mouth_width_v1` and `tongue_range`. Detector v1-v4
+remain readable; compatible eyes/winks/head survive, but old tongue appearance
+and ranges require retraining. See [TONGUE_TIP.md](TONGUE_TIP.md) and
+[MOVEMENT_CALIBRATION.md](MOVEMENT_CALIBRATION.md) for measurement units,
+shared raw diagnostics and guided movement checks.
 Processing is MouseConfig; preview contains pointer/scroll speeds. No images, raw
 training vectors, arming state or live tongue validation flags are saved. Wink
 check counts are persisted with the fitted model. Old research/event models are

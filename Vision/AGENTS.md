@@ -44,9 +44,10 @@ lane documentation here. Put requests for shared changes in `interface-requests/
   once code exists. Never commit real recordings or personal calibration data.
 
 Read `../Contracts/MOVEMENT_CALIBRATION.md` for guided head/tongue ranges and
-shared capture diagnostics. Detector presets are v4; combined profiles remain v3.
+shared capture diagnostics. Detector presets are v5; combined profiles remain v3.
 Use the same workbench trace in camera setup and calibration. No UI-sampled history
 or second worker. Keep tongue raw mouth coordinates separate from personal ranges,
-require fresh saved-range rechecks, and preserve invalid observations. The current
-color detector excludes protrusion outside the lips; do not reuse its fit for a
-future model/crop without a versioned contract and fresh calibration.
+require fresh saved-range rechecks, and preserve invalid observations. Read `../Contracts/TONGUE_TIP.md`: the current expanded crop reports the middle
+of the visible front boundary in mouth-width units. Invalid tips never fall back
+to a centroid. v1-v4 tongue appearance/ranges require retraining. Future model/crop
+changes also require a versioned contract and fresh calibration.

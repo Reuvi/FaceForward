@@ -28,13 +28,13 @@ def draw_raw_scopes(canvas, state):
             45 if pitch else 1,
         ),
         (
-            "Raw tongue centroid · mouth fraction",
+            "Raw tongue tip · mouth widths",
             (
-                ("tongue_candidate_x", "X", "#75e3a8"),
-                ("tongue_candidate_y", "Y", "#f2d66f"),
+                ("tongue_tip_x", "X", "#75e3a8"),
+                ("tongue_tip_y", "Y", "#f2d66f"),
             ),
-            0,
-            1,
+            -.8,
+            .8,
         ),
     )
     rows = state["trace"]
@@ -94,7 +94,7 @@ def draw_raw_scopes(canvas, state):
     canvas.create_text(
         width - 8,
         height - 3,
-        text="Captured samples · last 8 s · dark = unknown hold · tongue needs appearance training",
+        text="Captured samples · last 8 s · dark = unknown hold · tongue needs appearance + visible front edge",
         fill="#adbbcc",
         anchor="se",
         font=("Arial", 9),
@@ -276,8 +276,8 @@ def draw_position(canvas, state, kind):
         for index, (keys, title, color) in enumerate(
             (
                 (
-                    ("tongue_candidate_x", "tongue_candidate_y"),
-                    "Raw centroid · mouth coordinates",
+                    ("tongue_tip_x", "tongue_tip_y"),
+                    "Raw tip · mouth widths",
                     "#75e3a8",
                 ),
                 (
@@ -306,7 +306,7 @@ def draw_position(canvas, state, kind):
             canvas.create_text(
                 x0 + 3,
                 y0 + 3,
-                text="0,0 · left/up",
+                text="−.8,−.8 · left/up" if index==0 else "0,0 · left/up",
                 fill="#adbbcc",
                 anchor="nw",
                 font=("Arial", 8),
@@ -314,25 +314,27 @@ def draw_position(canvas, state, kind):
             canvas.create_text(
                 x1 - 3,
                 y1 - 3,
-                text="1,1 · right/down",
+                text=".8,.8 · right/down" if index==0 else "1,1 · right/down",
                 fill="#adbbcc",
                 anchor="se",
                 font=("Arial", 8),
             )
+            def plot_value(value):
+                return (value+.8)/1.6 if index==0 else value
             bounds = state.get("tongue_range")
             if index == 0 and bounds:
                 canvas.create_rectangle(
-                    x0 + bounds["x"]["low"] * (x1 - x0),
-                    y0 + bounds["y"]["low"] * (y1 - y0),
-                    x0 + bounds["x"]["high"] * (x1 - x0),
-                    y0 + bounds["y"]["high"] * (y1 - y0),
+                    x0 + plot_value(bounds["x"]["low"]) * (x1 - x0),
+                    y0 + plot_value(bounds["y"]["low"]) * (y1 - y0),
+                    x0 + plot_value(bounds["x"]["high"]) * (x1 - x0),
+                    y0 + plot_value(bounds["y"]["high"]) * (y1 - y0),
                     outline="#b18bff",
                     dash=(4, 3),
                 )
             point, known = display_point(state, keys)
             if point:
-                x = x0 + point[0] * (x1 - x0)
-                y = y0 + point[1] * (y1 - y0)
+                x = x0 + plot_value(point[0]) * (x1 - x0)
+                y = y0 + plot_value(point[1]) * (y1 - y0)
                 canvas.create_oval(
                     x - 6,
                     y - 6,

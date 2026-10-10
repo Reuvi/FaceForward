@@ -92,7 +92,7 @@ eye is required before that eye can activate. Both intentional winks can activat
 | --- | --- | --- |
 | Left/right eye | Anatomical `*_eye_open` unchanged; added `eye_intent` from independent calibrated facial appearance | Per-frame wink states: 1 while held, 0 for open/blink; no dwell |
 | Head Y | Image-height fraction or pitch degrees → calibrated `[0,1]`: up 0, neutral .5, down 1 | Smoothed scroll velocity; .5 means stopped |
-| Tongue X/Y | Color candidate centroid → personal movement range; center .5, X toward anatomical right, Y down | Relative pointer velocity; .5 means stopped per output axis |
+| Tongue X/Y | Visible front-edge midpoint → personal movement range; center .5, X toward anatomical right, Y down | Relative pointer velocity; .5 means stopped per output axis |
 
 Gaze and head X remain unavailable in this calibrated path. Tongue absence is
 unavailable input, never an invented center. The raw-mock adapter's eye bits use
@@ -122,17 +122,18 @@ while stopped or while your face is unavailable. A left-eye-only profile is vali
 | Saved section | Contents |
 | --- | --- |
 | `format`, `source_kind` | `face_mouse_profile_v3` (v1/v2 readable); camera or synthetic |
-| `detector` | Version/algorithm, detector settings, independent eye fits including raw closed/open uncertainty limits and appearance models/check counts, head mode and three-point fit, optional tongue color prototypes/radius/margin and personal X/Y range |
+| `detector` | Version/algorithm, detector settings, independent eye fits including raw closed/open uncertainty limits and appearance models/check counts, head mode and three-point fit, optional tongue color prototypes/radius/margin, tip measurement identifier and personal X/Y range |
 | `processing` | Applied motion settings; legacy raw/replay eye settings retained but bypassed for camera wink samples |
 | `preview` | Simulated pointer and scroll speed |
 
 It does **not** save pictures, raw training pixels, sample traces, tracking IDs,
 selection, live tongue validation flags, armed state, or driver permission. Local files
 are written atomically with private file permissions. They are not committed.
-Detector presets now use version 4; combined profiles remain v3. Detector v1/v2
+Detector presets now use version 5; combined profiles remain v3. Detector v1/v2
 files restore geometry but need the current eye guide for wink buttons. Detector
-v3 restores wink models. Older files lack a tongue range, so run the new tongue
-position guide before valid tongue output.
+v3/v4 retain wink models. All v1-v4 tongue appearance/ranges must be retrained
+because the expanded crop and tip coordinates differ. See the
+[tongue-tip guide](../docs/TONGUE_TIP_TESTING.md).
 New files omit research settings, images and raw wink training vectors.
 Saving does not activate anything; it records the current applied configuration.
 

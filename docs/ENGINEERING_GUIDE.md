@@ -2,9 +2,11 @@
 
 Current head/tongue update: use the [movement calibration guide](MOVEMENT_CALIBRATION_GUIDE.md)
 for guided position fitting, raw graphs on camera setup and shared capture data.
-Detector presets are now v4 (combined profiles remain v3). Saved tongue ranges
-require **Recheck saved tongue range** after loading/restarting; older presets
-without ranges need the new tongue guide. Eye classification is unchanged.
+Detector presets are now v5 (combined profiles remain v3). The
+[tongue-tip guide](TONGUE_TIP_TESTING.md) covers the new visible front-boundary
+measurement. v1-v4 tongue appearance/ranges require retraining; compatible
+eye/wink/head fits survive. Saved v5 tongue ranges require **Recheck saved tongue
+range** after loading/restarting. Eye classification is unchanged.
 
 
 > Current calibrated camera eye workflow: [Eye calibration/testing guide](EYE_CALIBRATION_GUIDE.md).
@@ -189,7 +191,8 @@ The existing `tongue_ratios()` can transform a real centroid into mouth-relative
 X/Y using mouth width and opening height. It rejects an out-of-mouth centroid.
 It does not detect a tongue itself. The new calibrated path instead uses
 `Vision/tongue.py`: mouth crop, small LAB color-prototype model, morphology and
-candidate centroid. See the [detector runbook](../Vision/DETECTION_LAB.md) for
+the front-boundary midpoint from `Vision/tongue_tip.py`, with mouth-width
+scaling on both axes. See the [detector runbook](../Vision/DETECTION_LAB.md) for
 actual measurements, training, gates and fresh validation requirements.
 
 [calibration.py](../Vision/calibration.py) provides in-memory fitting primitives:

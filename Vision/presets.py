@@ -7,22 +7,23 @@ import numpy as np
 from .calibration import AxisCalibration, EyeCalibration
 from .features import DetectionConfig
 from .signals import finite_number
-from .tongue import TongueModel
+from .tongue import TongueModel, TONGUE_MEASUREMENT
 
 LEGACY_ALGORITHM = "lid-gap-head-y-lab-color-v1"
 ALGORITHM = "guided-lid-gap-head-y-lab-color-v2"
 WINK_ALGORITHM = "frame-wink-eye-head-tongue-v3"
 MOVEMENT_ALGORITHM = "personal-head-tongue-ranges-v4"
+TIP_ALGORITHM = "color-tongue-tip-v5"
 
 
 def decode_winks(data):
     from .wink_model import validate_models
-    return validate_models(data["winks"]) if data.get("version") in (3,4) else {}
+    return validate_models(data["winks"]) if data.get("version") in (3,4,5) else {}
 
 
 def decode_tongue_range(data, config):
     from .movement_guide import validate_range
-    return validate_range(data["tongue_range"],config) if data.get("version")==4 else None
+    return validate_range(data["tongue_range"],config) if data.get("version")==5 else None
 
 
 def _keys(value, expected, name):
@@ -33,13 +34,16 @@ def _keys(value, expected, name):
 def decode_preset(data):
     """Validate completely before the workbench changes any active state."""
     fields=("version", "algorithm", "settings", "eyes", "head", "tongue")
-    if isinstance(data,dict) and data.get("version") in (3,4):fields+=("winks",)
-    if isinstance(data,dict) and data.get("version")==4:fields+=("tongue_range",)
+    if isinstance(data,dict) and data.get("version") in (3,4,5):fields+=("winks",)
+    if isinstance(data,dict) and data.get("version") in (4,5):fields+=("tongue_range",)
+    if isinstance(data,dict) and data.get("version")==5:fields+=("tongue_measurement",)
     _keys(data, fields, "Detector preset")
     if (type(data["version"]) is not int
-            or (data["version"], data["algorithm"]) not in ((1, LEGACY_ALGORITHM), (2, ALGORITHM), (3,WINK_ALGORITHM), (4,MOVEMENT_ALGORITHM))):
+            or (data["version"], data["algorithm"]) not in ((1, LEGACY_ALGORITHM), (2, ALGORITHM), (3,WINK_ALGORITHM), (4,MOVEMENT_ALGORITHM), (5,TIP_ALGORITHM))):
         raise ValueError("Unsupported detector preset version or algorithm")
     config = DetectionConfig.from_dict(data["settings"])
+    if data["version"]==5 and data["tongue_measurement"]!=TONGUE_MEASUREMENT:
+        raise ValueError("Unsupported tongue measurement coordinate space")
     if not isinstance(data["eyes"], dict) or set(data["eyes"]) - {"left", "right"}:
         raise ValueError("Unknown eye preset")
     eyes = {}
@@ -82,13 +86,19 @@ def decode_preset(data):
         raise ValueError("Profile needs at least one fitted detector")
     winks=decode_winks(data)
     if set(winks)-set(eyes):raise ValueError("Wink model requires matching eye geometry")
+    if data["version"] == 4:
+        from .movement_guide import validate_range
+        old_range = validate_range(data["tongue_range"],config,bounds=(0,1))
+        if old_range is not None and tongue is None:
+            raise ValueError("Legacy tongue range requires its appearance model")
     if decode_tongue_range(data,config) is not None and tongue is None:
         raise ValueError("Tongue movement range requires an appearance model")
-    return config, eyes, head, tongue
+    # Expanded negatives and front-edge coordinates cannot reuse an inner-mouth fit.
+    return config, eyes, head, tongue if data["version"]==5 else None
 
 
 def encode_preset(core):
-    result = {"version": 4, "algorithm": MOVEMENT_ALGORITHM, "settings": core.config.to_dict(),
+    result = {"version": 5, "algorithm": TIP_ALGORITHM, "tongue_measurement": TONGUE_MEASUREMENT, "settings": core.config.to_dict(),
               "winks": core.winks,
               "tongue_range": {key:asdict(fit) for key,fit in core.tongue_range.items()} if core.tongue_range else None,
               "eyes": {side: {name: getattr(fit, name) for name in ("closed", "opened", "threshold", "closed_limit", "open_limit")}

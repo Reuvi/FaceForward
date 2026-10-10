@@ -2,9 +2,11 @@
 
 Current head/tongue update: use the [movement calibration guide](MOVEMENT_CALIBRATION_GUIDE.md)
 for guided position fitting, raw graphs on camera setup and shared capture data.
-Detector presets are now v4 (combined profiles remain v3). Saved tongue ranges
-require **Recheck saved tongue range** after loading/restarting; older presets
-without ranges need the new tongue guide. Eye classification is unchanged.
+Detector presets are now v5 (combined profiles remain v3). The
+[tongue-tip guide](TONGUE_TIP_TESTING.md) covers the new visible front-boundary
+measurement. v1-v4 tongue appearance/ranges require retraining; compatible
+eye/wink/head fits survive. Saved v5 tongue ranges require **Recheck saved tongue
+range** after loading/restarting. Eye classification is unchanged.
 
 
 The calibrated camera and detector demo now assume **one person**. The app uses

@@ -2,9 +2,11 @@
 
 Current head/tongue update: use the [movement calibration guide](MOVEMENT_CALIBRATION_GUIDE.md)
 for guided position fitting, raw graphs on camera setup and shared capture data.
-Detector presets are now v4 (combined profiles remain v3). Saved tongue ranges
-require **Recheck saved tongue range** after loading/restarting; older presets
-without ranges need the new tongue guide. Eye classification is unchanged.
+Detector presets are now v5 (combined profiles remain v3). The
+[tongue-tip guide](TONGUE_TIP_TESTING.md) covers the new visible front-boundary
+measurement. v1-v4 tongue appearance/ranges require retraining; compatible
+eye/wink/head fits survive. Saved v5 tongue ranges require **Recheck saved tongue
+range** after loading/restarting. Eye classification is unchanged.
 
 
 > Current calibrated camera eye workflow: [Eye calibration/testing guide](EYE_CALIBRATION_GUIDE.md).
@@ -35,7 +37,7 @@ For camera-free calibration use `--source detector-demo` instead. See the
 | Independent left eye | Live open/closed collection, robust personalized threshold, separate binary output, raw ratio and image gates | Real-person blink/wink accuracy, glasses/occlusion and threshold chatter |
 | Independent right eye | Separate collection/classification and validity; no both-eye veto | Same tests for this anatomical eye independently |
 | Head vertical | Calibrated up/neutral/down; default nose-bridge vertical image fraction, optional camera-frame pitch degrees | Neutral drift, comfortable repeatable range, pose and distance sensitivity |
-| Tongue X/Y | Marked positive tissue + empty-mouth negatives, color segmentation, visible mask and actual candidate centroid; separate absent/visible checks gate valid output | Real-person precision/recall, false positives on gums/lips, lighting sensitivity and usable movement range |
+| Tongue X/Y | Marked positive tissue + empty-mouth negatives, color segmentation, visible mask and front-edge midpoint; appearance plus personal range/fresh checks gate valid output | Real-person precision/recall, false positives on gums/lips, lighting sensitivity and usable movement range |
 
 App connects valid v1 measurements directly to Processing. The real Drivers
 connection remains pending. Gaze and horizontal head output remain invalid
@@ -63,7 +65,7 @@ that guarantees a matching region is tongue. Inspect its mask while testing.
 Local camera → face landmarks (+ optional transform) → explicit subject selection
    ├─ each eye: lid ratio → independent open/closed calibration → binary measurement
    ├─ head Y: image position or pitch → up/neutral/down fit → normalized position
-   └─ tongue: mouth crop → calibrated pixel segmentation → candidate centroid
+   └─ tongue: padded mouth crop → calibrated pixel segmentation → visible front-edge midpoint
                               → new absent/visible exercises → normalized X/Y
 All channels → native measurements / time scopes / local scalar CSV
 Same calibrated values → Processing → existing Live lab (explicit Start preview)

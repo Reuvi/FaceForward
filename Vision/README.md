@@ -175,7 +175,8 @@ watchdog; the integration lifecycle is still to be agreed.
   Missing or invalid scores cannot make valid control signals.
 - `tongue_ratios()` implements continuous mouth-relative geometry for a real
   detector's centroid. It rejects degenerate mouth geometry and out-of-mouth
-  positions. Nothing currently detects or supplies that centroid.
+  positions. The calibrated workbench instead uses the color-mask front-edge midpoint in
+  mouth-width units; see [tongue-tip testing](../docs/TONGUE_TIP_TESTING.md).
 
 The legacy pipeline binding is memory-only. App can save the new detector fits in
 a versioned local profile and load them for the single user, even without a visible

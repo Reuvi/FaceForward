@@ -34,6 +34,9 @@ class DetectionConfig:
     position_check_tolerance: float = 0.2
     min_mouth_px: float = 28
     min_mouth_opening: float = 0.07
+    tongue_tip_min_extension: float = 0.10
+    tongue_tip_fit_error: float = 0.025
+    tongue_tip_max_speed: float = 6
     tongue_margin: float = 4
     tongue_min_area: float = 0.025
     tongue_max_area: float = 0.8
@@ -54,6 +57,9 @@ class DetectionConfig:
             "min_mouth_opening": (0.02, 0.5), "tongue_margin": (1, 30),
             "tongue_min_area": (0.005, 0.3), "tongue_max_area": (0.4, 0.95),
             "tongue_ambiguity": (0.1, 0.9),
+            "tongue_tip_min_extension": (0.08, 0.4),
+            "tongue_tip_fit_error": (0.005, 0.08),
+            "tongue_tip_max_speed": (1, 30),
         }
         for name, (low, high) in bounds.items():
             value = getattr(self, name)

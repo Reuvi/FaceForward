@@ -91,7 +91,7 @@ class DetectionLab:
         self.tongue_tab=self.tab(tabs,"3 Tongue")
         self.tongue_panel=MovementPanel(self.tongue_tab,root,self.call,"tongue")
         tongue=self.scroll_content(self.tongue_tab)
-        self.text(tongue,"Appearance setup: keep lighting and mouth opening steady. Capture an empty open mouth, then freeze the visible tongue and click ONLY tongue tissue before fitting.")
+        self.text(tongue,"Appearance setup: keep lighting and mouth opening steady. Capture the tongue-hidden mouth plus surrounding lips/skin, then freeze a visible tongue and click ONLY tongue tissue before fitting.")
         ttk.Button(tongue,text="1  Capture EMPTY open mouth",command=lambda:self.call("collect","tongue_absent")).pack(fill="x",pady=3)
         row=ttk.Frame(tongue);row.pack(fill="x",pady=3)
         ttk.Button(row,text="2  Freeze visible tongue",command=lambda:self.call("freeze_mouth")).pack(side="left")
@@ -99,7 +99,7 @@ class DetectionLab:
         self.mouth=tk.Label(tongue,bg="#14202c",text="Mouth crop appears when your face is visible",fg="white")
         self.mouth.pack(pady=6)
         self.mouth.bind("<Button-1>",self.mark_tongue)
-        self.text(tongue,"Frozen crop: click tongue tissue, avoiding lips/teeth. The live green region is an experimental centroid candidate inside the lips, not the tongue tip. Protruding tissue is excluded. Once fitted, start the position guide above. Its first step checks that a hidden tongue is absent.")
+        self.text(tongue,"Frozen crop: click tongue tissue, avoiding lips/teeth. Green is the candidate mask; orange is its chosen front edge; cyan is the edge midpoint; purple is the attachment cue. Keep the whole tip visible. Once fitted, start the position guide above. Its first step checks that a hidden tongue is absent.")
         ttk.Button(tongue,text="Reset tongue calibration",command=lambda:self.call("reset_tongue")).pack(fill="x",pady=3)
         ttk.Label(tongue,textvariable=self.tongue_details,justify="left",wraplength=420,font=("Menlo",10)).pack(anchor="w",pady=6)
         settings=self.tab(tabs,"Settings")
@@ -151,7 +151,7 @@ class DetectionLab:
     def mark_tongue(self,event):
         if not self.runtime.snapshot()["frozen"]:
             return
-        self.call("mark_tongue",event.x/256,event.y/192)
+        self.call("mark_tongue",event.x/256,event.y/256)
 
     def apply_settings(self):
         try:
@@ -194,7 +194,7 @@ class DetectionLab:
             return
         if key == "mouth" and frozen:
             bgr=bgr.copy()
-            cv2.rectangle(bgr,(58,43),(69,54),(0,230,255),1)
+            cv2.rectangle(bgr,(74,74),(85,85),(0,230,255),1)
         rgb=cv2.cvtColor(cv2.resize(bgr,size),cv2.COLOR_BGR2RGB)
         photo=tk.PhotoImage(data=f"P6\n{size[0]} {size[1]}\n255\n".encode()+rgb.tobytes(),format="PPM")
         self.photos[key]=photo;widget.configure(image=photo,text="",pady=0)
@@ -238,7 +238,7 @@ class DetectionLab:
         self.source_status.set(f"{state['source']}   |   capture #{(state['frame'] or {}).get('sequence','—')}   |   single user: {'detected' if state['selected'] else 'waiting for face'}   |   " +
             "   ".join(f"{k}: {v:.1f}" for k,v in timing.items()))
         self.show_image(self.preview,"preview",state["preview"],(320,240))
-        self.show_image(self.mouth,"mouth",state["mouth"],(256,192),frozen=state["frozen"])
+        self.show_image(self.mouth,"mouth",state["mouth"],(256,256),frozen=state["frozen"])
         signals=next((f["signals"] for f in frame["faces"] if f["subject_id"]==state["selected"]),{})
         eye_lines=[]
         for side in ("left","right"):
@@ -265,7 +265,7 @@ class DetectionLab:
         head=state["features"].get("head",{})
         self.head_details.set(f"Mode: {state['config']['head_mode']}\nRaw: {self.fmt(head.get('value'))}\nNormalized Y: {self.fmt(signals.get('head_y',{}).get('value'))}\nQuality: {head.get('quality',0):.2f}\n{state['reasons'].get('head','Waiting for face')}\n\nComfortable range: " + (f"{state['head']['low']:.3f} → {state['head']['center']:.3f} → {state['head']['high']:.3f}" if state["head"] else "not calibrated"))
         val=state["validation"]
-        self.tongue_details.set(f"{'FROZEN — click tissue' if state['frozen'] else 'LIVE crop / green candidate mask'}\n{state['reasons'].get('tongue','Waiting for face')}\nCandidate: {state['candidate']}\nPixels: {state['tongue_pixels']}\n" + "\n".join(f"{k}: {'PASS' if v['passed'] else 'FAIL'} ({v['detected_fraction']:.0%}, n={v['samples']})" for k,v in val.items()))
+        self.tongue_details.set(f"{'FROZEN — click tissue' if state['frozen'] else 'LIVE crop / green candidate mask'}\n{state['reasons'].get('tongue','Waiting for face')}\nRaw tip (mouth widths): {state['candidate']}\nPixels: {state['tongue_pixels']}\n" + "\n".join(f"{k}: {'PASS' if v['passed'] else 'FAIL'} ({v['detected_fraction']:.0%}, n={v['samples']})" for k,v in val.items()))
         self.metrics.set("\n".join(f"{k:16} {self.fmt(signals.get(k,{}).get('value'))}   {'valid' if signals.get(k,{}).get('valid') else 'unavailable'}" for k in ("left_eye_open","right_eye_open","head_y","tongue_x","tongue_y")))
         if self.calibration_tabs.select()==str(self.eye_tab):
             draw_eye_scope(self.eye_scope,state)

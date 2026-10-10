@@ -4,8 +4,10 @@ Authorized integration task: Reuvi, base `0123b8d`, branch
 `work/reuvi/integration/tongue-tip`. Keep native local Python and the existing color
 segmentation approach. No pretrained network or Processing/driver change.
 
-Replace the current control measurement (region centroid) with an estimated visible
-free-end point. Use a padded mouth-aligned square, 1.6 mouth widths on each side,
+Replace the current control measurement (region centroid) with the midpoint of the visible front color boundary. Select the front arc
+using the mask geometry, fit its middle, and anchor it to the observed front
+boundary; do not average the tongue body.
+Use a padded mouth-aligned square with side length 1.6 mouth widths,
 covering protrusion. Raw tip coordinates are signed mouth-width units about the
 mouth-corner midpoint: anatomical right +X, down +Y. Both axes use mouth width,
 not mouth opening. Domain is [-0.8, 0.8] on both axes. Normalized tongue_x/y still

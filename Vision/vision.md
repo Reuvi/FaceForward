@@ -1,5 +1,9 @@
 # Vision measurement plan
 
+Current calibrated tongue measurements supersede the original centroid design
+below: see [the tip contract](../Contracts/TONGUE_TIP.md) and
+[testing guide](../docs/TONGUE_TIP_TESTING.md).
+
 For the first implementation's run commands, verified behavior, and remaining
 work, see [Vision/README.md](README.md) and [the handoff](HANDOFF.md).
 

@@ -8,20 +8,17 @@ Do not describe a successful calibration or a synthetic test as tongue accuracy.
 
 ## What the current detector can and cannot measure
 
-`mouth_crop()` in `tongue.py` warps the inner mouth to 128×96 and masks an eroded
-inner-lip polygon. `TongueModel.detect()` selects a color component and reports
-its centroid. That means:
+The original detector used an inner-mouth centroid. The current
+[color-tip increment](../Contracts/TONGUE_TIP.md) uses a padded 160×160 crop,
+includes protruding tissue, and measures the middle of the visible front boundary
+in mouth-width units on both axes. It remains color-based: a matching gum/lip
+region or an occluding lip can still fool its geometric cues. A visible mask is
+not a verified tongue label. Inspect the orange front boundary and cyan midpoint
+before trusting a personal range. See [testing steps](../docs/TONGUE_TIP_TESTING.md).
 
-- Protruding tissue outside the lips is excluded, even if clearly visible on camera.
-- Centroid motion is not tongue-tip motion; changing the visible tissue changes it.
-- Raw Y is divided by the current mouth opening, so opening the mouth changes Y.
-- A matching gum/lip patch can pass color gates. Personal range calibration cannot
-  fix an incorrect mask; inspect the candidate before starting the range guide.
-
-The new guide learns comfortable ranges of this specific measurement. Raw candidate
-coordinates remain visible before range fitting. Null/invalid stays null/invalid;
-darker plot holds are display only. The earlier eye previous-input policy does not
-turn missing tongue detections into held control input.
+Raw tip coordinates remain visible before range fitting. Null/invalid stays
+null/invalid; darker plot holds are display only. The eye previous-input policy
+does not turn missing tongue detections into held control input.
 
 ## First learned model to evaluate
 
@@ -53,13 +50,12 @@ movements are a different evaluation task from continuous pointer control.
 1. Reuse App's existing camera frame and landmarks. Add a selectable local
    segmentation backend, with the color baseline still available. Load only an
    explicit local model path; no runtime downloads or network inference.
-2. Define a padded, rotated mouth crop that includes comfortable protrusion.
-   Decode and display the actual mask, model score, area and failure reason.
-   Missing/ambiguous/out-of-frame masks remain invalid. Do not fabricate a centered
-   point or silently fall back to a color candidate after model failure.
-3. Keep the initial learned measurement a centroid. Evaluate mouth-width scaling
-   on both axes to reduce mouth-opening dependence; this is a new coordinate space,
-   not a silent change to the current mouth-height-normalized raw Y.
+2. Reuse or explicitly revise the current padded, rotated mouth crop. Display
+   the actual mask, score, area and failure reason. Missing/ambiguous/out-of-frame
+   masks remain invalid; do not silently fall back to a color measurement.
+3. Evaluate the visible front-edge midpoint using the new mask. Centroid can be
+   a debug comparison, not the requested control point. Keep mouth-width scaling
+   and measure tip-boundary error as well as segmentation quality.
 4. Version and persist the backend, model hash, coordinate space and fitted range
    together. Changing any of them invalidates tongue calibration only. Old color
    ranges must never be reused for a different mask or coordinate system. Update
