@@ -2,8 +2,9 @@
 
 ## Three lanes, one integration owner
 
-Use Vision, Processing, and Drivers as the three parallel work streams. Select one
-person to coordinate shared interfaces and merges. That responsibility can rotate.
+Use Vision, Processing, and Drivers as the three parallel work streams, with
+roughly one person responsible for each section and their agents working within it.
+Select one person to coordinate shared interfaces and merges. That responsibility can rotate.
 People and GitHub handles are intentionally not assigned to lanes yet.
 
 | Lane | Owns | Develop independently using |
@@ -19,14 +20,16 @@ The integrator owns root dependency files, CI, `Contracts/`, and application wir
 Put cross-lane questions in `<Component>/interface-requests/<task>.md` and reference
 them in the handoff. Changing a shared contract is a separate coordinated task.
 
-## Initial setup sharing
+## Shared starting point
 
-The local setup branch is `chore/team-agent-setup`. Local feature worktrees are
-based on its setup commit. A local commit is not visible to other computers.
-Publish the setup branch and merge its PR into the team's default branch before
-teammates start from `origin/main`. If the team needs an earlier start, fetch the
-published setup branch and explicitly use `--base origin/chore/team-agent-setup`.
-Do not send teammates a branch reference that has not been published.
+The collaboration setup is on `main`. Fetch the latest `origin/main` before
+starting a new task, and read `docs/ORIGINAL_PROJECT_NOTES.md` for the original
+brief. A local commit is not visible to other computers until it is published.
+
+The initial local bootstrap worktrees still belong to their respective agents.
+When ready, each owner should fetch and merge `origin/main` inside their own clean
+worktree to pick up updated notes. Do not switch, reset, or update another agent's
+active worktree. New agents should start from the latest `origin/main`.
 
 ## New agent / new task
 

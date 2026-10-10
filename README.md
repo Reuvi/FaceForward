@@ -10,7 +10,8 @@ The original `Drivers/readme.MD` is preserved.
 
 ## Start here
 
-1. Read [the team workflow](docs/TEAM_WORKFLOW.md) and [agent instructions](AGENTS.md).
+1. Read [the original project notes](docs/ORIGINAL_PROJECT_NOTES.md),
+   [the team workflow](docs/TEAM_WORKFLOW.md), and [agent instructions](AGENTS.md).
 2. Pick a lane and create a separate worktree for every active agent:
 
    ```bash
@@ -19,8 +20,7 @@ The original `Drivers/readme.MD` is preserved.
    ```
 
    The helper prints the exact directory to open. It requires Python 3.9+ and Git.
-   During initial setup, use `--base chore/team-agent-setup` locally until the
-   setup commit has been published and incorporated into the shared base.
+   The collaboration setup is available on `main`; fetch before creating a worktree.
 3. Open that worktree and paste the matching [agent starter](docs/AGENT_STARTERS.md).
 4. Implement against the [v1 contracts and fixtures](Contracts/README.md).
 
@@ -38,13 +38,15 @@ The original `Drivers/readme.MD` is preserved.
 | `tests/tooling/` | Isolation/scope helper checks | Integration owner |
 | `docs/`, `tools/`, `.github/` | Shared plan, collaboration tools, review/CI | Integration owner |
 
-The three lanes do not assign people automatically. Agree who owns each lane and
+The team is split roughly one person per section. Agree who owns each lane and
 who is integrating before starting. The same person can cover integration in a
 separate worktree. Each teammate clones the repository on their own computer;
 worktrees isolate concurrent agents on one computer.
 
-See [the project plan](docs/PROJECT_PLAN.md) for scope, milestones, and undecided
-implementation choices. No application framework or detector model has been selected.
+See [the original project notes](docs/ORIGINAL_PROJECT_NOTES.md) for the team's
+source brief and [the project plan](docs/PROJECT_PLAN.md) for organized milestones
+and proposed implementation choices. No application framework or detector model
+has been selected.
 
 ## Scaffold checks
 

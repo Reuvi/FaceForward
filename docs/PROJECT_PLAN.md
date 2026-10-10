@@ -1,5 +1,9 @@
 # Project plan
 
+Read [the original project instructions and notes](ORIGINAL_PROJECT_NOTES.md) first.
+This document organizes that brief and adds proposed implementation choices; it
+does not replace the original notes or subsequent explicit team decisions.
+
 ## Intended experience
 
 Build a non-contact human–computer interface for people with severe movement

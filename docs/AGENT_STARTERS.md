@@ -4,6 +4,10 @@ Create/open a separate worktree first. Replace the bracketed fields, then paste
 one prompt into the agent working in that worktree. Multiple agents in a lane need
 distinct task scopes, branches, and worktrees.
 
+Every agent must also read `docs/ORIGINAL_PROJECT_NOTES.md` for the team's original
+brief before implementation. The team has roughly one person per section; each
+person's agents stay in that section unless a cross-section handoff is coordinated.
+
 ## Vision
 
 ```text
