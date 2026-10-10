@@ -1,0 +1,3 @@
+# Optional live-camera/pose dependencies. Core replay/calibration use stdlib only.
+mediapipe==0.10.35
+opencv-contrib-python==4.13.0.92

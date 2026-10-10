@@ -4,6 +4,15 @@ Read the root `AGENTS.md` and `Contracts/README.md`. Own only `Vision/**` and
 `tests/vision/**`. Keep implementation, dependencies, example capture tools, and
 lane documentation here. Put requests for shared changes in `interface-requests/`.
 
+- Keep the runtime native, local, and efficient: no browser, JavaScript, web server,
+  HTTP transport, remote inference, or runtime model downloads. Load MediaPipe
+  models from local files and pass SignalFrame dictionaries directly in process.
+- Processing's native Python/Tk lab accepts SignalFrame v1 via `Lab.ingest(frame)`
+  in external-source mode. Keep Vision's continuous values and `*_eye_open`
+  polarity (1 = open); its separate raw adapter uses 1 = closed. App owns wiring.
+- Keep inference off Tk's UI thread. Detection, processing, and drawing have
+  separate cadences; preview work is optional. Avoid growing queues and measure
+  overhead with `python3 -m Vision.benchmark` before adding runtime dependencies.
 - Capture/sample at a configurable rate and report actual timing, not an assumed FPS.
 - Emit SignalFrame v1 with no more than two faces, stable session-local subject IDs,
   calibrated measurements, and explicit confidence/validity for every signal.
