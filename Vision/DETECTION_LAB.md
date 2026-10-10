@@ -31,7 +31,7 @@ not pip. Stop other camera consumers before camera mode. Inference stays local.
 5. Use **Save active profile** on the source tab to save fits plus Processing settings.
    Motion/loss and same-source restart retain completed fits. Use **Load saved
    profile** to restore a JSON, including while stopped or without a visible face.
-   Loading/restarting requires fresh tongue absent/visible checks. See [profile semantics](../App/README.md#saved-face--mouse-profiles).
+   Loading/restarting requires **Recheck saved tongue range** (absent + five positions). See [profile semantics](../App/README.md#saved-face--mouse-profiles).
 
 For isolated Vision development only, `python -m Vision.lab --demo` or
 `python -m Vision.lab --camera --model Vision/.local/face_landmarker.task` opens the
@@ -43,7 +43,7 @@ Do not launch both camera entry points together.
 
 The preview is unmirrored: **your left eye is on the image's right**. Anatomical
 labels never depend on display orientation. Mock checkboxes/sliders have been removed
-from this view. The detector demo follows the eye guide automatically. Selection,
+from this view. The detector demo follows eye/head/tongue guides automatically. Selection,
 fitting, model/mask logic and all units below are
 shared by the embedded and standalone views.
 
@@ -189,12 +189,12 @@ buttons. The combined App saves `face_mouse_profile_v3` without research setting
 v1/v2 files remain readable. See the [profile guide](../docs/EYE_CALIBRATION_GUIDE.md#save-load-and-maintain).
 The legacy per-eye `collect()` API remains for developer regression tests, not UI use.
 
-## 2. Vertical head movement
+## 2. Vertical head calibration
 
-Two explicit measurements are supported. Default **position** matches movement
-of the tracked point up/down in the image. To test nodding instead, set
-`"head_mode": "pitch"` in **Settings**, click **Apply settings**, and
-recalibrate. Applying settings clears all channels, so choose the mode first.
+Choose **position** or **pitch** directly in **2 Head Y**. This selector clears only
+head calibration. Press **Start head position guide** and follow neutral/up/down,
+then three fresh checks. Rest/preparation frames do not train. See the
+[head/tongue testing guide](../docs/MOVEMENT_CALIBRATION_GUIDE.md) for cues and views.
 
 | Mode | Raw measurement and units | What changes it |
 | --- | --- | --- |
@@ -206,7 +206,7 @@ uniform scale. Degenerate, reflected, nonfinite, or strongly anisotropic matrice
 are rejected. Translation in the transform is ignored. This is a camera-relative
 pose proxy; it is not a camera-intrinsics-calibrated physical angle measurement.
 
-Capture **NEUTRAL**, **UP**, and **DOWN**, at comfortable, repeatable positions.
+The guide captures **NEUTRAL**, **UP**, and **DOWN**, at comfortable, repeatable positions.
 The labels define direction even if a raw angle increases in the opposite order.
 The robust groups must be ordered, nonoverlapping, and separated by at least
 0.02 image-height fraction in position mode, or 3 degrees in pitch mode.
@@ -231,16 +231,18 @@ Use the visible mask and a separate live validation exercise to identify that.
    form the negative class. A closed mouth is rejected, not accepted as training.
 2. Make the tongue visible, click **Freeze visible tongue**, and click a patch
    wholly inside actual tongue tissue. Avoid edges, teeth, gums, and lips.
-   Alternatively, if tongue tissue fills the yellow center square, use
-   **Mark center patch**. The frozen image is held only in memory.
+   The frozen image is held only in memory.
 3. Repeat freeze/mark on another representative tongue patch if needed. Then click
    **Fit appearance model**. A failed color-separation check requires recollection;
    do not label non-tongue pixels just to make a fit pass.
-4. Hide the tongue while keeping the mouth open; click **Validate ABSENT**.
-5. Show it again on new frames; click **Validate VISIBLE**. Move within a modest,
-   comfortable range. Both checks must pass before `tongue_x/y` become valid.
-6. Repeatedly hide/show it and move it in both axes. Watch whether the green mask
-   actually stays on the tongue. Refit if lighting or mouth appearance changes.
+4. Press **Start tongue position guide**. Hide the tongue with the mouth open for
+   the absence check, then hold center/your-left/your-right/up/down for training.
+5. Repeat the five positions on new frames for checking. All checks must pass
+   before `tongue_x/y` become valid personal coordinates. Inspect the live mask
+   and the raw/personal position planes; no mouse transfer functions apply there.
+6. After loading a profile or restarting, use **Recheck saved tongue range** to
+   check absent + five positions without fitting again. Older presets without a
+   range need the full guide. Recollect appearance if it detects non-tongue tissue.
 
 Pipeline:
 
@@ -253,7 +255,7 @@ mouth corners + upper/lower inner lip
  → distance/radius gate + 3×3 morphology
  → largest unambiguous connected component
  → centroid / mouth width and opening height
- → quality gates + passed held-out frame exercises → normalized X/Y
+ → raw candidate X/Y → personal center/endpoints → fresh checks → personal X/Y
 ```
 
 Training uses up to 4,000 positive pixels from marked patches and 12,000 negative
@@ -261,12 +263,16 @@ pixels, at most 3 positive and 8 negative deterministic k-means prototypes, and
 at most 12 iterations. A fifth of each pixel set is withheld to check fit quality:
 positive recall must be at least 75%, false positives at most 2%. That pixel holdout
 is correlated with training images and **is not independent accuracy evidence**.
-The separate, newly captured absent/visible exercises provide a session check:
-no more than 5% detections while absent and at least 80% while visible. These are
-manually labeled exercises, not automatic verification of your pose. Both require
-at least `min_samples` usable frames and at least 80% usable collection frames.
-Changing marked pixels, refitting, resetting, or recollecting negatives invalidates
-previous checks. Re-running either validation removes its previous pass first.
+The new guide starts with tongue absent (at most 5% candidate detections in usable
+frames), then captures five directional training groups and five independent check
+groups. Each collection requires at least `min_samples` usable frames and 80%
+availability. Each position check requires 90% of all captured samples within
+`position_check_tolerance` of both target coordinates; unavailable frames fail the
+check. Training requires ordered, distinct, stable groups. These are manually
+labeled session exercises, not automatic pose verification or population accuracy.
+Changing appearance samples/model clears the personal range and previous checks.
+The legacy absent/visible collection API remains for component tests, but cannot
+make tongue output valid without a fitted personal range.
 
 | Measurement | Definition |
 | --- | --- |
@@ -275,16 +281,17 @@ previous checks. Re-running either validation removes its previous pass first.
 | Candidate area | Connected-component pixels / eroded inner-mouth pixels, fraction |
 | Candidate X | Centroid column / 127; 0 user's left mouth corner, 1 user's right |
 | Candidate Y | Centroid row / 95; 0 upper inner-lip level, 1 lower inner-lip level |
-| `tongue_x/y` | The same continuous coordinates, valid only after both exercises pass |
+| `tongue_x/y` | Personal range: 0/1 comfortable endpoints, .5 learned center; both appearance and fresh range checks required |
 
 X/Y refer to the visible region's **centroid, not the tongue tip**. The crop follows
 mouth translation, scale, and in-plane rotation. Mouth opening changes Y's scale;
 keep the opening fairly consistent while testing. Lips/teeth covering the tongue,
 a tongue extending outside the mouth domain, similar colors, changing lighting,
 and extreme pose can cause a miss or a false candidate. Tongue absence stays
-unavailable; it does not become a fake centered position. Calibration here learns
-appearance; it does not stretch personal movement endpoints to fill the whole
-mouth domain. Future Processing tuning can handle comfortable ranges.
+unavailable; it does not become a fake centered position. Calibration learns appearance and a personal movement range in separate stages.
+It cannot recover tissue outside the inner-lip crop or convert a centroid into a
+tongue tip. Read [the model evaluation plan](TONGUE_MODEL_PLAN.md) for the supplied
+segmentation research and the next detector comparison.
 
 ## Image gates and every tunable
 
@@ -304,7 +311,10 @@ Settings JSON contains only the following tunables, not learned face calibration
 | `min_brightness`, `max_brightness` | 20, 235 | Mean grayscale intensity on 0–255 scale |
 | `max_clipped_fraction` | 0.5 | Maximum fraction with gray <5 or >250 |
 | `eye_separation` | 0.015 | Minimum separation of retained open/closed raw ratio groups |
-| `endpoint_tolerance` | 0.05 | Allowed head normalized endpoint overshoot |
+| `endpoint_tolerance` | 0.05 | Allowed head/tongue normalized endpoint overshoot |
+| `movement_rest_ms` | 1500 | Rest between head/tongue guide steps |
+| `tongue_position_separation` | 0.04 | Minimum adjacent tongue reference separation, mouth fractions |
+| `position_check_tolerance` | 0.2 | Maximum normalized error in each fresh movement check |
 | `head_mode` | `position` | `position` or `pitch` |
 | `head_position_separation` | 0.02 | Minimum adjacent head-target image-height fraction separation |
 | `head_pitch_separation` | 3 | Minimum adjacent head-target separation, degrees |
@@ -340,8 +350,10 @@ for hidden camera buffering. The status shows actual inter-sample Hz, inference
 milliseconds, feature-processing milliseconds, and capture age at processing.
 
 The UI/preview draw at about 10 Hz independently of input sampling. Alongside the
-two binary eye scopes, three analog scopes
-show raw eye ratios, raw head measurements, and normalized head/tongue values.
+eye scopes, the camera setup view now shows raw eye ratios, raw head measurements
+and raw tongue candidates. Calibration shares these capture rows and adds head
+bars/tongue planes plus a calibrated-position time graph. Select the relevant
+graph in either view; UI redraws never add samples.
 X uses actual monotonic capture time; lines between samples are display-only.
 There is no detector interpolation, fabricated new sample, or Processing filter.
 The displayed raw scope ranges are 0–0.4 for eyes, 0–1 for image head position,
@@ -422,6 +434,8 @@ and latency. Automated synthetic success does not supply these human measurement
 
 - `features.py`: validated tunables, lid/head measurements, image-quality evidence.
 - `tongue.py`: mouth geometry, color training, segmentation and candidate centroid.
+- `movement_guide.py`: capture-timed head/tongue ranges and independent repeat checks.
+- `movement_view.py`: shared raw graphs, raw/personal position displays and guide cues.
 - `workbench.py`: subject/session-bound live collection, independent fits and validity.
 - `lab_runtime.py`: single source worker, lifecycle, preview and bounded trace export.
 - `lab.py`: reusable native calibration view; embedded in App or standalone.

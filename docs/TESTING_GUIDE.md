@@ -1,5 +1,12 @@
 # Mouse MVP testing companion
 
+Current head/tongue update: use the [movement calibration guide](MOVEMENT_CALIBRATION_GUIDE.md)
+for guided position fitting, raw graphs on camera setup and shared capture data.
+Detector presets are now v4 (combined profiles remain v3). Saved tongue ranges
+require **Recheck saved tongue range** after loading/restarting; older presets
+without ranges need the new tongue guide. Eye classification is unchanged.
+
+
 > Current calibrated camera eye workflow: [Eye calibration/testing guide](EYE_CALIBRATION_GUIDE.md).
 > It supersedes eye dwell controls and Detection research instructions below.
 > The historical raw/mock/replay examples retain their original timed behavior.

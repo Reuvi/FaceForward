@@ -4,7 +4,7 @@ Run **one `App` window** for the complete testing workflow. The original Process
 lab now contains **Detection calibration** as another tab. One camera/inference
 worker supplies the calibrated measurements to both the detector view and the
 existing input/output scopes and simulated desktop. Switching tabs keeps the source
-and completed calibration. Leaving an active guided eye sequence cancels it, because
+and completed calibration. Leaving an active eye/head/tongue guide cancels it, because
 its instructions would no longer be visible.
 
 The standalone detector was initially isolated because the team wanted to test
@@ -34,7 +34,7 @@ python3 -m App
 
 | Source in the app | Purpose | Calibration/profile behavior |
 | --- | --- | --- |
-| Detector demo (synthetic pixels) | Automatically exercise guided eye calibration | Single user attaches automatically; Start eye calibration; the fixture follows the guide, then cycles independent closures; saves synthetic profiles |
+| Detector demo (synthetic pixels) | Exercise guided eyes, head and tongue ranges | Single user attaches automatically; the fixture follows the active guide; appearance marking remains manual; saves synthetic profiles |
 | Camera (live calibration) | Test your actual facial measurements | Face attaches automatically; calibrate or load a camera profile; validate on your current image |
 | Vision demo (synthetic) | Automatic four-action Processing regression | Supplies prebuilt valid SignalFrames; no detector training or face profile |
 | Vision replay (NDJSON) | Inspect recorded synthetic SignalFrame sequences | Select a subject; preserves input timing; no images or calibration collection |
@@ -56,17 +56,18 @@ The requested FPS takes effect on source start; actual Hz and capture age are sh
    Follow [the eye testing guide](../docs/EYE_CALIBRATION_GUIDE.md) for exact cues,
    acceptance rules, measurements and troubleshooting. Restart discards bad eye
    training without clearing head/tongue fits. Focus on eyes before proceeding.
-3. In **2 Head Y**, capture NEUTRAL, UP, DOWN. Default measurement is vertical
-   position of the nose bridge divided by image height. For nodding, choose
-   `head_mode: "pitch"` in detector Settings **before** calibrating; it
-   uses degrees from the facial transform. Applying detector settings clears fits.
-4. In **3 Tongue**, capture an EMPTY open mouth, freeze a visible tongue, mark
-   tongue-only tissue, and fit the appearance model. Run **Validate ABSENT** with
-   tongue hidden and **Validate VISIBLE** with it visible, using new frames. Both
-   must pass before tongue X/Y becomes valid. Inspect the mask for false candidates.
-5. On **Vision source & raw signals**, inspect valid values; or stay in calibration
-   to examine the raw ratios, thresholds, masks and detector scopes. You may test
-   one fitted channel while others remain unavailable.
+3. In **2 Head Y**, select **position** (vertical image translation) or **pitch**
+   (nodding), then **Start head position guide**. Follow neutral/up/down and a
+   separate repeat for checking. The selector resets only head calibration.
+4. In **3 Tongue**, capture an EMPTY open mouth, freeze a visible tongue, click
+   tongue-only tissue, and fit appearance. Then **Start tongue position guide**:
+   tongue absent, center/left/right/up/down training, and fresh position checks.
+   Both appearance and personal range are required for valid tongue output.
+5. On **Vision source & raw signals**, the default **Raw measurements** panel and
+   graphs show detector units before calibration. **Calibrated signals** shows
+   personal positions. Both tabs use the same captured samples as calibration.
+   See [the head/tongue testing guide](../docs/MOVEMENT_CALIBRATION_GUIDE.md) for
+   the position bars/planes, sound cues, acceptance rules and saved-range rechecks.
 6. Open **Live lab**, return your head/tongue to neutral and open both eyes, then
    press **Start preview**. Existing scopes show input, intermediate processing,
    and output. Mouse movement, scroll and click counters occur inside the lab.
@@ -91,7 +92,7 @@ eye is required before that eye can activate. Both intentional winks can activat
 | --- | --- | --- |
 | Left/right eye | Anatomical `*_eye_open` unchanged; added `eye_intent` from independent calibrated facial appearance | Per-frame wink states: 1 while held, 0 for open/blink; no dwell |
 | Head Y | Image-height fraction or pitch degrees → calibrated `[0,1]`: up 0, neutral .5, down 1 | Smoothed scroll velocity; .5 means stopped |
-| Tongue X/Y | Color candidate centroid in the mouth frame; X toward anatomical right, Y down | Relative pointer velocity; .5 means stopped per output axis |
+| Tongue X/Y | Color candidate centroid → personal movement range; center .5, X toward anatomical right, Y down | Relative pointer velocity; .5 means stopped per output axis |
 
 Gaze and head X remain unavailable in this calibrated path. Tongue absence is
 unavailable input, never an invented center. The raw-mock adapter's eye bits use
@@ -108,8 +109,9 @@ without manual switches; after completion the fixture cycles left, right and bot
 closures. Start preview to inspect the resulting clicks in Live lab. This exercises
 wiring, not real-face accuracy. Mock checkboxes/sliders are removed from calibration; the old mock eye checkboxes
 are also hidden in App’s Live lab. Standalone Processing retains its developer controls.
-Developer scripts can still set `LabRuntime.demo_controls`; tests retain manual
-head/tongue fixtures. For the automatic four-action mouse exercise, use `python3 -m App`.
+Head and tongue guides also receive automatic synthetic targets. During EMPTY capture
+the synthetic tongue hides, then becomes visible for freezing/marking. Developer
+scripts can still set `LabRuntime.demo_controls`. For the automatic four-action mouse exercise, use `python3 -m App`.
 
 ## Saved face + mouse profiles
 
@@ -120,15 +122,17 @@ while stopped or while your face is unavailable. A left-eye-only profile is vali
 | Saved section | Contents |
 | --- | --- |
 | `format`, `source_kind` | `face_mouse_profile_v3` (v1/v2 readable); camera or synthetic |
-| `detector` | Version/algorithm, detector settings, independent eye fits including raw closed/open uncertainty limits and appearance models/check counts, head mode and three-point fit, optional tongue color prototypes/radius/margin |
+| `detector` | Version/algorithm, detector settings, independent eye fits including raw closed/open uncertainty limits and appearance models/check counts, head mode and three-point fit, optional tongue color prototypes/radius/margin and personal X/Y range |
 | `processing` | Applied motion settings; legacy raw/replay eye settings retained but bypassed for camera wink samples |
 | `preview` | Simulated pointer and scroll speed |
 
 It does **not** save pictures, raw training pixels, sample traces, tracking IDs,
 selection, live tongue validation flags, armed state, or driver permission. Local files
 are written atomically with private file permissions. They are not committed.
-Detector presets now use version 3. Version 1/2 files restore geometry and other
-settings but require the new eye guide before camera wink buttons are available.
+Detector presets now use version 4; combined profiles remain v3. Detector v1/v2
+files restore geometry but need the current eye guide for wink buttons. Detector
+v3 restores wink models. Older files lack a tongue range, so run the new tongue
+position guide before valid tongue output.
 New files omit research settings, images and raw wink training vectors.
 Saving does not activate anything; it records the current applied configuration.
 
@@ -137,8 +141,8 @@ To reuse: choose/start the matching Camera or Detector demo source, then click
 source or while your face is unavailable. App validates the whole profile, applies
 it to the single user, restores Processing settings, and leaves preview stopped.
 Camera and synthetic profiles cannot be mixed. Check eye/head readings again;
-repeat tongue ABSENT and VISIBLE checks under current lighting. If those fail,
-recollect tongue training. Loaded color prototypes do not retain training samples.
+use **Recheck saved tongue range** under current lighting (absent + five position
+checks). If those fail, recollect tongue appearance/range. Loaded color prototypes do not retain training samples.
 
 Head motion, brief loss, stale frames, Stop source and restart of the same source
 retain your completed eye/wink/head/tongue fits in memory. Detection resumes
@@ -158,15 +162,15 @@ Processing settings. Neither is a substitute for **Save active profile**.
 
 **Stop / Escape** immediately disables preview but keeps measurement running.
 **Stop source** also stops capture and retains completed calibration. Calibration
-captures/changes and profile loading disarm preview. Leaving an active guided Eyes
-sequence cancels it; completed fits survive tab changes.
+captures/changes and profile loading disarm preview. Leaving any active eye/head/tongue
+guide cancels it; completed fits survive tab changes.
 Close the window to shut down the source and Processing workers.
 
 ```text
 One App worker: camera → MediaPipe OR synthetic image generator
     ↓ image + landmarks + original capture timestamp
 Vision.LabRuntime.ingest → DetectorWorkbench: measurements/calibration
-    ├─ latest image + raw features + trace → Detection calibration tab
+    ├─ latest image + shared raw features/trace → camera setup + calibration tabs
     └─ calibrated SignalFrame v1 → App → Lab.ingest
                                          ↓ independent 100 Hz Processing clock
                                      existing Live lab / scopes / simulated mouse

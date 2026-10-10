@@ -59,6 +59,12 @@ missing measurements: zero is a real extreme/closed state.
 | `head_x` | Comfortable left limit | Neutral head position | Comfortable right limit |
 | `head_y` | Comfortable up limit | Neutral head position | Comfortable down limit |
 
+For the current calibrated camera path, `position_space: "personal_range_v1"`
+explicitly changes tongue endpoints to the user's learned comfortable limits and
+center to their learned neutral. Raw mouth fractions remain diagnostics. The table
+above remains the legacy replay meaning; see
+[MOVEMENT_CALIBRATION.md](MOVEMENT_CALIBRATION.md) for the coordinated override.
+
 Left/right refers to the user's perspective and anatomical eye, independent of
 preview mirroring. Normalize positional signals using that user's calibrated
 reference/range. Uncalibrated positional signals are invalid for control. Store

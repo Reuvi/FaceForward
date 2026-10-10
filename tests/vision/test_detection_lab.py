@@ -147,7 +147,7 @@ class WorkbenchTests(unittest.TestCase):
         self.now=1000.
         self.sequence=0
         self.session="test-session"
-        self.core=DetectorWorkbench(DetectionConfig(settle_ms=0,collect_ms=400,min_samples=8),clock=lambda:self.now)
+        self.core=DetectorWorkbench(DetectionConfig(settle_ms=0,collect_ms=400,movement_rest_ms=0,min_samples=8),clock=lambda:self.now)
         self.feed()
         self.core.select(self.core.frame["faces"][0]["subject_id"])
 
@@ -177,6 +177,15 @@ class WorkbenchTests(unittest.TestCase):
         self.core.mark_tongue(.5,.5)
         self.core.fit_tongue()
 
+    def tongue_positions(self):
+        runtime=LabRuntime(clock=lambda:self.now);runtime.workbench=self.core
+        self.core.start_movement_guide("tongue")
+        while self.core.movement_guide.active:
+            guide=self.core.movement_guide;state=guide.state(self.now)
+            if state["waiting"]:self.core.present_movement_step(guide.index,state["phase"])
+            self.feed(**runtime.demo_input())
+        self.assertTrue(self.core.movement_guide.passed,self.core.notice)
+
     def test_all_four_channels_and_independent_simultaneous_closures(self):
         self.eyes()
         self.collect("head_up",head=.15)
@@ -187,11 +196,14 @@ class WorkbenchTests(unittest.TestCase):
         self.assertFalse(signals["tongue_x"]["valid"])
         self.collect("validate_absent")
         self.collect("validate_visible",tongue=True)
+        self.assertFalse(self.feed(tongue=True)["tongue_x"]["valid"])  # Appearance alone is not a personal range.
+        self.tongue_positions()
         signals=self.feed(left_closed=True,right_closed=True,tongue=True,tongue_x=.65,head=.675)
         self.assertEqual(signals["left_eye_open"]["value"],0)
         self.assertEqual(signals["right_eye_open"]["value"],0)
         self.assertAlmostEqual(signals["head_y"]["value"],.75)
-        self.assertAlmostEqual(signals["tongue_x"]["value"],.65,delta=.025)
+        self.assertAlmostEqual(self.core.tongue.xy[0],.65,delta=.025)
+        self.assertAlmostEqual(signals["tongue_x"]["value"],.875,delta=.05)
         self.assertTrue(signals["tongue_y"]["valid"])
         self.assertFalse(signals["gaze_x"]["valid"])
         self.assertFalse(self.feed()["tongue_x"]["valid"])
@@ -215,6 +227,7 @@ class WorkbenchTests(unittest.TestCase):
 
     def test_tongue_validation_failure_recheck_and_model_change(self):
         self.tongue()
+        self.tongue_positions()
         self.collect("validate_absent",tongue=True)
         self.collect("validate_visible",tongue=True)
         self.assertFalse(self.feed(tongue=True)["tongue_x"]["valid"])

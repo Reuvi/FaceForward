@@ -1,5 +1,12 @@
 # Single-user calibration: testing and lifecycle
 
+Current head/tongue update: use the [movement calibration guide](MOVEMENT_CALIBRATION_GUIDE.md)
+for guided position fitting, raw graphs on camera setup and shared capture data.
+Detector presets are now v4 (combined profiles remain v3). Saved tongue ranges
+require **Recheck saved tongue range** after loading/restarting; older presets
+without ranges need the new tongue guide. Eye classification is unchanged.
+
+
 The calibrated camera and detector demo now assume **one person**. The app uses
 the logical subject `single-user`; geometric tracking IDs no longer decide which
 calibration to keep. MediaPipe requests one face per inference. This is not face

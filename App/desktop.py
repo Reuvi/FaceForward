@@ -1,14 +1,15 @@
 """Native source/diagnostic view built around the existing Processing lab."""
 
-from collections import deque
 import tkinter as tk
 import json
 from pathlib import Path
 from types import SimpleNamespace
 from tkinter import filedialog, ttk
 
-from Processing.mouse.desktop import DesktopLab, Scope, label, set_var, BG, TEXT, MUTED, GREEN
+from Processing.mouse.desktop import DesktopLab, label, set_var, BG, TEXT, MUTED, GREEN
 from Vision.signals import SIGNALS
+from Vision.movement_view import draw_raw_scopes
+from Vision.eye_scope import draw_feature_scope
 
 
 SOURCES = {"Vision demo (synthetic)": "demo", "Vision replay (NDJSON)": "replay",
@@ -49,9 +50,7 @@ class IntegratedDesktop(DesktopLab):
     def __init__(self, root, session, options):
         self.session = session
         self.options = options
-        self.vision_history = deque(maxlen=1200)
         self.vision_generation = -1
-        self.vision_sequence = None
         self.vision_after = None
         self.preview_photo = None
         self.preview_seen = -1
@@ -117,23 +116,26 @@ class IntegratedDesktop(DesktopLab):
         panels.rowconfigure(0, weight=1)
         signals = ttk.Frame(panels, style="Panel.TFrame", padding=12)
         signals.grid(row=0, column=0, sticky="nsew", padx=(0, 12))
-        label(signals, "Vision measurements before Processing", style="Heading.TLabel").pack(anchor="w")
-        label(signals, "SignalFrame eyes: 1 = open, 0 = closed. Raw mock bits use 1 = closed.", style="Small.TLabel").pack(anchor="w", pady=(5, 8))
+        label(signals, "Detector readings · before device mapping", style="Heading.TLabel").pack(anchor="w")
+        reading_tabs=ttk.Notebook(signals);reading_tabs.pack(fill="both",expand=True,pady=(8,0))
+        raw_page=ttk.Frame(reading_tabs,padding=8);calibrated_page=ttk.Frame(reading_tabs,padding=8)
+        reading_tabs.add(raw_page,text="Raw measurements");reading_tabs.add(calibrated_page,text="Calibrated signals")
+        self.raw_ratios = tk.StringVar(value="No camera landmarks received")
+        label(raw_page, "Raw camera measurements / single user", style="Heading.TLabel").pack(anchor="w",pady=(0,8))
+        label(raw_page, textvariable=self.raw_ratios, style="Panel.TLabel", font=("Menlo", 10), justify="left", wraplength=480).pack(anchor="w")
+        label(raw_page, "Raw graphs below use every captured sample. Calibrate in Detection calibration; device mappings come afterward.\nTongue centroid appears after appearance training and remains experimental.",
+              style="Small.TLabel", wraplength=470).pack(anchor="w", pady=12)
+        self.input_result = tk.StringVar()
+        label(raw_page, textvariable=self.input_result, style="Small.TLabel", wraplength=470).pack(anchor="w")
+        label(calibrated_page, "Personal positions: 0–1, center .5. Eye openness: 1 open / 0 closed.\nThese are detection outputs, not mouse velocity or screen coordinates.",style="Small.TLabel",wraplength=470).pack(anchor="w",pady=(0,8))
         columns = ("signal", "value", "confidence", "status")
-        self.signal_table = ttk.Treeview(signals, columns=columns, show="headings", height=8, style="Vision.Treeview")
+        self.signal_table = ttk.Treeview(calibrated_page, columns=columns, show="headings", height=8, style="Vision.Treeview")
         for name, width in zip(columns, (155, 75, 80, 120)):
             self.signal_table.heading(name, text=name.title())
             self.signal_table.column(name, width=width, minwidth=60, stretch=True)
         for name in SIGNALS:
             self.signal_table.insert("", "end", iid=name, values=(name, "—", "—", "Unavailable"))
-        self.signal_table.pack(fill="x")
-        self.raw_ratios = tk.StringVar(value="No camera landmarks received")
-        label(signals, "Raw camera ratios / single user", style="Heading.TLabel").pack(anchor="w", pady=(13, 6))
-        label(signals, textvariable=self.raw_ratios, style="Panel.TLabel", font=("Menlo", 10), justify="left", wraplength=520).pack(anchor="w")
-        label(signals, "Calibrate in Detection calibration. Valid measurements feed the same Processing lab.\nTongue segmentation is experimental; inspect its mask and validation checks.",
-              style="Small.TLabel", wraplength=550).pack(anchor="w", pady=12)
-        self.input_result = tk.StringVar()
-        label(signals, textvariable=self.input_result, style="Small.TLabel", wraplength=540).pack(anchor="w")
+        self.signal_table.pack(fill="both",expand=True)
 
         camera = ttk.Frame(panels, style="Panel.TFrame", padding=12)
         camera.grid(row=0, column=1, sticky="nsew")
@@ -145,17 +147,15 @@ class IntegratedDesktop(DesktopLab):
                                                           font=("Helvetica Neue", 14), justify="center")
         label(camera, "Camera frames stay in memory. The preview does not record video.", style="Small.TLabel").pack(anchor="w")
 
-        scopes = ttk.Frame(self.vision_page); scopes.pack(fill="x", pady=(12, 0))
-        self.raw_scopes = []
-        for i, (title, keys, limits) in enumerate((
-            ("Raw eyelid gap / eye width · left blue / right amber", ("left_open", "right_open"), (0, 0.5)),
-            ("Raw iris X / eye width · left blue / right amber", ("left_x", "right_x"), (0, 1)),
-            ("Raw iris Y / eye width · left blue / right amber", ("left_y", "right_y"), (-0.3, 0.3)),
-        )):
-            scopes.columnconfigure(i, weight=1, uniform="vision-scope")
-            scope = Scope(scopes, title, keys, limits)
-            scope.grid(row=0, column=i, sticky="nsew", padx=(0, 7))
-            self.raw_scopes.append(scope)
+        scopes = ttk.Frame(self.vision_page); scopes.pack(side="bottom",fill="x", pady=(12, 0),before=panels)
+        self.raw_capture = tk.StringVar(value="Raw detector samples — no device mapping")
+        row=ttk.Frame(scopes);row.pack(fill="x")
+        label(row,textvariable=self.raw_capture,style="Small.TLabel").pack(side="left")
+        self.raw_graph=tk.StringVar(value="All signals")
+        ttk.Combobox(row,textvariable=self.raw_graph,values=("All signals","Left facial features","Right facial features","Eye ratios"),
+                     state="readonly",width=21).pack(side="right")
+        self.raw_canvas=tk.Canvas(scopes,height=170,background=BG,highlightthickness=0)
+        self.raw_canvas.pack(fill="x")
 
     def open_calibration(self, event=None):
         if self.notebook.select() != str(self.calibration_page) or self.calibration_ui is not None:
@@ -235,12 +235,11 @@ class IntegratedDesktop(DesktopLab):
 
     def select_subject(self):
         self.session.select_subject(self.subject_var.get())
-        self.vision_history.clear()
 
     def refresh_vision(self):
         if self.closed:
             return
-        state = self.session.state()
+        state = self.session.state(include_detector=True)
         frame = state["frame"]
         lab_state = self.lab.state(self.after)
         selected = lab_state["runtime"]["subject_id"]
@@ -248,8 +247,6 @@ class IntegratedDesktop(DesktopLab):
                  and state["age_ms"] <= lab_state["config"]["stale_ms"])
         if self.vision_generation != state["generation"]:
             self.vision_generation = state["generation"]
-            self.vision_history.clear()
-            self.vision_sequence = None
             self.preview_seen = -1
             self.preview_photo = None
             self.camera_canvas.itemconfigure(self.preview_item, image="")
@@ -292,9 +289,8 @@ class IntegratedDesktop(DesktopLab):
             ratios = eyes.get(eye)
             lines.append(f"{eye:5s} open {ratios['openness']:.4f}   X {ratios['horizontal']:.4f}   Y {ratios['vertical']:.4f}" if ratios
                          else f"{eye:5s} unavailable")
-        detector_state = None
-        if self.session.detector_runtime is not None and state["mode"] in ("camera", "detector-demo"):
-            detector_state = self.session.detector_state()
+        detector_state = state["detector"]
+        if detector_state is not None:
             lines = []
             for key, feature in detector_state["features"].items():
                 if key != "face":
@@ -302,6 +298,8 @@ class IntegratedDesktop(DesktopLab):
                     reading = "—" if value is None else f"{value:.4f}"
                     lines.append(f"{key:5s} raw {reading}   quality {feature['quality']:.2f}")
             lines.append("Head units: " + ("image-height fraction" if detector_state["config"]["head_mode"] == "position" else "pitch degrees"))
+            candidate=detector_state.get("candidate")
+            lines.append("Tongue raw mouth X/Y: "+(f"{candidate[0]:.3f}, {candidate[1]:.3f}" if candidate else "unavailable; inspect Tongue calibration"))
             lines.append(detector_state["notice"])
         ref = raw.get("head_reference")
         if ref and state["mode"] not in ("camera", "detector-demo"):
@@ -311,22 +309,17 @@ class IntegratedDesktop(DesktopLab):
         set_var(self.raw_ratios, "\n".join(lines))
         result = lab_state["input_status"]
         set_var(self.input_result, "Latest input: " + (result["reason"] if result else "waiting"))
-        token = (frame["session_id"], frame["sequence"], selected) if frame else None
-        if token and token != self.vision_sequence:
-            self.vision_sequence = token
-            row = {"t": frame["timestamp_ms"] / 1000, "scope_context": (frame["session_id"], selected, detector_state["generation"] if detector_state else None)}
-            for eye in ("left", "right"):
-                ratios = eyes.get(eye, {})
-                for field, key in (("open", "openness"), ("x", "horizontal"), ("y", "vertical")):
-                    row[f"{eye}_{field}"] = ratios.get(key) if fresh else None
-            if detector_state is not None:
-                for eye in ("left", "right"):
-                    feature = detector_state["features"].get(eye, {})
-                    row[eye + "_open"] = feature.get("value") if fresh and feature.get("quality", 0) > 0 else None
-            self.vision_history.append(row)
         if self.notebook.select() == str(self.vision_page):
-            for scope in self.raw_scopes:
-                scope.draw(list(self.vision_history))
+            if detector_state is not None:
+                if self.raw_graph.get()=="All signals":draw_raw_scopes(self.raw_canvas,detector_state)
+                else:draw_feature_scope(self.raw_canvas,detector_state,self.raw_graph.get(),include_score=False)
+                capture=detector_state["frame"] or {}
+                set_var(self.raw_capture,f"Raw capture #{capture.get('sequence','—')} · {capture.get('timestamp_ms',0):.1f} ms · same measurements as Detection calibration")
+            else:
+                self.raw_canvas.delete("all")
+                self.raw_canvas.create_text(15,25,text="Camera and Detector demo provide raw image measurements. This source contains prebuilt SignalFrames.",
+                                            fill=MUTED,anchor="nw",width=1000)
+                set_var(self.raw_capture,"No raw camera capture in this source")
             if state["preview"] is not None and state["preview_id"] != self.preview_seen:
                 self.preview_photo = tk.PhotoImage(data=state["preview"], format="PPM")
                 self.preview_seen = state["preview_id"]
@@ -344,7 +337,7 @@ class IntegratedDesktop(DesktopLab):
     def close(self):
         if not self.closed:
             if self.calibration_ui is not None:
-                self.calibration_ui.eye_panel.close()
+                self.calibration_ui.close_panels()
             self.closed = True
             self.session.close()
             self.root.destroy()

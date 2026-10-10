@@ -21,6 +21,10 @@ Vision/.venv/bin/python -m App --source camera --model Vision/.local/face_landma
 ```
 
 Follow [the unified workflow and saved-profile guide](App/README.md).
+The [head/tongue calibration guide](docs/MOVEMENT_CALIBRATION_GUIDE.md) covers guided
+position fitting, raw graphs on camera setup, shared readings and saved profiles.
+The [tongue model plan](Vision/TONGUE_MODEL_PLAN.md) incorporates the supplied
+segmentation research and distinguishes the current color baseline from future models.
 The [detector runbook](Vision/DETECTION_LAB.md) specifies measurements and thresholds.
 Optional camera dependencies/model setup are in [Vision setup](Vision/README.md).
 The standalone component tools are for developers; App requires no second program.

@@ -16,6 +16,7 @@ class DetectionConfig:
     settle_ms: float = 1000
     collect_ms: float = 1800
     eye_rest_ms: float = 3000
+    movement_rest_ms: float = 1500
     min_samples: int = 12
     stale_ms: float = 250
     min_face_px: float = 80
@@ -29,6 +30,8 @@ class DetectionConfig:
     head_mode: str = "position"
     head_position_separation: float = 0.02
     head_pitch_separation: float = 3
+    tongue_position_separation: float = 0.04
+    position_check_tolerance: float = 0.2
     min_mouth_px: float = 28
     min_mouth_opening: float = 0.07
     tongue_margin: float = 4
@@ -40,12 +43,14 @@ class DetectionConfig:
         bounds = {
             "settle_ms": (0, 5000), "collect_ms": (300, 10000),
             "eye_rest_ms": (0, 30000),
+            "movement_rest_ms": (0, 30000),
             "stale_ms": (80, 2000), "min_face_px": (20, 500),
             "min_eye_px": (4, 100), "min_focus": (1, 1000),
             "min_brightness": (0, 120), "max_brightness": (130, 255),
             "max_clipped_fraction": (0.05, 0.9), "eye_separation": (0.001, 0.2),
             "endpoint_tolerance": (0, 0.1), "head_position_separation": (0.005, 0.2),
             "head_pitch_separation": (1, 30), "min_mouth_px": (12, 200),
+            "tongue_position_separation": (0.01, 0.3), "position_check_tolerance": (0.05, 0.35),
             "min_mouth_opening": (0.02, 0.5), "tongue_margin": (1, 30),
             "tongue_min_area": (0.005, 0.3), "tongue_max_area": (0.4, 0.95),
             "tongue_ambiguity": (0.1, 0.9),

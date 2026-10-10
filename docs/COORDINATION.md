@@ -10,6 +10,41 @@ graphs on the camera tab, and consistent data across tabs. Device-specific trans
 functions and driver integration remain the next stage. Contract lands first:
 [MOVEMENT_CALIBRATION.md](../Contracts/MOVEMENT_CALIBRATION.md).
 
+Implementation handoff:
+
+- Head guide: choose image Y or pitch, train neutral/up/down, then check new frames.
+  The dedicated mode selector resets only head calibration.
+- Tongue: current color appearance training plus absent/center/four-directions
+  guide, independent fresh position checks, personal X/Y range, and saved-range
+  recheck. Raw candidate, mask and calibrated position planes remain distinct.
+- Camera setup defaults to raw measurements and shared raw time graphs. Calibration
+  reads the same capture rows, generation, sequence and timestamp. There is one
+  worker; UI redraws do not create samples. Plot-only unknown holds stay dark.
+- Detector preset v4 adds tongue ranges; combined profile v3 is unchanged. v1/v2/v3
+  detector loading is preserved. Older appearance-only tongue profiles need a new
+  range; source restart/loading requires fresh absent + five-position checks.
+- Added `position_space: personal_range_v1` on calibrated camera frames. Tongue
+  outputs now use comfortable endpoints and learned neutral; legacy replay keeps
+  its existing interpretation. Eye behavior and Processing/Drivers are unchanged.
+- Supplied research reviewed against `Vision/tongue.py` and the existing local
+  research benchmark. Current color segmentation excludes protruding tissue and
+  measures centroid, not tip. No pretrained model is active. See
+  [TONGUE_MODEL_PLAN.md](../Vision/TONGUE_MODEL_PLAN.md) for local model evaluation,
+  timing caveats, coordinate/version requirements and recording-session holdouts.
+- Testing instructions: [MOVEMENT_CALIBRATION_GUIDE.md](MOVEMENT_CALIBRATION_GUIDE.md).
+  Start with detector-demo to exercise the guides, then test actual camera accuracy.
+
+Validation: **235 tests passed**: 101 Vision (including local-model blank-image
+smoke), 69 Processing, 58 integration (including 8 opt-in native Tk checks), and
+7 tooling. The 490-frame headless mouse exercise accepted all captures, observed
+left/right/pointer/scroll and released output at EOF. Native source-view inspection
+showed raw graphs before calibration. Synthetic tests cover asymmetric/reversed
+ranges, independent repeat checks, unavailable/overlapping input, profile migration,
+failed validation, hidden-tab cancellation, late prompt acknowledgments and shared
+snapshot consistency. Real-person detection/comfort/latency remain unmeasured.
+Ruff F checks, whitespace and integration scope checks pass. The feature branch is retained for the handoff; other agents
+should branch from updated main and keep their own worktrees.
+
 ## Current simplified wink calibration task
 
 Reuvi asks to remove Detection research and train blink-versus-wink appearance in

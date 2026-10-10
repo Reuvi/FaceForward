@@ -113,6 +113,20 @@ class LabRuntime:
                 phase = (self.clock()/1000) % 8
                 controls.update(left_closed=2 <= phase < 3 or 6 <= phase < 7,
                                 right_closed=4 <= phase < 5 or 6 <= phase < 7)
+            controls.setdefault("tongue",True)
+            job=self.workbench.job
+            if job and job.target in ("tongue_absent","validate_absent","validate_visible"):
+                controls["tongue"]=job.target=="validate_visible"
+            movement=self.workbench.movement_guide
+            if movement and movement.active:
+                state=movement.state(self.clock())
+                if movement.kind=="head":
+                    controls["head"]={"neutral":.5,"up":.2,"down":.8}[state["name"]]
+                else:
+                    controls["tongue"]=state["name"]!="absent"
+                    x,y={"absent":(.5,.5),"center":(.5,.5),"left":(.3,.5),
+                         "right":(.7,.5),"up":(.5,.3),"down":(.5,.7)}[state["name"]]
+                    controls.update(tongue_x=x,tongue_y=y)
             return controls
 
     def ingest(self, captured, observations, *, inference_ms=0, preview=True):
@@ -182,6 +196,7 @@ class LabRuntime:
                       "head_y", "tongue_x", "tongue_y", "left_wink_bit", "right_wink_bit"}
             needed.update(side+"_"+key for side in ("left","right")
                           for key in ("blink","squint","cheek","brow","wink_score"))
+            needed.update(("tongue_candidate_x","tongue_candidate_y"))
             cutoff = self.workbench.trace[-1]["timestamp_ms"]-8000 if self.workbench.trace else 0
             scope_subject = state.get("scope_subject", state["selected"])
             for row in reversed(self.workbench.trace):

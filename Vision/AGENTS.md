@@ -42,3 +42,11 @@ lane documentation here. Put requests for shared changes in `interface-requests/
 - Before handoff, check no face, one/two faces, identity loss/reacquisition, missing
   features, orientation/mirroring, and sample timing. Document setup/run/test commands
   once code exists. Never commit real recordings or personal calibration data.
+
+Read `../Contracts/MOVEMENT_CALIBRATION.md` for guided head/tongue ranges and
+shared capture diagnostics. Detector presets are v4; combined profiles remain v3.
+Use the same workbench trace in camera setup and calibration. No UI-sampled history
+or second worker. Keep tongue raw mouth coordinates separate from personal ranges,
+require fresh saved-range rechecks, and preserve invalid observations. The current
+color detector excludes protrusion outside the lips; do not reuse its fit for a
+future model/crop without a versioned contract and fresh calibration.

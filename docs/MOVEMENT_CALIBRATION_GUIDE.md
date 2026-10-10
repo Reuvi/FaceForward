@@ -1,0 +1,192 @@
+# Head and tongue calibration, raw views, and the device boundary
+
+Use the same local Python/Tk App. **Vision source & raw signals** is the camera
+setup tab. It now defaults to raw measurements and shows raw graphs before any
+personal position calibration. **Detection calibration** uses that same capture
+history; it does not start another detector or resample the data at UI speed.
+
+From the repository root:
+
+```bash
+Vision/.venv/bin/python -m App --source camera \
+  --model Vision/.local/face_landmarker.task --camera-id 0 --fps 30
+```
+
+For a synthetic exercise, use `--source detector-demo` instead, without model or
+camera arguments. Generated input follows head/tongue guides automatically.
+It also hides the tongue during an empty-mouth capture and shows it afterward
+so you can freeze and mark the center patch. This is a wiring test, not ML accuracy.
+
+## First inspect the camera tab
+
+The **Raw measurements** panel and bottom graphs show:
+
+| Raw measurement | Units and availability |
+| --- | --- |
+| Left/right eyelid gap / eye width | Dimensionless ratio; available before eye calibration |
+| Head Y | Nose-bridge image-height fraction, or pitch in degrees, selected in Head Y calibration |
+| Tongue centroid X/Y | Fractions of the mouth crop; available after appearance training, before personal range calibration |
+| Eye facial coefficients | Choose Left/Right facial features in the raw graph selector; same-side blink, squint, cheek and brow scores, 0–1 |
+
+Tongue position cannot be measured before its appearance model exists. A blank
+centroid graph means unavailable, not centered. The candidate is experimental
+color segmentation and can mistake similarly colored tissue for tongue.
+Inspect the green candidate mask during calibration.
+
+The **Calibrated signals** subtab shows the actual SignalFrame values. These remain
+unavailable until the relevant calibration is ready. Raw values and calibrated
+values intentionally have different units; the labels separate them. Neither view
+shows mouse speed, acceleration or screen position.
+
+Both main tabs use the same workbench samples, sequence numbers and capture
+timestamps. The displayed capture number identifies the current reading. Switch
+tabs without resetting anything. The UI draws roughly ten times per second, but
+the graphs retain every accepted captured sample from the last eight seconds.
+The video preview is separately throttled; an image may be older than the current
+numeric sample. A larger sample rate does not create extra calibration evidence
+from duplicate timestamps.
+
+## Calibrate vertical head movement
+
+1. Open **Detection calibration → 2 Head Y**.
+2. Choose **position** for moving your whole head up/down in the camera image,
+   or **pitch** for nodding. The selector resets only head calibration; eye and
+   tongue fits remain. Keep the camera and your distance reasonably consistent.
+3. Press **Start head position guide**. Follow neutral → comfortable up →
+   comfortable down. Get into position during preparation and hold during capture.
+4. Repeat the three positions for the fresh checks. These samples verify the fit;
+   they do not change the learned references. The flow takes about 25 seconds
+   with default preparation, capture and rest times.
+5. Inspect the two bars: purple is the raw measurement, green is the calibrated
+   position. The orange line is the requested target during guidance. Up maps
+   to 0, neutral to .5, and down to 1, even when the raw pitch sign is reversed.
+
+Return to neutral repeatedly, then stop halfway toward each limit. Expect about
+.25 and .75 at those halfway positions. Test comfortable motion while blinking and
+speaking; record drift or unavailable readings. Head X is not implemented in this
+mouse MVP. Image translation and rotation are distinct measurements; this guide
+does not claim to fully disentangle them or correct camera perspective.
+
+## Calibrate tongue appearance and position
+
+1. Open **Detection calibration → 3 Tongue**. Appearance controls scroll below the always-visible guide.
+   Open your mouth with the tongue hidden, press **Capture EMPTY open mouth**,
+   and hold during its preparation/capture countdown.
+2. Show your tongue, press **Freeze visible tongue**, then click tissue wholly
+   inside the tongue in the frozen crop. Avoid lips, teeth, gums and borders.
+   The frozen image stays only in memory.
+3. Press **Fit appearance model**. Inspect the live green candidate region:
+   it should follow the visible tongue. If it follows other tissue, reset and
+   recollect; a good-looking numerical position alone is insufficient.
+4. Press **Start tongue position guide**. First hide the tongue with the mouth
+   still open for the absence check. Then follow comfortable center → your left
+   → your right → up → down, keeping mouth opening fairly steady.
+5. Repeat those five positions for separate fresh checks. The 11-step guide takes
+   about 46 seconds after appearance setup. It stops early with a reason if a
+   collection or check fails. Recollect appearance if the absent check fails.
+
+The left position plane shows the **raw mouth centroid**. Its purple rectangle is
+the learned personal range once fitted. The right plane shows **personal position**,
+with your learned neutral at (.5, .5). X increases toward your anatomical right;
+Y increases down. The camera preview is unmirrored, so the displayed camera image
+has the opposite horizontal appearance from this anatomical coordinate plot.
+The orange circle is a requested calibration target, not a detection.
+
+This tracks the visible region's centroid **inside the lips**, not the tongue tip.
+Tissue protruding outside that crop is excluded; range calibration cannot recover
+it. Changing mouth
+opening changes the raw Y reference; occlusion, saliva/reflections, lips/gums and
+lighting can still cause misses or false candidates. Comfortable positions must be
+distinct and repeatable. No absent or unreliable input is replaced with a fake
+center. Unknown intervals hold the last plot position in a darker color, while
+the actual signal stays null/invalid.
+
+## Inspect, retry, save
+
+Below the position display, choose **Raw detector signals** or **Calibrated positions**
+to inspect time traces. Raw graphs are the same renderer and capture rows as the
+camera tab. Calibrated position traces use 0–1 and show no device transfer function.
+Use **Export trace CSV** to save scalar measurements, confidence/validity,
+calibration generation, raw candidate coordinates and personal positions.
+No images are exported.
+
+**Cancel** or leaving an active guide's tab cancels unfinished collection and
+keeps preview stopped. Starting a new range calibration clears that channel's
+previous range; completed unrelated eye/head/tongue fits remain. A brief face
+loss during normal tracking preserves completed calibration. Rest/preparation
+frames never train either range. Low tones mean rest, a rising pair means
+prepare, three high tones mean capture, and success/retry have separate cues.
+
+Save using **Save active profile** in the camera tab. Detector preset v4 adds
+`tongue_range`; the enclosing `face_mouse_profile_v3` remains readable by this
+App. Old detector v1/v2/v3 files still load, but without a tongue range you must
+run the new position guide before tongue X/Y becomes valid. Eye-model compatibility
+is unchanged.
+
+Loading works while stopped or without a face, and always leaves preview stopped.
+After loading or restarting the source, use **Recheck saved tongue range**:
+an absent check plus five position checks reuse the saved range without refitting
+it. If these fail, recollect appearance/range under the current conditions.
+Fits survive normal tab switches and brief motion/loss. Calibration files and
+personal traces should remain in ignored local directories.
+
+## Calibration rules and measurements
+
+Head uses three robust reference groups. Tongue uses independent X and Y axis
+fits from the five directional groups. Each axis maps linearly on either side of
+the learned center, so unequal movement ranges on the two sides are supported.
+Capture windows retain at most 512 distinct-timestamp samples. Training requires
+at least `min_samples` usable frames and at least 80% availability.
+Robust fitting rejects overlapping/unstable groups. Later position checks require
+90% of captured samples to fall within `position_check_tolerance` of the requested
+normalized target in every axis. Missing/out-of-range samples count as failures.
+The tongue absence check permits at most 5% candidate detections in usable frames.
+These are transparent MVP checks, not validated human accuracy claims.
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `settle_ms` / `collect_ms` | 1000 / 1800 ms | Preparation and capture windows |
+| `movement_rest_ms` | 1500 ms | Rest between movement steps |
+| `min_samples` | 12 | Minimum usable distinct-timestamp samples |
+| `head_position_separation` | .02 | Minimum adjacent reference separation, image-height fraction |
+| `head_pitch_separation` | 3° | Minimum adjacent pitch separation |
+| `tongue_position_separation` | .04 | Minimum adjacent X/Y separation in mouth fractions |
+| `position_check_tolerance` | .2 | Maximum normalized error in a fresh target check |
+| `endpoint_tolerance` | .05 | Small normalized overshoot clips to 0/1; larger overshoot is unavailable |
+
+Advanced detector settings remain in **Settings**; applying the whole settings
+JSON resets all fits. Use the dedicated head selector to change only head mode.
+These thresholds control calibration reliability; they are not mouse sensitivity,
+dead zones, velocity or acceleration.
+
+## General device workflow
+
+```text
+Camera frames
+  → raw detector measurements + validity
+  → personal calibration: positions and independent wink states
+  → selected device's mappings and transfer functions
+  → driver/emulator output
+```
+
+This increment implements the first two layers and their diagnostics. Calibration
+describes the person and camera, so it can be reused by different device mappings.
+For a mouse, later Processing work can turn head position into scroll velocity,
+tongue position into relative pointer velocity, and wink samples into button
+states. A future gamepad could map the same positions to joystick axes with its
+own transfer settings. Selecting that device must select its mappings; it should
+not redefine the raw signal or overwrite personal calibration.
+
+The existing mouse preview remains available for regression testing, but no new
+mouse transfer functions or real driver integration are added here.
+See [the contract](../Contracts/MOVEMENT_CALIBRATION.md) for profile and signal semantics.
+
+## Tongue research supplied during this work
+
+The suggested pretrained segmentation model is a candidate for a separate detector
+comparison; it is not running in this App yet. Its supplied 41.3 ms CPU inference
+measurement excludes the rest of the pipeline and does not establish webcam
+accuracy. See [the model evaluation plan](../Vision/TONGUE_MODEL_PLAN.md) for the
+local integration design, crop/coordinate changes and concrete comparison metrics.
+The current color mask remains visible so you can identify where it fails during
+calibration instead of treating fitted positions as proof of detection quality.

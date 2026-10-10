@@ -35,7 +35,7 @@ remain a later/device-specific stage. Generic legacy replay keeps its old schema
 
 Detector preset v4 adds `tongue_range` and retains v1/v2/v3 loading. Combined
 profile v3 remains unchanged. Completed fits persist through brief loss and source
-restart; loading/restart still require fresh tongue appearance checks. Old profiles
+restart; loading/restart require a fresh absent + five-position recheck of the saved range. Old profiles
 without a tongue movement range require the new position guide before tongue
 output can be valid. Stored ranges are never guessed from the full mouth.
 
@@ -45,3 +45,9 @@ Calibration samples use original capture timestamps and only acknowledged captur
 windows; rest/preparation, duplicates, missing features and stale input do not train.
 Full source loss/cancel preserves completed fits and discards unfinished work.
 Synthetic tests establish behavior, not real-person detector accuracy.
+
+A later learned segmentation backend must explicitly version its coordinate space
+and calibration. The current raw domain excludes tongue protrusion outside the
+inner lips. Changing crop/scaling or centroid to tip requires a new coordinated
+contract; do not load current color-based ranges onto those new measurements.
+See [the tongue model evaluation plan](../Vision/TONGUE_MODEL_PLAN.md).

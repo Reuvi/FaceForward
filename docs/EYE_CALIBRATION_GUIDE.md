@@ -1,5 +1,12 @@
 # Eye calibration and testing
 
+Current head/tongue update: use the [movement calibration guide](MOVEMENT_CALIBRATION_GUIDE.md)
+for guided position fitting, raw graphs on camera setup and shared capture data.
+Detector presets are now v4 (combined profiles remain v3). Saved tongue ranges
+require **Recheck saved tongue range** after loading/restarting; older presets
+without ranges need the new tongue guide. Eye classification is unchanged.
+
+
 This is the current eye workflow in the local Python/Tk App. The separate
 Detection research tab has been removed. One guided calibration learns eye shape,
 natural blinks and intentional winks, then checks each eye on new movements.

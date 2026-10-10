@@ -103,8 +103,11 @@ completed fits survive tab changes. The real driver is not wired.
 
 `face_mouse_profile_v3` contains `format`, `source_kind` (`camera` or `synthetic`),
 `detector`, `processing`, and `preview`; v1/v2 remain readable. Detector section
-version 3 uses `frame-wink-eye-head-tongue-v3`, DetectionConfig, separate eye geometry
-and checked per-frame wink models, a head fit and optional tongue color parameters.
+version 4 uses `personal-head-tongue-ranges-v4`, DetectionConfig, separate eye geometry
+and checked per-frame wink models, a head fit, optional tongue color parameters
+and `tongue_range`. Detector v1/v2/v3 remain readable; v3 retains wink fits but needs
+the new tongue range guide. See [MOVEMENT_CALIBRATION.md](MOVEMENT_CALIBRATION.md)
+for personal coordinates, shared raw diagnostics and guided movement checks.
 Processing is MouseConfig; preview contains pointer/scroll speeds. No images, raw
 training vectors, arming state or live tongue validation flags are saved. Wink
 check counts are persisted with the fitted model. Old research/event models are
@@ -116,7 +119,7 @@ owns detector preset validation/export/import; App validates/binds both together
 
 Load requires a matching source kind, but no visible face or running camera.
 It replaces the active single user's parameters, resets and disarms the processor,
-and requires fresh tongue absent/visible validation.
+and requires a fresh tongue absent + five-position recheck of the saved range.
 Eye/head parameters apply to subsequent samples; the operator must recheck them.
 Stop, stale input, loss, and same-source restart preserve completed calibration.
 An interrupted capture/guide is cancelled; invalid observations never train it.

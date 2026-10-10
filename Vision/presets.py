@@ -12,11 +12,17 @@ from .tongue import TongueModel
 LEGACY_ALGORITHM = "lid-gap-head-y-lab-color-v1"
 ALGORITHM = "guided-lid-gap-head-y-lab-color-v2"
 WINK_ALGORITHM = "frame-wink-eye-head-tongue-v3"
+MOVEMENT_ALGORITHM = "personal-head-tongue-ranges-v4"
 
 
 def decode_winks(data):
     from .wink_model import validate_models
-    return validate_models(data["winks"]) if data.get("version")==3 else {}
+    return validate_models(data["winks"]) if data.get("version") in (3,4) else {}
+
+
+def decode_tongue_range(data, config):
+    from .movement_guide import validate_range
+    return validate_range(data["tongue_range"],config) if data.get("version")==4 else None
 
 
 def _keys(value, expected, name):
@@ -27,10 +33,11 @@ def _keys(value, expected, name):
 def decode_preset(data):
     """Validate completely before the workbench changes any active state."""
     fields=("version", "algorithm", "settings", "eyes", "head", "tongue")
-    if isinstance(data,dict) and data.get("version")==3:fields+=("winks",)
+    if isinstance(data,dict) and data.get("version") in (3,4):fields+=("winks",)
+    if isinstance(data,dict) and data.get("version")==4:fields+=("tongue_range",)
     _keys(data, fields, "Detector preset")
     if (type(data["version"]) is not int
-            or (data["version"], data["algorithm"]) not in ((1, LEGACY_ALGORITHM), (2, ALGORITHM), (3,WINK_ALGORITHM))):
+            or (data["version"], data["algorithm"]) not in ((1, LEGACY_ALGORITHM), (2, ALGORITHM), (3,WINK_ALGORITHM), (4,MOVEMENT_ALGORITHM))):
         raise ValueError("Unsupported detector preset version or algorithm")
     config = DetectionConfig.from_dict(data["settings"])
     if not isinstance(data["eyes"], dict) or set(data["eyes"]) - {"left", "right"}:
@@ -75,12 +82,15 @@ def decode_preset(data):
         raise ValueError("Profile needs at least one fitted detector")
     winks=decode_winks(data)
     if set(winks)-set(eyes):raise ValueError("Wink model requires matching eye geometry")
+    if decode_tongue_range(data,config) is not None and tongue is None:
+        raise ValueError("Tongue movement range requires an appearance model")
     return config, eyes, head, tongue
 
 
 def encode_preset(core):
-    result = {"version": 3, "algorithm": WINK_ALGORITHM, "settings": core.config.to_dict(),
+    result = {"version": 4, "algorithm": MOVEMENT_ALGORITHM, "settings": core.config.to_dict(),
               "winks": core.winks,
+              "tongue_range": {key:asdict(fit) for key,fit in core.tongue_range.items()} if core.tongue_range else None,
               "eyes": {side: {name: getattr(fit, name) for name in ("closed", "opened", "threshold", "closed_limit", "open_limit")}
                        for side, fit in core.eyes.items()},
               "head": asdict(core.head) if core.head else None, "tongue": None}

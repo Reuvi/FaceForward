@@ -33,3 +33,11 @@ complete blink/wink guide in Detection calibration. Read `../Contracts/EYE_INTEN
 Hide legacy eye timer controls in App; legacy component/replay formats retain them.
 Save profile v3 without research; accept validated v1/v2 files without reviving their
 research runtime. Never restore old event models as frame classifiers.
+
+Read `../Contracts/MOVEMENT_CALIBRATION.md` for guided head/tongue ranges and
+shared capture diagnostics. Detector presets are v4; combined profiles remain v3.
+Use the same workbench trace in camera setup and calibration. No UI-sampled history
+or second worker. Keep tongue raw mouth coordinates separate from personal ranges,
+require fresh saved-range rechecks, and preserve invalid observations. The current
+color detector excludes protrusion outside the lips; do not reuse its fit for a
+future model/crop without a versioned contract and fresh calibration.

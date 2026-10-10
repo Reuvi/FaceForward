@@ -153,6 +153,52 @@ class FullscreenCalibrationTests(unittest.TestCase):
 
 @unittest.skipUnless(os.environ.get("RUN_TK_TESTS") == "1", "Explicit desktop Tk test required")
 class SingleUserWindowTests(unittest.TestCase):
+    def test_head_guide_shared_raw_graphs_and_cancel_on_tab_change(self):
+        import tkinter as tk
+        from App.desktop import IntegratedDesktop
+        from App.mouse_runtime import MouseSession
+        from Vision.capture import CapturedImage
+        from Vision.demo_detection import demo_image
+        from Vision.signals import Envelope
+        now=[1000.]
+        session=MouseSession(clock=lambda:now[0]);session.mode="detector-demo"
+        root=tk.Tk()
+        options=SimpleNamespace(source="detector-demo",replay=None,model=None,fps=30,camera_id=0,no_preview=True,subject=None)
+        with patch.object(session,"start"),patch("Vision.movement_view.CalibrationSounds"):
+            ui=IntegratedDesktop(root,session,options)
+            self.addCleanup(lambda:None if ui.closed else ui.close())
+            root.geometry("1420x850")
+            session.detector_command("configure",dict(settle_ms=0,collect_ms=300,movement_rest_ms=0,min_samples=5))
+            sequence=0
+            def feed():
+                nonlocal sequence
+                sequence+=1;now[0]+=25
+                image,observations=demo_image(**session.detector_runtime.demo_input())
+                session.deliver_detection(CapturedImage(Envelope("tk-movement",sequence,now[0]),image),observations,preview=False)
+            feed();ui.refresh_vision();root.update()
+            self.assertGreaterEqual(ui.raw_canvas.winfo_height(),160)
+            self.assertIn("Raw capture #1",ui.raw_capture.get())
+            ui.notebook.select(ui.calibration_page);ui.open_calibration();root.update()
+            view=ui.calibration_ui;view.calibration_tabs.select(view.head_tab);root.update()
+            view.head_panel.start.invoke()
+            view.tick();root.update()
+            core=session.detector_runtime.workbench
+            while core.movement_guide.active:
+                feed();view.tick();root.update()
+                self.assertLess(sequence,300)
+            self.assertTrue(core.movement_guide.passed,core.notice)
+            self.assertIsNotNone(core.head)
+            for mode in view.movement_scope_picker["values"]:
+                view.movement_scope_mode.set(mode);view.tick();root.update()
+                self.assertTrue(view.scope.find_all())
+            view.head_panel.start.invoke();view.tick();root.update()
+            ui.notebook.select(ui.vision_page);view.tick();root.update()
+            self.assertIsNone(core.movement_guide)
+            self.assertFalse(session.lab.processor.armed)
+            ui.refresh_vision()
+            self.assertIn(f"Raw capture #{sequence}",ui.raw_capture.get())
+            self.assertEqual(session.state(include_detector=True)["detector"]["trace"],session.detector_state()["trace"])
+
     def test_live_selection_hidden_replay_selection_available_and_profile_load_stopped(self):
         import tkinter as tk
         import tempfile

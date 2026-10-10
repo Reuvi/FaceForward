@@ -69,7 +69,8 @@ class MouseSession:
             return self.detector_runtime
 
     def detector_command(self, name, *args):
-        allowed = {"start_eye_guide", "present_eye_step", "collect", "cancel", "freeze_mouth", "mark_tongue", "fit_tongue", "reset_tongue", "configure", "reset_calibration"}
+        allowed = {"start_eye_guide", "present_eye_step", "start_movement_guide", "present_movement_step",
+                   "set_head_mode", "collect", "cancel", "freeze_mouth", "mark_tongue", "fit_tongue", "reset_tongue", "configure", "reset_calibration"}
         if name not in allowed:
             raise ValueError("Unsupported calibration command")
         with self.lock:
@@ -80,7 +81,7 @@ class MouseSession:
                                 clear_eye_history=name in ("start_eye_guide", "configure", "collect", "fit_tongue", "reset_tongue", "reset_calibration"))
             result = runtime.command(name, *args)
             validation_only = name == "collect" and args and args[0] in ("validate_absent", "validate_visible")
-            if name not in ("freeze_mouth", "cancel", "present_eye_step") and not validation_only:
+            if name not in ("freeze_mouth", "cancel", "present_eye_step", "present_movement_step") and not validation_only:
                 self.profile_label = "Modified calibration — save profile to keep it"
                 self.profile_binding = None
             return result
@@ -209,15 +210,20 @@ class MouseSession:
                 if core.frame is not None:
                     self.frame = dict(core.frame, diagnostic_only=False)
 
-    def state(self):
+    def state(self, *, include_detector=False):
         with self.lock:
             self._expire_detector()
             span = self.times[-1] - self.times[0] if len(self.times) > 1 else 0
             age = self.clock() - self.frame["timestamp_ms"] if self.frame is not None else None
             running = self.thread is not None and self.thread.is_alive() and not self.stop_event.is_set()
+            detector=(self.detector_state() if include_detector and self.detector_runtime is not None
+                      and self.mode in ("camera","detector-demo") else None)
+            # Calibration mutations can invalidate an output between captures.
+            # Use the same snapshot for the setup table and raw plots.
+            frame=dict(detector["frame"],diagnostic_only=False) if detector and detector["frame"] else self.frame
             return {"mode": self.mode, "status": self.status, "error": self.error,
                     "running": running, "generation": self.generation,
-                    "frame": self.frame, "observations": self.observations,
+                    "frame": frame, "observations": self.observations, "detector": detector,
                     "preview": self.preview, "preview_id": self.preview_id,
                     "received": self.received, "accepted": self.accepted,
                     "age_ms": age, "inference_ms": self.inference_ms,

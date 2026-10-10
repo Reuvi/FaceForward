@@ -30,7 +30,7 @@ class UnifiedCalibrationTests(unittest.TestCase):
         self.session.mode = "detector-demo"
         self.addCleanup(self.session.close)
         self.core = self.session.ensure_detector_runtime().workbench
-        self.session.detector_command("configure", {"settle_ms":0,"collect_ms":400,"eye_rest_ms":100,"min_samples":8})
+        self.session.detector_command("configure", {"settle_ms":0,"collect_ms":400,"eye_rest_ms":100,"movement_rest_ms":0,"min_samples":8})
         self.feed()
         self.assertEqual(self.core.selected, SINGLE_SUBJECT)
         self.assertEqual(self.lab.runtime["subject_id"], SINGLE_SUBJECT)
@@ -67,6 +67,16 @@ class UnifiedCalibrationTests(unittest.TestCase):
         self.session.detector_command("fit_tongue")
         self.collect("validate_absent")
         self.collect("validate_visible",tongue=True)
+        self.guided_movement("tongue")
+
+    def guided_movement(self,kind):
+        self.session.detector_command("start_movement_guide",kind)
+        while self.core.movement_guide.active:
+            guide=self.core.movement_guide;state=guide.state(self.now)
+            if state["waiting"]:self.session.detector_command("present_movement_step",guide.index,state["phase"])
+            self.feed(**self.session.detector_runtime.demo_input())
+            self.assertFalse(self.lab.processor.armed)
+        self.assertTrue(self.core.movement_guide.passed,self.core.notice)
 
     def guided_eyes(self):
         self.session.detector_command("start_eye_guide")
@@ -197,7 +207,7 @@ class UnifiedCalibrationTests(unittest.TestCase):
             write_profile(broken,corrupted)
             with self.assertRaises(ValueError):self.session.load_profile(broken)
             self.assertEqual(self.core.export_calibration(),detector)
-            self.assertEqual(detector["version"],3)
+            self.assertEqual(detector["version"],4)
             self.assertEqual(read_profile(path)["format"],"face_mouse_profile_v3")
             self.assertEqual(detector['settings']['eye_rest_ms'],100)
             self.session.load_profile(path)
@@ -209,6 +219,7 @@ class UnifiedCalibrationTests(unittest.TestCase):
             # Old profiles remain readable; they retain the original single threshold.
             detector["version"]=1;detector["algorithm"]="lid-gap-head-y-lab-color-v1"
             detector.pop("winks")
+            detector.pop("tongue_range")
             for fit in detector["eyes"].values():
                 del fit["closed_limit"];del fit["open_limit"]
             _,eyes,_,_=decode_preset(detector)
@@ -224,6 +235,7 @@ class UnifiedCalibrationTests(unittest.TestCase):
                     from Processing.research.settings import settings
                     legacy["detector"].update(version=2,algorithm="guided-lid-gap-head-y-lab-color-v2")
                     legacy["detector"].pop("winks")
+                    legacy["detector"].pop("tongue_range")
                     legacy["research"]={"settings":settings(),"fits":{},"pose_bounds":{},"models":{},"gaze":None}
                 old_path=Path(directory)/f"legacy{version}.json"
                 write_profile(old_path,legacy)
@@ -282,7 +294,7 @@ class UnifiedCalibrationTests(unittest.TestCase):
         self.assertEqual((result["left_click"],result["right_click"]),(0,1))
         result=self.hold(tongue=True,left_closed=True,right_closed=True)
         self.assertEqual((result["left_click"],result["right_click"]),(1,1))
-        result=self.hold(tongue=True,tongue_x=.72,head=.78)
+        result=self.hold(tongue=True,tongue_x=.65,head=.78)
         self.assertGreater(result["pointer_x"],.51)
         self.assertGreater(result["scroll_y"],.51)
         self.assertEqual(self.lab.state()["raw"]["sequence"],self.core.frame["sequence"])

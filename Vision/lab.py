@@ -9,8 +9,8 @@ from tkinter import filedialog, messagebox, ttk
 import cv2
 
 from .eye_view import EyeGuidePanel
-from .eye_scope import draw_eye_scope, draw_feature_scope, scope_samples
-from LabUI.traces import darker, trace_runs
+from .movement_view import MovementPanel, draw_position, draw_raw_scopes, draw_calibrated_scope
+from .eye_scope import draw_eye_scope, draw_feature_scope
 from .features import DetectionConfig
 from .lab_runtime import LabRuntime
 
@@ -22,6 +22,7 @@ class DetectionLab:
         self.visible = visible
         self.runtime = runtime if runtime is not None else LabRuntime()
         self.photos = {}
+        self.after_id = None
         if not self.embedded:
             root.title("Vision Detection Lab — calibration only / no mouse output")
             root.geometry("1230x910")
@@ -66,6 +67,9 @@ class DetectionLab:
         self.eye_scope_picker=ttk.Combobox(left,textvariable=self.eye_scope_mode,state="readonly",
             values=("Wink samples","Left facial features","Right facial features","Eye ratios"))
         self.eye_scope_picker.pack(fill="x")
+        self.movement_scope_mode=tk.StringVar(value="Raw detector signals")
+        self.movement_scope_picker=ttk.Combobox(left,textvariable=self.movement_scope_mode,state="readonly",
+            values=("Raw detector signals","Calibrated positions"))
         self.scope=tk.Canvas(left,height=180 if self.embedded else 220,bg="#14202c",highlightthickness=0)
         self.scope.pack(fill="x",pady=6)
         ttk.Label(left,textvariable=self.metrics,justify="left",wraplength=620,font=("Menlo",9 if self.embedded else 10)).pack(anchor="w")
@@ -75,14 +79,19 @@ class DetectionLab:
         self.eye_panel = EyeGuidePanel(eye,root,self.call)
         ttk.Label(eye,textvariable=self.eye_details,justify="left",wraplength=465,font=("Menlo",10)).pack(anchor="w",pady=8)
         head=self.tab(tabs,"2 Head Y")
-        self.text(head,"Default: nose-bridge height / image height. Move your whole head up and down. For nodding instead, change head_mode to pitch in Settings and recalibrate. Pitch uses the face model's camera-frame rotation in degrees.")
-        self.text(head,"Hold a comfortable neutral pose, then a comfortable upper and lower limit. Use the same distance from the camera. Raw positions must form stable, distinct groups.")
-        for target,label in (("head_neutral","Capture NEUTRAL"),("head_up","Capture UP"),("head_down","Capture DOWN")):
-            ttk.Button(head,text=label,command=lambda t=target:self.call("collect",t)).pack(fill="x",pady=6)
-        self.text(head,"Normalized Y: up = 0, neutral = 0.5, down = 1. Values beyond the calibrated tolerance are unavailable. This is position, not scroll velocity.")
-        ttk.Label(head,textvariable=self.head_details,justify="left",wraplength=430,font=("Menlo",11)).pack(anchor="w",pady=15)
-        tongue=self.tab(tabs,"3 Tongue")
-        self.text(tongue,"Experimental appearance segmentation. Use steady lighting. First open your mouth with the tongue hidden; then freeze a visible tongue and click ONLY tongue tissue. Lips, gums and teeth must not be marked.")
+        self.head_tab=head
+        self.text(head,"Choose what moves: whole-head height in the image, or nodding angle. Changing this resets only head calibration.")
+        self.head_mode=tk.StringVar(value=self.runtime.snapshot()["config"]["head_mode"])
+        self.head_mode_picker=ttk.Combobox(head,textvariable=self.head_mode,values=("position","pitch"),state="readonly")
+        self.head_mode_picker.pack(fill="x",pady=5)
+        self.head_mode_picker.bind("<<ComboboxSelected>>",lambda event:self.call("set_head_mode",self.head_mode.get()))
+        self.head_panel=MovementPanel(head,root,self.call,"head")
+        self.text(head,"Stay at the same camera distance. Move only as far as comfortable. Purple is raw position; green is the calibrated 0–1 position. Neutral is .5, up is 0, down is 1. This is position, not scrolling speed.")
+        ttk.Label(head,textvariable=self.head_details,justify="left",wraplength=440,font=("Menlo",10)).pack(anchor="w",pady=10)
+        self.tongue_tab=self.tab(tabs,"3 Tongue")
+        self.tongue_panel=MovementPanel(self.tongue_tab,root,self.call,"tongue")
+        tongue=self.scroll_content(self.tongue_tab)
+        self.text(tongue,"Appearance setup: keep lighting and mouth opening steady. Capture an empty open mouth, then freeze the visible tongue and click ONLY tongue tissue before fitting.")
         ttk.Button(tongue,text="1  Capture EMPTY open mouth",command=lambda:self.call("collect","tongue_absent")).pack(fill="x",pady=3)
         row=ttk.Frame(tongue);row.pack(fill="x",pady=3)
         ttk.Button(row,text="2  Freeze visible tongue",command=lambda:self.call("freeze_mouth")).pack(side="left")
@@ -90,13 +99,9 @@ class DetectionLab:
         self.mouth=tk.Label(tongue,bg="#14202c",text="Mouth crop appears when your face is visible",fg="white")
         self.mouth.pack(pady=6)
         self.mouth.bind("<Button-1>",self.mark_tongue)
-        ttk.Button(tongue,text="Mark center patch (if covered by tongue)",command=lambda:self.call("mark_tongue",.5,.5)).pack(fill="x",pady=2)
-        self.text(tongue,"Frozen image: click a tongue-only patch; repeat with another freeze if needed. Live green mask = candidate, not proof of tongue identity. X increases toward your anatomical right; Y downward.")
-        row=ttk.Frame(tongue);row.pack(fill="x",pady=3)
-        ttk.Button(row,text="4  Validate ABSENT",command=lambda:self.call("collect","validate_absent")).pack(side="left")
-        ttk.Button(row,text="5  Validate VISIBLE",command=lambda:self.call("collect","validate_visible")).pack(side="right")
+        self.text(tongue,"Frozen crop: click tongue tissue, avoiding lips/teeth. The live green region is an experimental centroid candidate inside the lips, not the tongue tip. Protruding tissue is excluded. Once fitted, start the position guide above. Its first step checks that a hidden tongue is absent.")
         ttk.Button(tongue,text="Reset tongue calibration",command=lambda:self.call("reset_tongue")).pack(fill="x",pady=3)
-        ttk.Label(tongue,textvariable=self.tongue_details,justify="left",wraplength=430,font=("Menlo",10)).pack(anchor="w",pady=6)
+        ttk.Label(tongue,textvariable=self.tongue_details,justify="left",wraplength=420,font=("Menlo",10)).pack(anchor="w",pady=6)
         settings=self.tab(tabs,"Settings")
         self.text(settings,"Edit tunables below. Applying clears calibration; your face reconnects automatically. Saving stores these tunables only. Use Save active profile in the main App to save learned calibration. head_mode is position or pitch.")
         ttk.Button(settings,text="Reset all calibration",command=lambda:self.call("reset_calibration")).pack(fill="x",pady=5)
@@ -116,6 +121,17 @@ class DetectionLab:
 
     def tab(self,tabs,title):
         frame=ttk.Frame(tabs,padding=10);tabs.add(frame,text=title);return frame
+
+    def scroll_content(self,parent):
+        canvas=tk.Canvas(parent,bg="#14202c",highlightthickness=0)
+        scrollbar=ttk.Scrollbar(parent,orient="vertical",command=canvas.yview)
+        scrollbar.pack(side="right",fill="y");canvas.pack(side="left",fill="both",expand=True)
+        canvas.configure(yscrollcommand=scrollbar.set)
+        content=ttk.Frame(canvas)
+        window=canvas.create_window(0,0,window=content,anchor="nw")
+        content.bind("<Configure>",lambda event:canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.bind("<Configure>",lambda event:canvas.itemconfigure(window,width=event.width))
+        return content
 
     def text(self,parent,text):
         ttk.Label(parent,text=text,wraplength=430,justify="left").pack(anchor="w",pady=7)
@@ -188,6 +204,9 @@ class DetectionLab:
         return "—" if value is None else f"{value:.3f}"
 
     def tick(self):
+        if self.after_id is not None:
+            self.root.after_cancel(self.after_id)
+            self.after_id=None
         state=self.runtime.snapshot()
         hidden=(self.visible is not None and not self.visible()) or self.root.state()=="iconic"
         if state["eye_guide"] and state["eye_guide"]["active"] and (hidden or self.calibration_tabs.select()!=str(self.eye_tab)):
@@ -195,9 +214,20 @@ class DetectionLab:
             state=self.runtime.snapshot()
             self.eye_panel.update(state)
         if hidden:
-            self.root.after(200,self.tick)
+            if state.get("movement_guide") and state["movement_guide"]["active"]:
+                self.call("cancel")
+            self.after_id=self.root.after(200,self.tick)
             return
+        guide=state.get("movement_guide")
+        expected=self.head_tab if guide and guide["kind"]=="head" else self.tongue_tab
+        if guide and guide["active"] and self.calibration_tabs.select()!=str(expected):
+            self.call("cancel")
+            state=self.runtime.snapshot()
         self.eye_panel.update(state)
+        self.head_panel.update(state)
+        self.tongue_panel.update(state)
+        self.head_mode.set(state["config"]["head_mode"])
+        self.head_mode_picker.configure(state="disabled" if state["calibrating"] else "readonly")
         if state["config"] != self.displayed_config:
             self.displayed_config = state["config"]
             self.settings.delete("1.0","end")
@@ -205,7 +235,7 @@ class DetectionLab:
         self.status.set(state["notice"])
         frame=state["frame"] or {"faces":[]}
         timing=state["timing"]
-        self.source_status.set(f"{state['source']}   |   single user: {'detected' if state['selected'] else 'waiting for face'}   |   " +
+        self.source_status.set(f"{state['source']}   |   capture #{(state['frame'] or {}).get('sequence','—')}   |   single user: {'detected' if state['selected'] else 'waiting for face'}   |   " +
             "   ".join(f"{k}: {v:.1f}" for k,v in timing.items()))
         self.show_image(self.preview,"preview",state["preview"],(320,240))
         self.show_image(self.mouth,"mouth",state["mouth"],(256,192),frozen=state["frozen"])
@@ -233,47 +263,37 @@ class DetectionLab:
             eye_lines.append("")
         self.eye_details.set("\n".join(eye_lines))
         head=state["features"].get("head",{})
-        self.head_details.set(f"Mode: {state['config']['head_mode']}\nRaw: {self.fmt(head.get('value'))}\nNormalized Y: {self.fmt(signals.get('head_y',{}).get('value'))}\nQuality: {head.get('quality',0):.2f}\n{state['reasons'].get('head','Waiting for face')}\n\nCalibration: {state['head']}\nSamples: " + str({k:v for k,v in state['samples'].items() if k.startswith('head')}))
+        self.head_details.set(f"Mode: {state['config']['head_mode']}\nRaw: {self.fmt(head.get('value'))}\nNormalized Y: {self.fmt(signals.get('head_y',{}).get('value'))}\nQuality: {head.get('quality',0):.2f}\n{state['reasons'].get('head','Waiting for face')}\n\nComfortable range: " + (f"{state['head']['low']:.3f} → {state['head']['center']:.3f} → {state['head']['high']:.3f}" if state["head"] else "not calibrated"))
         val=state["validation"]
         self.tongue_details.set(f"{'FROZEN — click tissue' if state['frozen'] else 'LIVE crop / green candidate mask'}\n{state['reasons'].get('tongue','Waiting for face')}\nCandidate: {state['candidate']}\nPixels: {state['tongue_pixels']}\n" + "\n".join(f"{k}: {'PASS' if v['passed'] else 'FAIL'} ({v['detected_fraction']:.0%}, n={v['samples']})" for k,v in val.items()))
         self.metrics.set("\n".join(f"{k:16} {self.fmt(signals.get(k,{}).get('value'))}   {'valid' if signals.get(k,{}).get('valid') else 'unavailable'}" for k in ("left_eye_open","right_eye_open","head_y","tongue_x","tongue_y")))
-        draw_eye_scope(self.eye_scope,state)
         if self.calibration_tabs.select()==str(self.eye_tab):
-            self.eye_scope_picker.configure(state="readonly")
+            draw_eye_scope(self.eye_scope,state)
+            self.movement_scope_picker.pack_forget()
+            self.eye_scope_picker.pack(fill="x",before=self.scope)
             if self.eye_scope_mode.get()=="Wink samples":
                 draw_eye_scope(self.scope,state,intent=True)
             else:
                 draw_feature_scope(self.scope,state,self.eye_scope_mode.get())
         else:
-            self.eye_scope_picker.configure(state="disabled")
-            self.draw_scope(state["trace"],state["scope_subject"],state["generation"],state["config"]["head_mode"],state["config"]["stale_ms"])
-        self.root.after(100,self.tick)
+            self.eye_scope_picker.pack_forget()
+            self.movement_scope_picker.pack(fill="x",before=self.scope)
+            kind="tongue" if self.calibration_tabs.select()==str(self.tongue_tab) else "head"
+            draw_position(self.eye_scope,state,kind)
+            if self.movement_scope_mode.get()=="Calibrated positions":draw_calibrated_scope(self.scope,state)
+            else:draw_raw_scopes(self.scope,state)
+        self.after_id=self.root.after(100,self.tick)
 
-    def draw_scope(self,rows,selected,generation,head_mode,stale_ms):
-        canvas=self.scope;canvas.delete("all")
-        width=max(400,canvas.winfo_width())
-        height=max(180,canvas.winfo_height())
-        band=(height-16)/3
-        specs=[("Raw eye ratio: left cyan / right orange (0–0.4)",(("left_raw","#6ed7fe"),("right_raw","#ffa663")),0,.4),
-               ("Raw head Y: " + ("image fraction (0–1)" if head_mode=="position" else "pitch degrees (−45–45)"),(("head_raw","#b18bff"),),0 if head_mode=="position" else -45,1 if head_mode=="position" else 45),
-               ("Normalized: head purple / tongue X green / Y yellow (0–1)",(("head_y","#b18bff"),("tongue_x","#75e3a8"),("tongue_y","#f2d66f")),0,1)]
-        start=rows[-1]["timestamp_ms"]-8000 if rows else 0
-        span=8000
-        for index,(label,series,low,high) in enumerate(specs):
-            top=5+index*band
-            bottom=top+band-10
-            canvas.create_text(8,top,text=label,fill="white",anchor="nw",font=("Arial",9))
-            canvas.create_line(10,bottom,width-10,bottom,fill="#45515d")
-            for key,color in series:
-                for unknown, segment in trace_runs(scope_samples(rows,key,selected,generation),max_gap=stale_ms,start=start):
-                    points=[]
-                    for timestamp,value in segment:
-                        points.extend((10+(timestamp-start)/span*(width-20),bottom-(max(low,min(high,value))-low)/(high-low)*(band-33)))
-                    canvas.create_line(*points,fill=darker(color) if unknown else color,width=2)
-        canvas.create_text(width-8,height-2,text="Last 8 s • dark = unknown hold (display only)",fill="#aab8c8",anchor="se",font=("Arial",9))
+    def close_panels(self):
+        if self.after_id is not None:
+            self.root.after_cancel(self.after_id)
+            self.after_id=None
+        self.eye_panel.close()
+        self.head_panel.close()
+        self.tongue_panel.close()
 
     def close(self):
-        self.eye_panel.close()
+        self.close_panels()
         self.runtime.close();self.root.destroy()
 
 

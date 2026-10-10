@@ -24,10 +24,10 @@ def binary_runs(rows, key, selected, generation, stale_ms, start=None):
                       step=True, max_gap=stale_ms, start=start)
 
 
-def draw_feature_scope(canvas, state, mode):
+def draw_feature_scope(canvas, state, mode, *, include_score=True):
     """Inspect the same captured features that train the per-eye classifier."""
     canvas.delete("all")
-    width,height=max(320,canvas.winfo_width()),max(180,canvas.winfo_height())
+    width,height=max(320,canvas.winfo_width()),max(160,canvas.winfo_height())
     rows=state["trace"]
     start=(rows[-1]["timestamp_ms"] if rows else 0)-8000
     if mode=="Eye ratios":
@@ -38,7 +38,8 @@ def draw_feature_scope(canvas, state, mode):
         series=tuple((side+"_"+key,key,color) for key,color in (
             ("blink","#6ed7fe"),("squint","#ffa663"),("cheek","#75e3a8"),
             ("brow","#d6a1ff"),("wink_score","#ffffff")))
-        title,maximum=side.title()+" appearance · 0–1 (score is not a probability)",1
+        if not include_score:series=series[:-1]
+        title,maximum=side.title()+(" appearance · 0–1 (score is not a probability)" if include_score else " raw facial coefficients · 0–1"),1
     canvas.create_text(8,5,text=title,fill="white",anchor="nw",font=("Arial",10))
     for index,(key,label,color) in enumerate(series):
         canvas.create_text(8+index*(width-16)/len(series),25,text=label,fill=color,anchor="nw",font=("Arial",9))

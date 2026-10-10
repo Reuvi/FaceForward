@@ -122,6 +122,14 @@ control the calibrated wink path. ON persists while a wink is recognized; open o
 recognized blink is OFF; unknown is held numeric input with known=false and released
 output. Actual reopening re-arms an eye after unknown. Keep raw anatomical eye
 fields unchanged and emit the additive `eye_intent` sample for every capture.
-New combined profiles are v3, detector presets v3, with checked appearance models;
+New combined profiles are v3, detector presets v4, with checked appearance models;
 old v1/v2 files load but require new wink calibration. Tests with synthetic faces
-are software checks, not measured human accuracy. Preserve head/tongue behavior.
+are software checks, not measured human accuracy.
+
+Read Contracts/MOVEMENT_CALIBRATION.md and docs/MOVEMENT_CALIBRATION_GUIDE.md before
+changing head/tongue. Shared raw graphs use original workbench captures across tabs.
+Head and tongue guides fit personal ranges then check new captures. Tongue needs
+appearance plus a personal range; saved ranges need fresh rechecks on load/restart.
+Keep inner-mouth centroid limitations visible. New tongue models/crops must version
+their coordinate space and invalidate incompatible fits; see Vision/TONGUE_MODEL_PLAN.md.
+Device-specific transfer functions and Drivers remain downstream.
