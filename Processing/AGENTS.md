@@ -4,8 +4,17 @@ Read the root `AGENTS.md` and `Contracts/README.md`. Own only `Processing/**` an
 `tests/processing/**`. Keep profile logic, mappings, diagnostic UI, dependencies,
 and lane documentation here. Put shared-change requests in `interface-requests/`.
 
-- Consume SignalFrame v1 and emit a full ControlFrame v1. Use injected clocks and
-  fixture streams so deterministic development needs neither camera nor OS driver.
+- The current task is the mouse-only prototype in `mouse/`; read `README.md` here
+  and `interface-requests/mouse-prototype.md`. Accept raw one-hot matrices/vectors
+  and independent eye bits (`1 = closed`) through an adapter; SignalFrame v1 is
+  also supported. Keep per-eye timing/state independent, with no combined-eye gate.
+- Keep the tester native and local: Python/Tk, no JavaScript, browser, or web server.
+  Processing runs independently of drawing; preserve bounded histories and measure
+  performance with the headless benchmark before adding runtime dependencies.
+- Output is currently `mouse_preview_v0`, pending the emulator teammate's format.
+  Preserve `mouse/output.py` as the serialization boundary. Independent output
+  sampling differs from the original draft ControlFrame v1; do not silently change
+  shared contracts. Use injected clocks and fixtures without camera/OS dependencies.
 - Implement calibration transforms, smoothing, per-signal confidence gates, dead
   zones, sensitivity curves, button dwell/debounce, and axis-to-velocity mappings.
 - Persist local user/device profiles; keep detector parameters separate from device
