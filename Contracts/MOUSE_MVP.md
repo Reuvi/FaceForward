@@ -166,3 +166,22 @@ held state; it cannot trigger a release-click or count as measured calibration d
 Missing-person frames continue to disable control, even while their held eye
 samples are recorded. With no history an eye starts at 0; source, selected-person,
 profile and calibration changes clear history. Head/tongue and output formats are unchanged.
+
+### Guided eye rest intervals
+
+Guided eye calibration inserts a rest before each pose after the first. Detector
+setting `eye_rest_ms` defaults to 3000 ms (0–30000 ms; 0 skips rest); old settings
+without this field load with the default. The Eyes panel edits this duration in
+seconds when starting/restarting the guide, and profiles retain it.
+
+Guide snapshots add `resting` and `phase` (`rest`, `prepare`, `capture`, `complete`).
+During rest, `target` is null, `preparing` is true, and no eye or expression-calibration
+samples are retained. Capture and numeric input delivery continue normally; output
+stays disarmed. Each rest and next pose waits for its prompt to be painted before
+its timer starts. `present_eye_step(index, phase=None)` optionally checks the phase
+so a delayed acknowledgment cannot start a different phase of the same pose.
+
+Four low tones announce rest; after the closed pose, two high reopen tones precede
+them. The next pose has its own ready/close/reopen cue, and three high tones mark
+sampling. Cancellation/source loss still dismisses the same native popup. No
+separate program, camera stream, recording, or dependency is introduced.

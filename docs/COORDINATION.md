@@ -281,3 +281,13 @@ and restarting the full-screen eye guide. Changed checked runtime modules pass R
 compilation, whitespace and integration scope checks pass. No live accuracy claim.
 The research readout now says `unknown / held`; see the research guide's updated
 eye-input section for manual testing.
+
+## Rest between guided eye poses — 2026-10-10
+
+User requested eye rest with distinct rest/resume sounds during calibration.
+Integration branch `work/reuvi/integration/eye-calibration-rest`, base `cfc8737`,
+owns Vision guided-eye timing, sounds/UI/config, App expression-sample gating,
+related tests and documentation. Default rest is 3 seconds between the seven poses,
+editable before Start; rest frames never train either eye geometry or blink fits.
+Live capture/input sampling continues and previews remain disarmed. Preserve
+independent eye fits, profile compatibility and the existing unknown-value hold.
