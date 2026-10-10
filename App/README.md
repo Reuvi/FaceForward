@@ -68,6 +68,9 @@ do not invert values again between modules.
 
 Install the optional dependencies and local model following
 [Vision's setup](../Vision/README.md#install-the-optional-camera-dependencies).
+After setup, `Vision/.venv/bin/python -m App` opens the demo with camera libraries
+available for switching sources in the same window. The main checkout on Reuvi's
+machine has this ignored environment and the verified local model prepared.
 All inference is local. The camera opens only in explicit camera mode:
 
 ```bash

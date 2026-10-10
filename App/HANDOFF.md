@@ -47,6 +47,8 @@ EOF/error/stop; keep diagnostics and output on separate clocks.
   integrated lab with disabled mock overrides, and live camera/landmark preview.
 - Camera frames stayed in memory. No images, face recordings, models, environments,
   or personal profiles are included in Git.
+- The main checkout has its own ignored `Vision/.venv` and a checksum-verified
+  copy of the already-downloaded model, ready for local diagnostics testing.
 - Whitespace, compilation, and integration ownership checks completed before merge.
 
 ## Remaining work
