@@ -74,6 +74,18 @@ class UnifiedCalibrationTests(unittest.TestCase):
                 self.feed(**controls)
                 self.assertFalse(self.lab.processor.armed)
 
+    def test_restarting_eye_calibration_clears_both_processing_histories(self):
+        self.guided_eyes()
+        self.feed(left_closed=True)
+        self.assertEqual(self.lab.processor.eye_sample['left']['value'],1.)
+        self.assertEqual(self.session.research.processor.eye_sample['left']['value'],1.)
+        self.session.detector_command("start_eye_guide")
+        self.assertIsNone(self.lab.processor.eye_sample)
+        self.assertIsNone(self.session.research.processor.eye_sample)
+        self.feed(left_closed=True)
+        for sample in (self.lab.processor.eye_sample,self.session.research.processor.eye_sample):
+            self.assertEqual(sample['left'],{'value':0.,'known':False})
+
     def test_guided_pixels_independence_unknown_and_profile_roundtrip(self):
         self.guided_eyes()
         self.assertEqual(set(self.core.eyes),{"left","right"})
@@ -92,7 +104,7 @@ class UnifiedCalibrationTests(unittest.TestCase):
         self.assertIsNone(self.core.trace[-1]["left_closed_bit"])
         for sample in (self.lab.state()['eye_sample'],self.session.research.processor.eye_sample):
             self.assertEqual(sample['sequence'],self.session.frame['sequence'])
-            self.assertEqual(sample['left'],{'value':0.,'known':False})
+            self.assertEqual(sample['left'],{'value':1.,'known':False})
             self.assertEqual(sample['right'],{'value':1.,'known':True})
         with tempfile.TemporaryDirectory() as directory:
             path=Path(directory)/"eyes.json"
@@ -103,6 +115,8 @@ class UnifiedCalibrationTests(unittest.TestCase):
             self.assertFalse(self.lab.processor.armed)
             self.feed(left_ratio=.09)
             self.assertFalse(self.core.frame["faces"][0]["signals"]["left_eye_open"]["valid"])
+            for sample in (self.lab.state()['eye_sample'],self.session.research.processor.eye_sample):
+                self.assertEqual(sample['left'],{'value':0.,'known':False})
             # Old profiles remain readable; they retain the original single threshold.
             detector["version"]=1;detector["algorithm"]="lid-gap-head-y-lab-color-v1"
             for fit in detector["eyes"].values():

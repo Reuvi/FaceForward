@@ -1,4 +1,4 @@
-"""Unknown eyes remain sampled numeric no-actions without fabricating observations."""
+"""Unknown eyes hold prior numeric input without fabricating observations/actions."""
 
 import csv
 import io
@@ -46,19 +46,25 @@ class EyeFallbackTests(unittest.TestCase):
     ):
         processor = MouseProcessor()
         processor.arm()
-        for sequence in range(40):
+        first = raw_frame(0, 0)
+        first["left_eye"] = 1
+        processor.accept(first, 0)
+        for sequence in range(1, 41):
             frame = raw_frame(sequence, sequence * 25)
             frame.update(left_eye=None, right_eye=None)
             self.assertTrue(processor.accept(frame, sequence * 25)["accepted"])
             sample = processor.eye_sample
             self.assertEqual(sample["sequence"], sequence)
             self.assertEqual(sample["timestamp_ms"], sequence * 25)
-            self.assertEqual(sample["left"], {"value": 0.0, "known": False})
+            self.assertEqual(sample["left"], {"value": 1.0, "known": False})
+            self.assertEqual(sample["right"], {"value": 0.0, "known": False})
+            self.assertTrue(processor.sample.left_closed)
+            self.assertFalse(processor.sample.left_known)
             output = processor.tick(sequence * 25)
             self.assertEqual(output["left_click"], 0)
             self.assertEqual(output["right_click"], 0)
             self.assertIsNone(output["diagnostics"]["left_closed"])
-        self.assertEqual(processor.accepted, 40)
+        self.assertEqual(processor.accepted, 41)
         self.assertFalse(processor.left.ready)
 
     def test_unknown_releases_a_hold_immediately_and_does_not_arm_the_eye(self):
@@ -79,13 +85,16 @@ class EyeFallbackTests(unittest.TestCase):
         out = processor.tick(750)
         self.assertEqual(out["left_click"], 0)
         self.assertFalse(processor.left.ready)
-        self.assertEqual(processor.eye_sample["left"]["value"], 0.0)
+        self.assertEqual(processor.eye_sample["left"]["value"], 1.0)
         self.assertEqual(processor.eye_sample["right"], {"value": 0.0, "known": True})
 
-    def test_absent_person_still_records_neutral_eyes_and_never_binds_bystander(self):
+    def test_absent_person_still_records_held_eyes_and_never_binds_bystander(self):
         processor = MouseProcessor()
         processor.arm()
-        for i in range(4):
+        first = raw_frame(0, 0)
+        first.update(left_eye=1, session_id="capture")
+        processor.accept(first, 0)
+        for i in range(1, 4):
             frame = dict(
                 schema_version=1,
                 session_id="capture",
@@ -97,7 +106,7 @@ class EyeFallbackTests(unittest.TestCase):
                 processor.accept(frame, i * 25)["accepted"]
             )  # No controllable subject.
             self.assertEqual(processor.eye_sample["sequence"], i)
-            self.assertEqual(processor.eye_sample["left"]["value"], 0.0)
+            self.assertEqual(processor.eye_sample["left"]["value"], 1.0)
             self.assertFalse(processor.eye_sample["left"]["known"])
             self.assertFalse(processor.armed)
         before = processor.eye_sample
@@ -123,12 +132,12 @@ class EyeFallbackTests(unittest.TestCase):
             feed(1.0)
         for _ in range(5):
             feed(None)
-        self.assertEqual(p.eye_sample["left"], {"value": 0.0, "known": False})
+        self.assertEqual(p.eye_sample["left"], {"value": 1.0, "known": False})
         self.assertEqual(p.click_id, 0)
         self.assertFalse(p.events[-1]["accepted"])
         self.assertEqual(p.gates["left"].phase, "WAIT_OPEN")
         self.assertIsNone(p.trace[-1]["left_closure"])
-        self.assertEqual(p.trace[-1]["left_input"], 0.0)
+        self.assertEqual(p.trace[-1]["left_input"], 1.0)
         self.assertFalse(p.trace[-1]["left_input_known"])
         runs = trace_runs(
             (r["t"], r["left_closure"], r["scope_context"]) for r in p.trace
@@ -152,24 +161,109 @@ class EyeFallbackTests(unittest.TestCase):
 
     def test_unknown_binary_classification_overrides_finite_ratio_score(self):
         p = ResearchProcessor()
+        p.feed(feature(75, 0, 0.2, 0.0), {}, 75)
         p.feed(feature(100, 1, 0.8, 1.0, left_eye_known=0, right_eye_known=1), {}, 100)
-        self.assertEqual(p.eye_sample["left"], {"value": 0.0, "known": False})
+        self.assertEqual(p.eye_sample["left"], {"value": 0.2, "known": False})
         self.assertEqual(p.eye_sample["right"], {"value": 1.0, "known": True})
         self.assertIsNone(p.trace[-1]["left_closure"])
         self.assertEqual(p.trace[-1]["left_measured_closure"], 0.8)
 
     def test_missing_research_face_updates_every_frame_without_duplicate_refresh(self):
         p = ResearchProcessor()
-        for i in range(6):
+        p.feed(feature(0, 0, 0.9, 0.1), {}, 0)
+        for i in range(1, 6):
             frame = dict(session_id="capture", sequence=i, timestamp_ms=i * 25)
             self.assertTrue(p.feed_unknown(frame, i * 25))
             self.assertEqual(p.eye_sample["sequence"], i)
-            self.assertEqual(p.trace[-1]["left_input"], 0.0)
+            self.assertEqual(p.trace[-1]["left_input"], 0.9)
+            self.assertEqual(p.eye_sample["right"], {"value": 0.1, "known": False})
             self.assertFalse(p.output["enabled"])
         self.assertEqual(len(p.trace), 6)
         self.assertFalse(p.feed_unknown(frame, 125))
         self.assertEqual(len(p.trace), 6)
         self.assertFalse(p.feed_unknown(dict(frame, sequence=7), 1000))
+
+    def test_research_hold_is_independent_and_uses_the_latest_observation(self):
+        p = ResearchProcessor()
+        for i, (left, right, expected) in enumerate(
+            (
+                (0.8, 0.1, (0.8, 0.1)),
+                (None, 0.3, (0.8, 0.3)),
+                (None, None, (0.8, 0.3)),
+                (0.0, None, (0.0, 0.3)),
+                (None, None, (0.0, 0.3)),
+            )
+        ):
+            p.feed(feature(i * 25, i, left, right), {}, i * 25)
+            self.assertEqual(
+                tuple(p.eye_sample[s]["value"] for s in ("left", "right")), expected
+            )
+            self.assertEqual(p.eye_sample["left"]["known"], left is not None)
+            self.assertEqual(p.eye_sample["right"]["known"], right is not None)
+
+    def test_research_history_clears_at_identity_or_calibration_boundaries(self):
+        for change in (
+            {"session_id": "new"},
+            {"subject_id": "other"},
+            {"generation": 2},
+        ):
+            p = ResearchProcessor()
+            p.feed(feature(0, 0, 1.0, 0.7), {}, 0)
+            p.feed(dict(feature(25, 1), **change), {}, 25)
+            self.assertEqual(p.eye_sample["left"], {"value": 0.0, "known": False})
+            self.assertEqual(p.eye_sample["right"], {"value": 0.0, "known": False})
+
+    def test_source_change_and_explicit_calibration_reset_clear_mouse_history(self):
+        lab = Lab(clock=lambda: 25)
+        first = raw_frame(0, 0)
+        first["left_eye"] = 1
+        lab.processor.accept(first, 0)
+        lab.disconnect("Stop only")
+        unknown = raw_frame(1, 25)
+        unknown["left_eye"] = None
+        lab.processor.accept(unknown, 25)
+        self.assertEqual(lab.processor.eye_sample["left"]["value"], 1.0)
+        lab.disconnect("Calibration changed", clear_eye_history=True)
+        lab.processor.accept(dict(unknown, sequence=2), 25)
+        self.assertEqual(lab.processor.eye_sample["left"]["value"], 0.0)
+        lab.processor.accept(dict(first, sequence=3, timestamp_ms=25), 25)
+        lab.processor.accept(dict(unknown, session_id="new", sequence=0), 25)
+        self.assertEqual(lab.processor.eye_sample["left"]["value"], 0.0)
+
+    def test_rejected_inputs_cannot_poison_the_held_value(self):
+        p = ResearchProcessor()
+        p.feed(feature(50, 2, 0.8, 0.0), {}, 50)
+        p.feed(feature(25, 1, 0.1, 1.0), {}, 50)
+        p.feed(feature(75, 3), {}, 75)
+        self.assertEqual(p.eye_sample["left"], {"value": 0.8, "known": False})
+        first = raw_frame(0, 0)
+        first["left_eye"] = 1
+        processor = MouseProcessor()
+        processor.accept(first, 0)
+        missing = dict(
+            schema_version=1,
+            session_id=first["session_id"],
+            sequence=2,
+            timestamp_ms=50,
+            faces=[],
+        )
+        processor.accept(missing, 50)
+        self.assertFalse(
+            processor.accept(dict(first, sequence=1, timestamp_ms=25, left_eye=0), 50)[
+                "accepted"
+            ]
+        )
+        processor.accept(dict(first, sequence=3, timestamp_ms=75, left_eye=None), 75)
+        self.assertEqual(processor.eye_sample["left"], {"value": 1.0, "known": False})
+
+    def test_first_subject_after_unknown_frames_cannot_rewind_capture_order(self):
+        p = ResearchProcessor()
+        p.feed_unknown(dict(session_id="capture", sequence=2, timestamp_ms=50), 50)
+        p.feed(feature(25, 1, 1.0, 1.0), {}, 50)
+        self.assertEqual(len(p.trace), 1)
+        self.assertEqual(p.eye_sample["sequence"], 2)
+        p.feed(feature(75, 3), {}, 75)
+        self.assertEqual(p.eye_sample["left"], {"value": 0.0, "known": False})
 
     def test_fallback_does_not_modify_the_source_measurements(self):
         raw = {"session_id": "a", "sequence": 1, "timestamp_ms": 20}

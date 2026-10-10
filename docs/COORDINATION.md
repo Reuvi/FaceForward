@@ -273,3 +273,11 @@ No prior input starts at 0. Source, selection, profile and calibration boundarie
 clear history. Unknowns still cancel timers/release button output; held input is not
 new measurement evidence. Dark plot holds remain. Vision observations, Drivers and
 other facial components keep their existing contracts.
+
+Validation: 108 relevant tests pass (64 Processing and 44 integration, including
+native Tk). Coverage includes closed/open and fractional holds, independent recovery,
+unknown cancellation of clicks, no-face frames, ordering, CSV output, profile load,
+and restarting the full-screen eye guide. Changed checked runtime modules pass Ruff;
+compilation, whitespace and integration scope checks pass. No live accuracy claim.
+The research readout now says `unknown / held`; see the research guide's updated
+eye-input section for manual testing.

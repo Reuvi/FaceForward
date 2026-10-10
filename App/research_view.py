@@ -820,7 +820,7 @@ class ResearchView:
             eye_text = (
                 f"Last capture {delivered['sequence']} eye inputs: "
                 + " / ".join(
-                    f"{side} {delivered[side]['value']:.2f} ({'known' if delivered[side]['known'] else 'unknown → open'})"
+                    f"{side} {delivered[side]['value']:.2f} ({'known' if delivered[side]['known'] else 'unknown / held'})"
                     for side in ("left", "right")
                 )
             )

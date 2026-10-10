@@ -205,10 +205,12 @@ class Lab:
                 raise ValueError("Unknown action")
             self.snapshot = self.processor.tick(self.clock())
 
-    def disconnect(self, reason):
+    def disconnect(self, reason, *, clear_eye_history=False):
         """Release output immediately at source EOF/error/stop, before timeout."""
         with self.lock:
             self.processor.disarm(reason)
+            if clear_eye_history:
+                self.processor.eye_sample = None
             self.snapshot = self.processor.tick(self.clock())
 
     def ingest(self, frame):

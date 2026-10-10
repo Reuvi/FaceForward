@@ -227,7 +227,7 @@ resume at the next known sample; unknown-to-known transitions jump at that sampl
 without interpolating across the missing interval. No known value in retained
 history means no line. These are rendering rules shared through `LabUI.traces`.
 Raw CSV observations stay null/invalid. The eye-only input adapter now supplies
-numeric closed=0/open with known=false for unknown eyes on each captured frame;
+the previous numeric input with known=false for unknown eyes on each captured frame;
 separate input/known columns expose that fallback. Unknown still cancels eye timers
 and releases buttons, without counting as intentional reopening. Motion validity is unchanged. Output traces show the actual released
 or neutral state, even while a raw-input trace visually holds its previous height.

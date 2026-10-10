@@ -1,6 +1,7 @@
 """Clock-injected mouse processor. No sleeping, networking, or OS side effects."""
 
 from collections import deque
+from dataclasses import replace
 import math
 
 from .config import MouseConfig
@@ -204,11 +205,13 @@ class MouseProcessor:
         try:
             normalized = eye_sample(frame, self.subject_id,
                 sample.left_closed if sample and sample.left_known else None,
-                sample.right_closed if sample and sample.right_known else None)
+                sample.right_closed if sample and sample.right_known else None,
+                previous=self.eye_sample)
         except (ValueError, AttributeError):
             return
         if is_fresh_sample(normalized, self.eye_sample, received_ms, self.config.stale_ms):
             self.eye_sample = normalized
+            return normalized
 
     def accept(self, frame, received_ms):
         if not finite(received_ms):
@@ -235,11 +238,16 @@ class MouseProcessor:
             or (self.sample and sample.timestamp_ms - self.sample.timestamp_ms > self.config.stale_ms)
         ):
             self.disarm("Input gap; start preview again")
+        normalized = self.record_eyes(frame, received_ms, sample)
+        if normalized is None:
+            self.rejected += 1
+            return {"accepted": False, "reason": "Duplicate or out-of-order eye input"}
+        sample = replace(sample, left_closed=bool(normalized["left"]["value"]),
+                         right_closed=bool(normalized["right"]["value"]))
         self.session, self.sequence = sample.session_id, sample.sequence
         self.sample = sample
         self.received_ms = received_ms
         self.accepted += 1
-        self.record_eyes(frame, received_ms, sample)
         self.pointer.push(sample.pointer, sample.timestamp_ms)
         self.scroll.push(sample.scroll, sample.timestamp_ms)
         if self.armed:

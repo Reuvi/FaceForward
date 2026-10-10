@@ -79,7 +79,8 @@ class MouseSession:
             if self.mode not in ("camera", "detector-demo"):
                 raise ValueError("Choose Camera or Detector demo in Vision source first")
             runtime = self.ensure_detector_runtime()
-            self.lab.disconnect("Calibration changed; start preview again when ready")
+            self.lab.disconnect("Calibration changed; start preview again when ready",
+                                clear_eye_history=name in ("start_eye_guide", "configure", "collect", "fit_tongue", "reset_tongue"))
             result = runtime.command(name, *args)
             self.research.stop("Detector calibration changed")
             if name in ("start_eye_guide", "configure"):

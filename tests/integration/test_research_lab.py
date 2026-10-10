@@ -70,7 +70,7 @@ class ResearchSessionTests(unittest.TestCase):
         self.assertNotIn("left_closure", self.core.processor.trace[-1])
         self.assertEqual(self.core.processor.eye_sample["sequence"], frame["sequence"])
         self.assertEqual(
-            self.core.processor.eye_sample["left"], {"value": 0.0, "known": False}
+            self.core.processor.eye_sample["left"], {"value": 1.0, "known": False}
         )
         self.assertEqual(self.core.processor.trace[-1]["t"], self.now / 1000)
 
@@ -99,6 +99,7 @@ class ResearchSessionTests(unittest.TestCase):
             self.core.observe(f, p, {})
 
     def test_trial_has_config_and_exports_null_without_display_holds(self):
+        self.feed(left=0.8)
         self.core.begin_trial("natural_blink", "train", 3)
         self.feed(left=None)
         trial = self.core.end_trial()
@@ -110,7 +111,7 @@ class ResearchSessionTests(unittest.TestCase):
             with (out / "frames.csv").open() as handle:
                 rows = list(csv.DictReader(handle))
             self.assertEqual(rows[-1]["left_closure"], "")
-            self.assertEqual(rows[-1]["left_input"], "0.0")
+            self.assertEqual(rows[-1]["left_input"], "0.8")
             self.assertEqual(rows[-1]["left_input_known"], "False")
             self.assertIn("profile", json.loads((out / "report.json").read_text()))
 

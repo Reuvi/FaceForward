@@ -102,6 +102,7 @@ class ResearchProcessor:
         )
         if clear_context:
             self.context = None
+            self.eye_sample = None
             self.last_time = None
             self.last_sequence = None
             self.previous_pose = None
@@ -143,12 +144,20 @@ class ResearchProcessor:
 
     def feed_unknown(self, frame, now):
         """Keep the eye stream continuous on a capture without a selected observation."""
-        normalized = eye_sample(frame, None)
+        subject = (
+            self.context[1]
+            if self.context and self.context[0] == frame["session_id"]
+            else None
+        )
+        normalized = eye_sample(frame, subject, previous=self.eye_sample)
         if not is_fresh_sample(
             normalized, self.eye_sample, now, self.config["stale_ms"]
         ):
             return False
-        self.reset("No selected research subject")
+        self.reset(
+            "No selected research subject",
+            clear_context=bool(self.context and self.context[0] != frame["session_id"]),
+        )
         self.eye_sample = normalized
         self.trace.append(
             dict(
@@ -169,6 +178,13 @@ class ResearchProcessor:
             self.reset("Invalid feature packet")
             raise
         t = packet["timestamp_ms"]
+        if not 0 <= now - t <= self.config["stale_ms"]:
+            self.reset("Stale research input")
+            return
+        # Check ordering before a changed subject/calibration clears held history.
+        if not is_fresh_sample(packet, self.eye_sample, now, self.config["stale_ms"]):
+            self.reset("Duplicate/out-of-order eye input")
+            return False
         context = (packet["session_id"], packet["subject_id"], packet["generation"])
         if self.context != context:
             self.reset("Face/calibration changed; start preview", clear_context=True)
@@ -177,9 +193,6 @@ class ResearchProcessor:
             packet["sequence"] <= self.last_sequence or t < self.last_time
         ):
             self.reset("Duplicate/out-of-order research input")
-            return
-        if not 0 <= now - t <= self.config["stale_ms"]:
-            self.reset("Stale research input")
             return
         dt = 0 if self.last_time is None else (t - self.last_time) / 1000
         if self.last_time is not None and dt * 1000 > self.config["stale_ms"]:
@@ -211,11 +224,12 @@ class ResearchProcessor:
         }
 
         normalized = eye_sample(
-            packet, packet["subject_id"], values["left"], values["right"]
+            packet,
+            packet["subject_id"],
+            values["left"],
+            values["right"],
+            previous=self.eye_sample,
         )
-        if not is_fresh_sample(normalized, self.eye_sample, now, c["stale_ms"]):
-            self.reset("Duplicate/out-of-order eye input")
-            return False
         self.eye_sample = normalized
         for side in ("left", "right"):
             if not normalized[side]["known"]:

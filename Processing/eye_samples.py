@@ -1,4 +1,4 @@
-"""Eye-only per-capture values. Unknown is numeric open plus an explicit flag.
+"""Eye-only per-capture values. Unknown holds prior input plus an explicit flag.
 
 Raw observations remain separate; this fallback must not teach calibration or
 complete a release gesture. Other facial signals intentionally have no default here.
@@ -7,12 +7,12 @@ complete a release gesture. Other facial signals intentionally have no default h
 from math import isfinite
 
 
-def eye_value(value):
+def eye_value(value, previous=0.0):
     known = type(value) in (bool, int, float) and isfinite(value) and 0 <= value <= 1
-    return {"value": float(value) if known else 0.0, "known": known}
+    return {"value": float(value) if known else previous, "known": known}
 
 
-def eye_sample(frame, subject_id, left=None, right=None):
+def eye_sample(frame, subject_id, left=None, right=None, *, previous=None):
     session, sequence, timestamp = (
         frame.get(k) for k in ("session_id", "sequence", "timestamp_ms")
     )
@@ -26,14 +26,18 @@ def eye_sample(frame, subject_id, left=None, right=None):
         or timestamp < 0
     ):
         raise ValueError("Eye samples require a valid capture envelope")
+    if previous and (
+        previous["session_id"] != session or previous["subject_id"] != subject_id
+    ):
+        previous = None
     return dict(
         format="eye_sample_v1",
         session_id=session,
         sequence=sequence,
         timestamp_ms=timestamp,
         subject_id=subject_id,
-        left=eye_value(left),
-        right=eye_value(right),
+        left=eye_value(left, previous["left"]["value"] if previous else 0.0),
+        right=eye_value(right, previous["right"]["value"] if previous else 0.0),
     )
 
 
