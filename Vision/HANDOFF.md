@@ -1,3 +1,30 @@
+# Detector calibration increment — current handoff
+
+User-authorized Vision implementation through the main integration chat, branch
+`work/reuvi/integration/vision-calibration-detectors`, base `dcd2e74`.
+
+- Added the detector-only native `Vision.lab`, independent timed eye calibration,
+  head Y position/pitch calibration, and experimental calibrated tongue segmentation.
+- Raw measurements, binary eye bits, quality/reasons, scopes, settings and local CSV
+  are inspectable. Marked tongue pixels and learned calibration are memory-only.
+- No Processing/Drivers imports, no OS mouse output, no App camera behavior change.
+  SignalFrame v1 polarity/units remain intact; workbench frames are diagnostic only.
+- Synthetic pixel/lifecycle tests and real-model blank-frame smoke are included;
+  real-person accuracy/occlusion/lighting testing is still required before connection.
+- Setup, algorithms, measurements, settings, module ownership and manual acceptance
+  exercises: [DETECTION_LAB.md](DETECTION_LAB.md). Current state summary:
+  [raw detection guide](../docs/RAW_DETECTION_GUIDE.md).
+- Checks: 66 Vision tests passed with the local model, including 21 new detector
+  tests; 34 Processing, 9 integration, and 7 tooling tests passed (116 total).
+  `pip check`, source compilation, whitespace and integration-scope checks passed.
+  Native UI inspection exercised selection, independent eye capture/classification,
+  and tongue freeze/mark/fit/held-out validation with synthetic pixels. No physical
+  camera or live mouse output was used for this increment.
+- Scope: `Vision/**`, `tests/vision/**`, shared documentation and CI. Teammate
+  worktrees were preserved. Older handoffs below are historical, not current status.
+
+---
+
 # First Vision implementation handoff
 
 ## Behavior

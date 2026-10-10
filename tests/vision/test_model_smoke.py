@@ -15,7 +15,7 @@ class ModelSmokeTests(unittest.TestCase):
         import numpy as np
         image = np.zeros((480, 640, 3), dtype=np.uint8)
         pipeline = VisionPipeline()
-        with MediaPipeDetector(os.environ["VISION_MODEL_PATH"]) as detector:
+        with MediaPipeDetector(os.environ["VISION_MODEL_PATH"], include_pose=True) as detector:
             for envelope in (Envelope("one", 0, 1000.2), Envelope("one", 3, 1027.8),
                              Envelope("two", 0, 2000.5)):
                 captured = CapturedImage(envelope, image)

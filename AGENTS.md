@@ -11,8 +11,11 @@ at the repository root. User instructions take precedence over this agreement.
 Current executable baseline: `python3 -m App` opens the native Vision + Processing
 mouse MVP. Read `App/README.md` and `Contracts/MOUSE_MVP.md` for actual capabilities
 and adopted local interfaces. Keep all four mouse mappings independent, preserve
-invalid detector values, and keep simulated sources explicitly labeled. Camera
-calibration/head/tongue detection and hardware-emulator integration remain pending.
+invalid detector values, and keep simulated sources explicitly labeled. The separate
+`python -m Vision.lab` now has live independent eye calibration, head Y and
+experimental tongue segmentation; read `Vision/DETECTION_LAB.md`. Real-person
+validation and connection of that workbench to Processing/Drivers remain pending.
+Do not automatically enable the new detectors in App.
 
 Reuvi's main integration conversation is the coordination hub for other agents.
 Read `docs/COORDINATION.md` before claiming work and return its handoff template

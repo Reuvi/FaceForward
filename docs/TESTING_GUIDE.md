@@ -1,5 +1,10 @@
 # Mouse MVP testing companion
 
+**Detector increment (October 10, 2026):** live calibration now has its own native
+`Vision.lab`. See [the detector runbook](../Vision/DETECTION_LAB.md) for eye, head
+and tongue measurements/tests. The combined App/Processing behavior documented
+below remains the earlier baseline; the new detectors have not been wired into it.
+
 Keep this open while testing. It covers the native application at runtime baseline
 `481fd34` from October 10, 2026. Read the
 [engineering guide](ENGINEERING_GUIDE.md) for signal meanings, formulas, all default

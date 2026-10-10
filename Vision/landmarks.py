@@ -22,6 +22,8 @@ class Observation:
     points: tuple
     head_reference: object = None
     eyes: dict = field(default_factory=dict)
+    # Optional detector-only diagnostics. Legacy camera users do not request pose.
+    rotation: object = None
 
 
 def observation_from_landmarks(landmarks, width, height):
@@ -70,11 +72,12 @@ def observation_from_landmarks(landmarks, width, height):
 class MediaPipeDetector:
     """Synchronous VIDEO mode: at most one inference in flight, at most two faces."""
 
-    def __init__(self, model_path):
+    def __init__(self, model_path, *, include_pose=False):
         self.model_path = Path(model_path).expanduser()
         if not self.model_path.is_file():
             raise FileNotFoundError(f"Face Landmarker model not found: {self.model_path}")
         self.landmarker = None
+        self.include_pose = include_pose
         self._session = self._sequence = self._capture_time = self._inference_time = None
 
     def __enter__(self):
@@ -88,6 +91,7 @@ class MediaPipeDetector:
             ),
             running_mode=mp.tasks.vision.RunningMode.VIDEO,
             num_faces=2,
+            output_facial_transformation_matrixes=self.include_pose,
         )
         self.landmarker = mp.tasks.vision.FaceLandmarker.create_from_options(self.options)
         return self
@@ -118,7 +122,14 @@ class MediaPipeDetector:
         height, width = captured.bgr.shape[:2]
         if len(result.face_landmarks) > 2:
             raise ValueError("detector exceeded the two-face contract")
-        return [observation_from_landmarks(face, width, height) for face in result.face_landmarks]
+        observations = [observation_from_landmarks(face, width, height) for face in result.face_landmarks]
+        if self.include_pose:
+            from .features import rotation_from_matrix
+            matrices = getattr(result, "facial_transformation_matrixes", ())
+            if len(matrices) == len(observations):
+                for observation, matrix in zip(observations, matrices):
+                    observation.rotation = rotation_from_matrix(matrix)
+        return observations
 
     def close(self):
         if self.landmarker is not None:

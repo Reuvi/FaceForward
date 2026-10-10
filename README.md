@@ -6,8 +6,19 @@ signal processing, and device output so three teammates can develop independentl
 
 **Repository status:** native mouse MVP integrating Vision and Processing. All
 four mouse behaviors work with synthetic/replay signals in the simulated desktop.
-Camera landmarks and raw eye diagnostics are available; live calibration, head
-and tongue detectors, and the real mouse-driver connection are still pending.
+A separate native detector lab now adds independent live eye calibration,
+calibrated head Y, and experimental tongue appearance segmentation. Real-person
+accuracy testing and connection of these new detectors to Processing/Drivers remain
+the next steps. See [the detector runbook](Vision/DETECTION_LAB.md).
+
+## Test live detection first
+
+```bash
+Vision/.venv/bin/python -m Vision.lab --camera --model Vision/.local/face_landmarker.task
+```
+
+Use `--demo` instead for generated pixels/landmarks. See [setup and calibration
+instructions](Vision/DETECTION_LAB.md). This detector window sends no mouse output.
 
 ## Run the combined native lab
 

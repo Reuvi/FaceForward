@@ -134,6 +134,16 @@ Changes to shared semantics also need the contract and integration guide updated
 6. Report the merged commit, checks, launch command, and remaining limitations
    here. The component owner then updates their own worktree from current main.
 
+## Detector implementation checkpoint
+
+The main chat authorized `work/reuvi/integration/vision-calibration-detectors`
+from `dcd2e74` to implement native detector calibration in `Vision/**`, its tests,
+shared docs and CI. [The detector runbook](../Vision/DETECTION_LAB.md) records the
+new independent eyes, head Y and experimental tongue segmentation. It is separate
+from Processing/Drivers. Its next acceptance step is real-person measurement and
+false-positive testing; a later, explicitly coordinated task can connect it.
+The first three rows below now refer to validation/refinement of that implementation.
+
 ## Next increments: candidates, not active assignments
 
 | Candidate task | Owning lane | Reviewable acceptance evidence |

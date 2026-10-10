@@ -19,3 +19,12 @@ jobs:
           python3 -m unittest discover -s tests/processing -v
           python3 -m unittest discover -s tests/integration -v
           python3 -m unittest discover -s tests/tooling -v
+
+  detector-pixels:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Install local Vision runtime dependencies
+        run: python3 -m pip install -r Vision/requirements.txt
+      - name: Test image measurements, calibration, and worker lifecycle
+        run: python3 -m unittest discover -s tests/vision -v

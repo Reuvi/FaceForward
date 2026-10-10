@@ -1,5 +1,14 @@
 # Vision development
 
+**New detector-only lab:** `Vision/.venv/bin/python -m Vision.lab --camera`
+provides live independent eye calibration, head Y (position or pitch), and
+experimental tongue appearance segmentation with a visible mask and validation
+exercises. Use `--demo` for generated pixels/landmarks. Read
+[DETECTION_LAB.md](DETECTION_LAB.md) for exact measurements, calibration, settings,
+test evidence, and remaining real-person accuracy work. These new detections are
+not yet connected to Processing/Drivers. The source CLI and App camera path
+described below retain their uncalibrated baseline.
+
 This is the first runnable slice of [the measurement plan](vision.md): synthetic
 and NDJSON replay, explicit OpenCV camera capture, MediaPipe landmarks, conservative
 two-face association, a reference overlay, and in-memory eye/gaze calibration.
@@ -116,7 +125,7 @@ The anatomical landmark groups were checked against the
 
 ## Explicit camera diagnostics
 
-Only this command opens a physical camera:
+For the older uncalibrated CLI preview, explicitly open a camera with:
 
 ```bash
 Vision/.venv/bin/python -m Vision camera \
