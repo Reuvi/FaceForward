@@ -1,0 +1,48 @@
+{
+  "mode": "mouse",
+  "closed_value": 1,
+  "left_eye": {
+    "dwell_ms": 320.0,
+    "release_ms": 60.0
+  },
+  "right_eye": {
+    "dwell_ms": 320.0,
+    "release_ms": 60.0
+  },
+  "pointer_source": "tongue",
+  "interpolation_ms": 50.0,
+  "stale_ms": 250.0,
+  "min_confidence": 0.5,
+  "pointer": {
+    "deadzone": 0.16,
+    "hysteresis": 0.03,
+    "exponent": 1.6,
+    "smoothing_ms": 90.0,
+    "acceleration": 5.0,
+    "deceleration": 8.0,
+    "jump_threshold": 0.25,
+    "boost_gain": 0.04,
+    "boost_max": 0.5,
+    "boost_decay_ms": 350.0,
+    "center_x": 0.5,
+    "center_y": 0.5,
+    "invert_x": false,
+    "invert_y": false
+  },
+  "scroll": {
+    "deadzone": 0.22,
+    "hysteresis": 0.03,
+    "exponent": 1.8,
+    "smoothing_ms": 90.0,
+    "acceleration": 5.0,
+    "deceleration": 8.0,
+    "jump_threshold": 0.25,
+    "boost_gain": 0.04,
+    "boost_max": 0.5,
+    "boost_decay_ms": 350.0,
+    "center_x": 0.5,
+    "center_y": 0.5,
+    "invert_x": false,
+    "invert_y": false
+  }
+}
