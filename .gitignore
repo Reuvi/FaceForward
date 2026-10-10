@@ -1,0 +1,26 @@
+# Concurrent checkouts and machine-local state
+.worktrees/
+.local/
+.env
+.env.*
+!.env.example
+.DS_Store
+
+# Python / JavaScript environments and generated output
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+node_modules/
+dist/
+build/
+coverage/
+*.log
+
+# Real user/camera data belongs outside version control
+recordings/
+data/private/
+local-profiles/

@@ -1,0 +1,25 @@
+name: Agent ownership
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  scope:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out PR source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check lane ownership
+        env:
+          SOURCE_BRANCH: ${{ github.head_ref }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: python3 tools/check_scope.py --branch "$SOURCE_BRANCH" --base "$BASE_SHA"
+      - name: Verify collaboration tools
+        run: python3 -m unittest discover -s tests/tooling -v
