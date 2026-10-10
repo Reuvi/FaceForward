@@ -1,5 +1,8 @@
 # Vision measurement plan
 
+For the first implementation's run commands, verified behavior, and remaining
+work, see [Vision/README.md](README.md) and [the handoff](HANDOFF.md).
+
 This is a design plan, not an implemented tracker. Use OpenCV for frame capture,
 image operations, and pose estimation; use MediaPipe Face Landmarker for face,
 eye, iris, and lip landmarks. Tongue localization requires a separate detector.
