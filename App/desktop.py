@@ -65,6 +65,10 @@ class IntegratedDesktop(DesktopLab):
 
     def build(self):
         super().build()
+        # Synthetic eye toggles belong to the standalone Processing developer lab.
+        for widget in self.mock_widgets:
+            if isinstance(widget, ttk.Checkbutton):
+                widget.pack_forget()
         style = ttk.Style(self.root)
         style.configure("Vision.Treeview", background=BG, fieldbackground=BG, foreground=TEXT, rowheight=23)
         style.map("Vision.Treeview", background=[("selected", "#405961")], foreground=[("selected", TEXT)])
@@ -259,7 +263,7 @@ class IntegratedDesktop(DesktopLab):
             "demo": "SYNTHETIC: all four mouse actions. Click Start preview, then open Live lab. Cycle: short blink → left wink → right wink → both → tongue circle → head up/down. Neutral periods allow arming.",
             "replay": "REPLAY: select a subject explicitly, then Start preview with neutral input. Capture gaps are preserved. EOF stops output; restart the source and re-arm to repeat.",
             "camera": "LIVE CAMERA: select your face → Detection calibration (or load a profile) → Start preview → Live lab. One camera stream feeds all tabs; no OS mouse output.",
-            "detector-demo": "SYNTHETIC PIXELS: select subject-0, calibrate with the controls on Detection calibration, then Start preview and open Live lab. This tests calibration and processing together without a camera.",
+            "detector-demo": "SYNTHETIC PIXELS: select subject-0, open Detection calibration and Start eye calibration. The fixture follows the guide automatically, then cycles independent closures. No camera or ML.",
         }
         set_var(self.source_detail, state["error"] or details[state["mode"]])
         set_var(self.selected_text, "Processing subject: " + selected)
@@ -327,6 +331,8 @@ class IntegratedDesktop(DesktopLab):
 
     def close(self):
         if not self.closed:
+            if self.calibration_ui is not None:
+                self.calibration_ui.eye_panel.sounds.close()
             self.closed = True
             self.session.close()
             self.root.destroy()

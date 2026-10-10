@@ -165,3 +165,30 @@ Serialize overlapping Vision work or claim different files first. A candidate is
 not assigned until a human/agent claims it in the shared conversation. Keep a
 short active task list in that conversation; this repository document should not
 pretend to be a synchronized task database.
+
+## Guided eyes handoff — 2026-10-10
+
+Reuvi's main chat requested an easier eye-first guide, open-pose coverage, independent
+on/off scopes, removal of mock controls, and audible start/close/reopen/end cues.
+Implemented on `work/reuvi/integration/guided-eye-calibration` from `14fce9c`, scoped
+to Vision, App wiring, detector/profile contract, tests and documentation.
+
+- `Vision/guided_eyes.py` owns the seven capture-timed steps and per-eye fit/check.
+- `calibration.py` learns closed/open raw limits; ambiguous ratios remain invalid.
+- `eye_view.py` owns native target/countdown/sounds; `eye_scope.py` draws sampled bits.
+- App remains one local Python/Tk program and one image worker; all guide phases
+  disarm Processing. Changing tabs only cancels an unfinished guide.
+- Detector preset v2 adds limits; v1 remains readable. No SignalFrame/driver changes.
+- GUI mock controls are removed; developer fixtures remain. The detector demo now
+  follows the eye guide automatically; after fitting it cycles independent closures.
+- Follow [the eye testing procedure](../Vision/DETECTION_LAB.md#1-independent-eye-calibration)
+  before further head/tongue testing. Synthetic checks do not establish human accuracy.
+
+Future agents must preserve independent channels, explicit face selection, unknown
+readings and invalidation/release semantics. A failed eye must not invalidate the
+other eye's successful fit. The raw ratio alone cannot distinguish every real pose;
+collect user testing observations before expanding head/tongue work.
+
+Validation: 136 tests passed (73 Vision including local model smoke, 36 Processing,
+20 integration, 7 tooling). Native synthetic UI completed the guide, plotted both
+binary channels, and cancelled/restarted correctly. No live-person accuracy claim.

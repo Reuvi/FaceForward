@@ -70,6 +70,9 @@ class EyeCalibration:
     gaze_x: AxisCalibration | None = None
     gaze_y: AxisCalibration | None = None
 
+    closed_limit: float | None = None
+    open_limit: float | None = None
+
     def __post_init__(self):
         if not all(finite_number(v) for v in (self.closed, self.opened)):
             raise ValueError("eye calibration must be finite")
@@ -77,6 +80,30 @@ class EyeCalibration:
             raise ValueError("open ratio must exceed closed ratio")
         if not unit_number(self.threshold) or self.threshold in (0, 1):
             raise ValueError("open threshold must be between 0 and 1")
+
+        if self.closed_limit is not None or self.open_limit is not None:
+            if (not all(finite_number(v) for v in (self.closed_limit, self.open_limit))
+                    or not self.closed <= self.closed_limit < self.open_limit <= self.opened):
+                raise ValueError("eye uncertainty limits must lie between closed and open references")
+
+    @classmethod
+    def fit_guided(cls, closed, open_groups, *, min_separation):
+        """Trim each pose separately so low open lids are not discarded as outliers."""
+        if not finite_number(min_separation) or min_separation <= 0:
+            raise ValueError("min_separation must be positive")
+        closed = _samples(closed)
+        groups = [_samples(group) for group in open_groups]
+        if not groups:
+            raise ValueError("open poses are required")
+        opened = [value for group in groups for value in group]
+        low, high = median(closed), median(opened)
+        top_closed, bottom_open = max(closed), min(opened)
+        gap = bottom_open - top_closed
+        if gap < min_separation:
+            raise ValueError("open poses overlap closed samples; keep eyes comfortably open and retry")
+        boundary = (top_closed + bottom_open) / 2
+        return cls(low, high, (boundary-low)/(high-low),
+                   closed_limit=top_closed + .2*gap, open_limit=bottom_open - .2*gap)
 
     @classmethod
     def fit(cls, closed, opened, *, min_separation, gaze_x=None, gaze_y=None):
@@ -91,6 +118,12 @@ class EyeCalibration:
 
     def classify(self, ratio, quality):
         if not finite_number(ratio) or ratio < 0:
+            return invalid()
+        if self.closed_limit is not None:
+            if ratio <= self.closed_limit:
+                return measurement(0, quality)
+            if ratio >= self.open_limit:
+                return measurement(1, quality)
             return invalid()
         score = max(0.0, min(1.0, (ratio - self.closed) / (self.opened - self.closed)))
         return measurement(1 if score >= self.threshold else 0, quality)

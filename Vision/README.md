@@ -201,7 +201,7 @@ profile format are defined in [the MVP contract](../Contracts/MOUSE_MVP.md) and
 | --- | --- |
 | Capture/replay and timing | Implemented; mocked capture failures and replay timing tested |
 | Landmarks, association, overlay | Implemented; official model blank-image smoke check passed; live faces untested |
-| Independent binary eyes | Live collection and per-eye threshold/quality gates implemented; real-person accuracy pending |
+| Independent binary eyes | One-button five-open-pose guide, sound cues, independent fits, uncertainty gaps and binary scopes; real-person accuracy pending |
 | Calibrated gaze | Legacy fitting primitives exist; current App calibration does not emit gaze |
 | Head Y | Image-position or transform-pitch calibration implemented; live range/sign/repeatability testing pending; head X invalid |
 | Tongue detection | Experimental color segmentation and validation implemented; real-person false positives/recall pending |

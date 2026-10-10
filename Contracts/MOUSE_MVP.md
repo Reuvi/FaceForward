@@ -96,11 +96,12 @@ and invokes Vision's public `LabRuntime.ingest` and calibration commands. That
 runtime is externally driven in App and does not start another worker. Calibrated
 SignalFrame values pass directly to the existing `Lab.ingest` and 100 Hz processor.
 Calibration collection and changes disarm the simulated preview. Tab changes do
-not restart capture, lose calibration, or arm output. The real driver is not wired.
+not restart capture or arm output. Leaving an active guided eye sequence cancels it;
+completed fits survive tab changes. The real driver is not wired.
 
 `face_mouse_profile_v1` contains `format`, `source_kind` (`camera` or `synthetic`),
-`detector`, `processing`, and `preview`. Detector section version 1 contains an
-algorithm identifier, DetectionConfig settings, separate eye fits, a head fit,
+`detector`, `processing`, and `preview`. Detector section version 2 uses algorithm
+`guided-lid-gap-head-y-lab-color-v2`, DetectionConfig settings, separate eye fits, a head fit,
 and optional tongue color prototypes/radius/margin. Processing is MouseConfig;
 preview contains pointer/scroll speeds. No subject/session IDs, raw pixel samples,
 images, live validation pass flags, arming state, or driver permissions are saved.
@@ -115,3 +116,26 @@ Stop, stale input, loss, and restart detach calibration; the saved file remains
 available for deliberate reload. No automatic identity matching occurs. Files are
 suggested under ignored `local-profiles/`; old Processing-only JSON import/export
 continues to mean transfer settings, not a complete detector profile.
+
+### Guided eye calibration increment
+
+The Eyes tab starts one sequence: five open poses (center, left, right, up, down),
+both eyes gently closed, then a fresh reopen check. Each eye fits and validates
+independently; no both-eye veto is introduced. Per-eye fits serialize `closed`,
+`opened`, `threshold`, `closed_limit`, `open_limit`. The latter two are raw lid-gap /
+eye-width ratios, both null for legacy fits or both finite ordered limits inside
+the closed/open references. New guided fits emit invalid/null between the limits;
+Processing already releases the affected button on invalid input. Named SignalFrame
+polarity remains 1=open, while the dedicated scope/CSV closed bit is 1=closed.
+
+Version 1 detector presets with algorithm `lid-gap-head-y-lab-color-v1` and three
+original eye fields still load. They keep the original single-boundary behavior
+until recalibrated. The containing `face_mouse_profile_v1` format is unchanged.
+No training poses, images, sound state or guide progress are persisted.
+
+Vision exposes `start_eye_guide`, `present_eye_step(index)` and `cancel` through
+App's command allowlist. A new phase waits for the UI to present its instruction
+before accepting captures. `DetectorWorkbench.calibrating` includes both legacy
+collections and all active guided phases; App disarms throughout. Restart drops
+both eye fits/samples but preserves unrelated head/tongue fits. Leaving the active
+Eyes view cancels the guide; loss/staleness clears calibration as before.

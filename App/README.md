@@ -3,8 +3,9 @@
 Run **one `App` window** for the complete testing workflow. The original Processing
 lab now contains **Detection calibration** as another tab. One camera/inference
 worker supplies the calibrated measurements to both the detector view and the
-existing input/output scopes and simulated desktop. Switching tabs keeps the source,
-selected face, calibration, and Processing state.
+existing input/output scopes and simulated desktop. Switching tabs keeps the source
+and completed calibration. Leaving an active guided eye sequence cancels it, because
+its instructions would no longer be visible.
 
 The standalone detector was initially isolated because the team wanted to test
 measurement before connecting Processing. That connection is now implemented.
@@ -33,7 +34,7 @@ python3 -m App
 
 | Source in the app | Purpose | Calibration/profile behavior |
 | --- | --- | --- |
-| Detector demo (synthetic pixels) | Manually test detection and Processing together | Select `subject-0`; calibrate using fake eye/tongue switches and sliders; saves synthetic profiles |
+| Detector demo (synthetic pixels) | Automatically exercise guided eye calibration | Select `subject-0`; Start eye calibration; the fixture follows the guide, then cycles independent closures; saves synthetic profiles |
 | Camera (live calibration) | Test your actual facial measurements | Select your face; calibrate or load a camera profile; validate on your current image |
 | Vision demo (synthetic) | Automatic four-action Processing regression | Supplies prebuilt valid SignalFrames; no detector training or face profile |
 | Vision replay (NDJSON) | Inspect recorded synthetic SignalFrame sequences | Select a subject; preserves input timing; no images or calibration collection |
@@ -47,9 +48,13 @@ The requested FPS takes effect on source start; actual Hz and capture age are sh
 1. On **Vision source & raw signals**, select your visible ID and press
    **Use selected subject**. A dropdown choice alone is not selection. A tracker ID
    is session-local, not biometric identity. Selection resets/disarms Processing.
-2. Open **Detection calibration**. In **1 Eyes**, capture OPEN and CLOSED for the
-   anatomical left eye, then independently for the right. Default capture gives
-   one second to pose, then collects 1.8 seconds. Wait for the status result.
+2. Open **Detection calibration → 1 Eyes**. Press **Test sound**, then **Start eye
+   calibration**. Follow the dot with eyes naturally open through five positions.
+   Close both gently at the descending tones, reopen at two high tones, and wait
+   for three rising completion tones. Each eye is fitted independently. Watch
+   separate binary scopes: **0 open, 1 closed, gaps uncertain/unavailable**.
+   Use **Restart eye calibration** to discard bad eye samples and repeat.
+   Focus on this eye test before proceeding to head/tongue.
 3. In **2 Head Y**, capture NEUTRAL, UP, DOWN. Default measurement is vertical
    position of the nose bridge divided by image height. For nodding, choose
    `head_mode: "pitch"` in detector Settings **before** selecting/calibrating; it
@@ -87,17 +92,14 @@ in [the detector runbook](../Vision/DETECTION_LAB.md). Transfer functions are in
 
 ### Camera-free calibration exercise
 
-In `detector-demo`, select `subject-0`. Leave Left closed unchecked for its OPEN
-capture, check it for CLOSED, then uncheck. Repeat for the right eye. For head
-captures, place the Head slider at about .5, .2, .8 for neutral/up/down respectively;
-these are generator controls, not measured image fractions. Leave Tongue visible
-unchecked for EMPTY. Check it, freeze, **Mark center patch**, fit; uncheck for
-ABSENT validation, check for VISIBLE. Keep tongue sliders near .5 initially.
-
-Start preview with neutral/open input. Hold Left closed beyond the default 320 ms;
-then test Right closed and both. Move head and tongue sliders to see scrolling and
-pointer velocity in Live lab. The synthetic source bypasses neural inference;
-it proves wiring and deterministic behavior, not accuracy on real faces.
+In `detector-demo`, select `subject-0`, then press **Start eye calibration** in
+Detection calibration. The generated pixels and landmarks follow all seven steps
+without manual switches; after completion the fixture cycles left, right and both
+closures. Start preview to inspect the resulting clicks in Live lab. This exercises
+wiring, not real-face accuracy. Mock checkboxes/sliders are removed from calibration; the old mock eye checkboxes
+are also hidden in App’s Live lab. Standalone Processing retains its developer controls.
+Developer scripts can still set `LabRuntime.demo_controls`; tests retain manual
+head/tongue fixtures. For the automatic four-action mouse exercise, use `python3 -m App`.
 
 ## Saved face + mouse profiles
 
@@ -108,13 +110,15 @@ required. A left-eye-only profile is valid; it does not calibrate the other eye.
 | Saved section | Contents |
 | --- | --- |
 | `format`, `source_kind` | `face_mouse_profile_v1`; camera or synthetic |
-| `detector` | Version/algorithm, detector settings, independent eye fits, head mode and three-point fit, optional tongue color prototypes/radius/margin |
+| `detector` | Version/algorithm, detector settings, independent eye fits including raw closed/open uncertainty limits, head mode and three-point fit, optional tongue color prototypes/radius/margin |
 | `processing` | Applied mouse mapping, dwell, thresholds, smoothing, response and acceleration settings |
 | `preview` | Simulated pointer and scroll speed |
 
 It does **not** save pictures, raw training pixels, sample traces, tracking IDs,
 selection, validation pass flags, armed state, or driver permission. Local files
 are written atomically with private file permissions. They are not committed.
+Detector presets now use version 2; version 1 is accepted with its original single
+eye threshold. Recalibrate legacy eye profiles to add open-pose coverage.
 Saving does not activate anything; it records the current applied configuration.
 
 To reuse: start the matching source → **Use selected subject** → **Load profile
@@ -136,7 +140,8 @@ Processing settings. Neither is a substitute for **Save active profile**.
 
 **Stop / Escape** immediately disables preview but keeps measurement running.
 **Stop source** also stops capture and clears active calibration. Calibration
-captures/changes and profile loading disarm preview. Tab changes do neither.
+captures/changes and profile loading disarm preview. Leaving an active guided Eyes
+sequence cancels it; completed fits survive tab changes.
 Close the window to shut down the source and Processing workers.
 
 ```text

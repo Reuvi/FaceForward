@@ -4,6 +4,7 @@ from collections import deque
 from dataclasses import asdict, dataclass, field, replace
 from .calibration import AxisCalibration, EyeCalibration
 from .features import DetectionConfig, analyze_features
+from .guided_eyes import GuidedEyes
 from .pipeline import VisionPipeline
 from .signals import invalid, make_face, measurement, monotonic_ms
 from .tongue import TongueModel, TongueResult, mouth_crop, sample_colors
@@ -38,6 +39,7 @@ class DetectorWorkbench:
         self.crop = self.frozen_crop = None
         self.tongue = TongueResult()
         self.job = None
+        self.eye_guide = None
         self.samples = {}
         self.eyes = {}
         self.head = None
@@ -54,6 +56,7 @@ class DetectorWorkbench:
         self.eyes.clear()
         self.head = None
         self.job = None
+        self.eye_guide = None
         self.crop = self.frozen_crop = None
         self.positives, self.negatives = [], []
         self.tongue_model = None
@@ -88,7 +91,7 @@ class DetectorWorkbench:
         self._clear_calibration()
         self.selected = subject
         self.features = {}
-        self.notice = f"Selected {subject}; collect each eye's open and closed targets"
+        self.notice = f"Selected {subject}; start guided eye calibration"
 
     def configure(self, values):
         config = DetectionConfig.from_dict(values)
@@ -129,8 +132,7 @@ class DetectorWorkbench:
         self._require_subject()
         if target not in TARGETS:
             raise ValueError("Unknown calibration target")
-        if self.job is not None:
-            raise ValueError("Finish or cancel the current collection")
+        self._require_idle()
         if target.startswith("validate_") and self.tongue_model is None:
             raise ValueError("Fit the tongue appearance model first")
         if target.startswith(("left_", "right_")):
@@ -153,12 +155,35 @@ class DetectorWorkbench:
         self.job = Collection(target, start, start + self.config.collect_ms)
         self.notice = "Prepare: " + target.replace("_", " ")
 
+    @property
+    def calibrating(self):
+        return self.job is not None or bool(self.eye_guide and self.eye_guide.active)
+
+    def start_eye_guide(self):
+        self._require_subject()
+        if self.job is not None:
+            raise ValueError("Finish or cancel the current collection first")
+        self.eyes.clear()
+        for target in list(self.samples):
+            if target.startswith(("left_", "right_")):
+                del self.samples[target]
+        self._invalidate("left_eye_open", "right_eye_open")
+        self.generation += 1
+        self.eye_guide = GuidedEyes(self.config)
+        self.notice = "Guided eyes: follow the dot with eyes comfortably open"
+
+    def present_eye_step(self, index):
+        self.expire()
+        if self.eye_guide:
+            self.eye_guide.present(index, self.clock())
+
     def cancel(self):
         self.job = None
+        self.eye_guide = None
         self.notice = "Collection cancelled"
 
     def _require_idle(self):
-        if self.job is not None:
+        if self.calibrating:
             raise ValueError("Finish or cancel the current collection first")
 
     def freeze_mouth(self):
@@ -193,6 +218,7 @@ class DetectorWorkbench:
         self.notice = "Appearance model fitted. Validate absent, then visible, on new frames."
 
     def reset_tongue(self):
+        self._require_idle()
         self._invalidate("tongue_x", "tongue_y")
         self.job = None
         self.positives, self.negatives = [], []
@@ -302,16 +328,23 @@ class DetectorWorkbench:
             elif self.features["face"].quality == 0:
                 self.tongue.reason = self.features["face"].reason
             self._collect_frame(frame["timestamp_ms"])
+            if self.eye_guide and self.eye_guide.active:
+                self.eye_guide.feed(frame["timestamp_ms"], self.features)
+                if not self.eye_guide.active:
+                    self.eyes = dict(self.eye_guide.fits)
+                    self.notice = self.eye_guide.report
             values = {}
             for side in ("left", "right"):
                 feature, calibration = self.features[side], self.eyes.get(side)
                 reason = feature.reason
                 if calibration is None:
-                    reason = "Collect open and closed targets for this eye"
+                    reason = "Complete guided eye calibration"
                 elif feature.quality > 0 and feature.value is not None:
-                    if feature.value <= max(calibration.opened * 1.8, calibration.opened + 0.04):
+                    if (calibration.closed_limit is not None
+                            or feature.value <= max(calibration.opened * 1.8, calibration.opened + 0.04)):
                         values[side + "_eye_open"] = calibration.classify(feature.value, feature.quality)
-                        reason = "Classified independently"
+                        reason = ("Classified independently" if values[side + "_eye_open"]["valid"]
+                                  else "UNCERTAIN: between learned open and closed ranges")
                     else:
                         reason = "Openness far outside calibration"
                 self.reasons[side] = reason
@@ -364,6 +397,8 @@ class DetectorWorkbench:
             row[key + "_confidence"] = item.get("confidence", 0)
         for side in ("left", "right"):
             calibration = self.eyes.get(side)
+            row[side + "_closed_limit_raw"] = calibration.closed_limit if calibration else None
+            row[side + "_open_limit_raw"] = calibration.open_limit if calibration else None
             row[side + "_threshold_raw"] = (calibration.closed + calibration.threshold * (calibration.opened - calibration.closed)) if calibration else None
             value = signals.get(side + "_eye_open", {}).get("value")
             row[side + "_closed_bit"] = 1 - value if value is not None else None
@@ -381,4 +416,6 @@ class DetectorWorkbench:
                 "tongue_pixels": {"positive": len(self.positives), "negative": len(self.negatives)},
                 "tongue_fit": self.tongue_model.report if self.tongue_model else None,
                 "validation": dict(self.validation), "collecting": self.job.target if self.job else None,
-                "generation": self.generation, "config": self.config.to_dict()}
+                "generation": self.generation, "config": self.config.to_dict(),
+                "eye_guide": self.eye_guide.state(self.clock()) if self.eye_guide else None,
+                "calibrating": self.calibrating}

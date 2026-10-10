@@ -63,6 +63,74 @@ class UnifiedCalibrationTests(unittest.TestCase):
         self.collect("validate_absent")
         self.collect("validate_visible",tongue=True)
 
+    def guided_eyes(self):
+        self.session.detector_command("start_eye_guide")
+        while self.core.eye_guide.active:
+            guide=self.core.eye_guide
+            self.session.detector_command("present_eye_step",guide.index)
+            index=guide.index
+            while guide.active and guide.index==index:
+                controls=self.session.detector_runtime.demo_input()
+                self.feed(**controls)
+                self.assertFalse(self.lab.processor.armed)
+
+    def test_guided_pixels_independence_unknown_and_profile_roundtrip(self):
+        self.guided_eyes()
+        self.assertEqual(set(self.core.eyes),{"left","right"})
+        self.feed(left_ratio=.14,right_closed=True)
+        signals=self.session.frame["faces"][0]["signals"]
+        self.assertEqual(signals["left_eye_open"]["value"],1)
+        self.assertEqual(signals["right_eye_open"]["value"],0)
+        self.feed(left_ratio=.5)
+        self.assertEqual(self.core.frame["faces"][0]["signals"]["left_eye_open"]["value"],1)
+        self.lab.action({"action":"arm"});self.hold()
+        result=self.hold(left_closed=True,right_closed=True)
+        self.assertEqual((result["left_click"],result["right_click"]),(1,1))
+        result=self.feed(left_ratio=.09,right_closed=True)
+        self.assertEqual((result["left_click"],result["right_click"]),(0,1))
+        self.assertIsNone(self.core.trace[-1]["left_closed_bit"])
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/"eyes.json"
+            self.session.save_profile(path)
+            detector=read_profile(path)["detector"]
+            self.assertEqual(detector["version"],2)
+            self.session.load_profile(path)
+            self.assertFalse(self.lab.processor.armed)
+            self.feed(left_ratio=.09)
+            self.assertFalse(self.core.frame["faces"][0]["signals"]["left_eye_open"]["valid"])
+            # Old profiles remain readable; they retain the original single threshold.
+            detector["version"]=1;detector["algorithm"]="lid-gap-head-y-lab-color-v1"
+            for fit in detector["eyes"].values():
+                del fit["closed_limit"];del fit["open_limit"]
+            _,eyes,_,_=decode_preset(detector)
+            self.assertIsNone(eyes["left"].closed_limit)
+
+    def test_guided_restart_cancel_loss_and_mixed_jobs(self):
+        self.calibrate()
+        old_head=self.core.head
+        self.lab.action({"action":"arm"});self.hold()
+        self.session.detector_command("start_eye_guide")
+        self.assertFalse(self.lab.processor.armed)
+        self.assertFalse(self.core.eyes)
+        self.assertEqual(self.core.head,old_head)
+        with self.assertRaises(ValueError):self.core.collect("head_up")
+        with self.assertRaises(ValueError):self.core.export_calibration()
+        with self.assertRaises(ValueError):self.core.reset_tongue()
+        self.lab.action({"action":"arm"});self.feed()
+        self.assertFalse(self.lab.processor.armed)
+        self.session.detector_command("present_eye_step",0)
+        self.hold(count=5)
+        self.session.detector_command("start_eye_guide")
+        self.assertEqual(self.core.eye_guide.groups,{"left":[],"right":[]})
+        self.assertIsNone(self.core.eye_guide.start_ms)
+        self.session.detector_command("cancel")
+        self.assertFalse(self.core.calibrating)
+        self.assertFalse(self.core.eyes)
+        self.session.detector_command("start_eye_guide")
+        self.feed(blank=True)
+        self.assertIsNone(self.core.eye_guide)
+        self.assertIsNone(self.core.selected)
+
     def test_calibration_feeds_all_four_mouse_outputs(self):
         self.calibrate()
         self.assertFalse(self.lab.processor.armed)

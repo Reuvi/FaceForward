@@ -11,7 +11,7 @@ from .tracking import Box
 
 
 def demo_image(*, left_closed=False, right_closed=False, head=0.5,
-               tongue=False, tongue_x=0.5, tongue_y=0.5):
+               tongue=False, tongue_x=0.5, tongue_y=0.5, left_ratio=None, right_ratio=None):
     """Anatomical right is image-left. Head value shifts Y and supplies a fake pitch."""
     offset = (head - 0.5) * 80
     bgr = np.full((480, 640, 3), (65, 65, 65), dtype=np.uint8)
@@ -24,7 +24,8 @@ def demo_image(*, left_closed=False, right_closed=False, head=0.5,
     for side, (corners, pairs, iris) in EYES.items():
         cx, cy, width = (385 if side == "left" else 255), 200 + offset, 60
         closed = left_closed if side == "left" else right_closed
-        gap = 2.5 if closed else 15
+        ratio = left_ratio if side == "left" else right_ratio
+        gap = width * ratio if ratio is not None else (2.5 if closed else 15)
         points[corners[0]], points[corners[1]] = (cx + width/2, cy), (cx - width/2, cy)
         for index, (a, b) in enumerate(pairs):
             x = cx + (index - 1) * 12

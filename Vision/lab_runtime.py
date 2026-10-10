@@ -56,7 +56,7 @@ class LabRuntime:
                     started = perf_counter()
                     if demo:
                         with self.lock:
-                            controls = dict(self.demo_controls)
+                            controls = self.demo_input()
                         bgr, observations = demo_image(**controls)
                         captured = CapturedImage(session.stamp(), bgr)
                         inference_ms = 0
@@ -81,6 +81,22 @@ class LabRuntime:
                 if not self.source.startswith("Error"):
                     self.source = "Stopped"
                     self.workbench.disconnect()
+
+    def demo_input(self):
+        """Automatic developer fixture; camera inputs never pass through this path."""
+        with self.lock:
+            guide = self.workbench.eye_guide
+            controls = dict(self.demo_controls)  # Available to developer scripts only.
+            if guide and guide.active:
+                ratio = {"center": .25, "left": .21, "right": .22, "up": .28,
+                         "down": .14, "closed": .04, "reopen": .25}[guide.step[0]]
+                controls.update(left_ratio=ratio, right_ratio=ratio*.94)
+            elif guide and not controls:
+                # Independent holds and simultaneous closure exercise the two scopes.
+                phase = (self.clock()/1000) % 8
+                controls.update(left_closed=2 <= phase < 3 or 6 <= phase < 7,
+                                right_closed=4 <= phase < 5 or 6 <= phase < 7)
+            return controls
 
     def ingest(self, captured, observations, *, inference_ms=0, preview=True):
         """Externally driven path: process one capture without starting a worker."""
@@ -141,8 +157,13 @@ class LabRuntime:
     def snapshot(self):
         with self.lock:
             state = deepcopy(self.workbench.state())
+            rows=[]
+            for row in reversed(self.workbench.trace):
+                if rows and row["timestamp_ms"] < rows[0]["timestamp_ms"]-8000:
+                    break
+                rows.append(row)
             state.update(source=self.source, timing=dict(self.timing), preview=self.preview,
-                         trace=list(self.workbench.trace)[-180:])
+                         trace=list(reversed(rows)))
             crop = self.workbench.frozen_crop or self.workbench.crop
             state["mouth"] = crop.bgr.copy() if crop else None
             state["frozen"] = self.workbench.frozen_crop is not None

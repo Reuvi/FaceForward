@@ -8,6 +8,8 @@ from tkinter import filedialog, messagebox, ttk
 
 import cv2
 
+from .eye_view import EyeGuidePanel
+from .eye_scope import draw_eye_scope
 from .features import DetectionConfig
 from .lab_runtime import LabRuntime
 
@@ -48,6 +50,9 @@ class DetectionLab:
             ttk.Button(bar, text="Select face", command=lambda:self.call("select",self.subject.get())).pack(side="left")
         ttk.Button(bar, text="Export trace CSV", command=self.export).pack(side="right")
         ttk.Label(outer,textvariable=self.source_status).pack(anchor="w",pady=5)
+        bottom=ttk.Frame(outer);bottom.pack(side="bottom",fill="x",pady=(8,0))
+        ttk.Label(bottom,textvariable=self.status,wraplength=1030,justify="left").pack(side="left",fill="x",expand=True)
+        ttk.Button(bottom,text="Cancel capture",command=lambda:self.call("cancel")).pack(side="right")
         body = ttk.Frame(outer)
         body.pack(fill="both",expand=True)
         left = ttk.Frame(body)
@@ -58,31 +63,16 @@ class DetectionLab:
         self.preview = tk.Label(left,bg="#15202b",width=640,height=1)
         self.preview.pack(fill="x")
         self.preview.configure(width=0,height=0,text="Camera is off",fg="white",pady=150)
-        self.demo_panel = ttk.LabelFrame(left,text="Synthetic controls — generated pixels and landmarks, no ML",padding=5)
-        self.demo_panel.pack(fill="x",pady=5)
-        self.demo_vars = {}
-        for name,title in (("left_closed","Left closed"),("right_closed","Right closed"),("tongue","Tongue visible")):
-            var=tk.BooleanVar(value=False); self.demo_vars[name]=var
-            ttk.Checkbutton(self.demo_panel,text=title,variable=var,command=self.update_demo).pack(side="left")
-        self.sliders = ttk.Frame(left)
-        self.sliders.pack(fill="x")
-        for row,(name,label) in enumerate((("head","Head up/down"),("tongue_x","Tongue X"),("tongue_y","Tongue Y"))):
-            var=tk.DoubleVar(value=.5); self.demo_vars[name]=var
-            ttk.Label(self.sliders,text=label,width=17).grid(row=row,column=0,sticky="w")
-            ttk.Scale(self.sliders,from_=0,to=1,variable=var,command=lambda _:self.update_demo()).grid(row=row,column=1,sticky="ew")
-        self.sliders.columnconfigure(1,weight=1)
+        self.eye_scope=tk.Canvas(left,height=180,bg="#14202c",highlightthickness=0)
+        self.eye_scope.pack(fill="x",pady=6)
         self.scope=tk.Canvas(left,height=180 if self.embedded else 220,bg="#14202c",highlightthickness=0)
         self.scope.pack(fill="x",pady=6)
         ttk.Label(left,textvariable=self.metrics,justify="left",wraplength=620,font=("Menlo",9 if self.embedded else 10)).pack(anchor="w")
         tabs=ttk.Notebook(right); tabs.pack(fill="both",expand=True)
         eye=self.tab(tabs,"1 Eyes")
-        self.text(eye,"Each eye learns its own open/closed threshold. Look forward, keep the face still, and capture each target. A countdown gives you time to pose. Both eyes can classify as closed independently.")
-        for side in ("left","right"):
-            group=ttk.LabelFrame(eye,text=side.title()+" anatomical eye",padding=8);group.pack(fill="x",pady=8)
-            ttk.Button(group,text="Capture OPEN",command=lambda s=side:self.call("collect",s+"_open")).pack(side="left",padx=5)
-            ttk.Button(group,text="Capture CLOSED",command=lambda s=side:self.call("collect",s+"_closed")).pack(side="left",padx=5)
-        self.text(eye,"Closed bit: 1 = closed, 0 = open. SignalFrame *_eye_open has the opposite polarity. No blink dwell or click mapping runs here.")
-        ttk.Label(eye,textvariable=self.eye_details,justify="left",wraplength=430,font=("Menlo",11)).pack(anchor="w",pady=15)
+        self.calibration_tabs, self.eye_tab = tabs, eye
+        self.eye_panel = EyeGuidePanel(eye,root,self.call)
+        ttk.Label(eye,textvariable=self.eye_details,justify="left",wraplength=465,font=("Menlo",10)).pack(anchor="w",pady=8)
         head=self.tab(tabs,"2 Head Y")
         self.text(head,"Default: nose-bridge height / image height. Move your whole head up and down. For nodding instead, change head_mode to pitch in Settings and recalibrate. Pitch uses the face model's camera-frame rotation in degrees.")
         self.text(head,"Hold a comfortable neutral pose, then a comfortable upper and lower limit. Use the same distance from the camera. Raw positions must form stable, distinct groups.")
@@ -116,9 +106,6 @@ class DetectionLab:
         ttk.Button(row,text="Apply settings",command=self.apply_settings).pack(side="left")
         ttk.Button(row,text="Load JSON",command=self.load_settings).pack(side="left")
         ttk.Button(row,text="Save JSON",command=self.save_settings).pack(side="left")
-        bottom=ttk.Frame(outer);bottom.pack(fill="x",pady=(8,0))
-        ttk.Label(bottom,textvariable=self.status,wraplength=1030,justify="left").pack(side="left",fill="x",expand=True)
-        ttk.Button(bottom,text="Cancel capture",command=lambda:self.call("cancel")).pack(side="right")
         if not self.embedded:
             root.protocol("WM_DELETE_WINDOW",self.close)
         self.tick()
@@ -142,10 +129,6 @@ class DetectionLab:
             self.runtime.start(demo=self.source.get()=="Synthetic demo",model=self.args.model,camera_id=self.args.camera_id,fps=self.args.fps)
         except (ValueError,TypeError) as exc:
             messagebox.showerror("Cannot start",str(exc),parent=self.root)
-
-    def update_demo(self):
-        with self.runtime.lock:
-            self.runtime.demo_controls={k:v.get() for k,v in self.demo_vars.items()}
 
     def mark_tongue(self,event):
         if not self.runtime.snapshot()["frozen"]:
@@ -203,10 +186,16 @@ class DetectionLab:
         return "—" if value is None else f"{value:.3f}"
 
     def tick(self):
-        if self.visible is not None and not self.visible():
+        state=self.runtime.snapshot()
+        hidden=(self.visible is not None and not self.visible()) or self.root.state()=="iconic"
+        if state["eye_guide"] and state["eye_guide"]["active"] and (hidden or self.calibration_tabs.select()!=str(self.eye_tab)):
+            self.eye_panel.cancel()
+            state=self.runtime.snapshot()
+            self.eye_panel.update(state)
+        if hidden:
             self.root.after(200,self.tick)
             return
-        state=self.runtime.snapshot()
+        self.eye_panel.update(state)
         if state["config"] != self.displayed_config:
             self.displayed_config = state["config"]
             self.settings.delete("1.0","end")
@@ -221,7 +210,7 @@ class DetectionLab:
         timing=state["timing"]
         self.source_status.set(f"{state['source']}   |   selected: {state['selected'] or 'none'}   |   " +
             "   ".join(f"{k}: {v:.1f}" for k,v in timing.items()))
-        self.show_image(self.preview,"preview",state["preview"],(320,240) if self.embedded else (480,360))
+        self.show_image(self.preview,"preview",state["preview"],(320,240))
         self.show_image(self.mouth,"mouth",state["mouth"],(256,192),frozen=state["frozen"])
         signals=next((f["signals"] for f in frame["faces"] if f["subject_id"]==state["selected"]),{})
         eye_lines=[]
@@ -230,16 +219,20 @@ class DetectionLab:
             item=signals.get(side+"_eye_open",{})
             bit=1-int(item["value"]) if item.get("valid") else None
             cal=state["eyes"].get(side)
-            eye_lines.append(f"{side.upper()} raw lid gap/width: {self.fmt(raw.get('value'))}\nClosed bit: {bit if bit is not None else 'unavailable'}  quality: {raw.get('quality',0):.2f}\n{state['reasons'].get(side,'Select a face')}\n")
-            if cal:
-                boundary=cal["closed"]+cal["threshold"]*(cal["opened"]-cal["closed"])
-                eye_lines.append(f"open {cal['opened']:.3f} / closed {cal['closed']:.3f}\nraw threshold {boundary:.3f}\n")
+            label="OPEN (0)" if bit==0 else "CLOSED (1)" if bit==1 else "UNCERTAIN / unavailable"
+            eye_lines.append(f"{side.upper()}: {label} | raw {self.fmt(raw.get('value'))}")
+            if cal and cal.get("closed_limit") is not None:
+                eye_lines.append(f"closed ≤ {cal['closed_limit']:.3f} | open ≥ {cal['open_limit']:.3f}")
+            elif cal:
+                eye_lines.append("Legacy threshold — run guide for open-pose coverage")
+            eye_lines.append(state['reasons'].get(side,'Select a face')+"\n")
         self.eye_details.set("\n".join(eye_lines))
         head=state["features"].get("head",{})
         self.head_details.set(f"Mode: {state['config']['head_mode']}\nRaw: {self.fmt(head.get('value'))}\nNormalized Y: {self.fmt(signals.get('head_y',{}).get('value'))}\nQuality: {head.get('quality',0):.2f}\n{state['reasons'].get('head','Select a face')}\n\nCalibration: {state['head']}\nSamples: " + str({k:v for k,v in state['samples'].items() if k.startswith('head')}))
         val=state["validation"]
         self.tongue_details.set(f"{'FROZEN — click tissue' if state['frozen'] else 'LIVE crop / green candidate mask'}\n{state['reasons'].get('tongue','Select a face')}\nCandidate: {state['candidate']}\nPixels: {state['tongue_pixels']}\n" + "\n".join(f"{k}: {'PASS' if v['passed'] else 'FAIL'} ({v['detected_fraction']:.0%}, n={v['samples']})" for k,v in val.items()))
         self.metrics.set("\n".join(f"{k:16} {self.fmt(signals.get(k,{}).get('value'))}   {'valid' if signals.get(k,{}).get('valid') else 'unavailable'}" for k in ("left_eye_open","right_eye_open","head_y","tongue_x","tongue_y")))
+        draw_eye_scope(self.eye_scope,state)
         self.draw_scope(state["trace"],state["selected"],state["generation"],state["config"]["head_mode"])
         self.root.after(100,self.tick)
 
@@ -270,6 +263,7 @@ class DetectionLab:
         canvas.create_text(width-8,height-2,text=f"{span/1000:.1f}s of capture time; connecting lines are display only",fill="#aab8c8",anchor="se",font=("Arial",9))
 
     def close(self):
+        self.eye_panel.sounds.close()
         self.runtime.close();self.root.destroy()
 
 

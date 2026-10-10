@@ -69,7 +69,7 @@ class MouseSession:
             return self.detector_runtime
 
     def detector_command(self, name, *args):
-        allowed = {"collect", "cancel", "freeze_mouth", "mark_tongue", "fit_tongue", "reset_tongue", "configure"}
+        allowed = {"start_eye_guide", "present_eye_step", "collect", "cancel", "freeze_mouth", "mark_tongue", "fit_tongue", "reset_tongue", "configure"}
         if name not in allowed:
             raise ValueError("Unsupported calibration command")
         with self.lock:
@@ -79,7 +79,7 @@ class MouseSession:
             self.lab.disconnect("Calibration changed; start preview again when ready")
             result = runtime.command(name, *args)
             validation_only = name == "collect" and args and args[0] in ("validate_absent", "validate_visible")
-            if name not in ("freeze_mouth", "cancel") and not validation_only:
+            if name not in ("freeze_mouth", "cancel", "present_eye_step") and not validation_only:
                 self.profile_label = "Modified calibration — save profile to keep it"
                 self.profile_binding = None
             return result
@@ -101,12 +101,12 @@ class MouseSession:
             observations = list(observations)
             runtime = self.ensure_detector_runtime()
             core = runtime.workbench
-            previous_selected, collecting = core.selected, core.job is not None
+            previous_selected, collecting = core.selected, core.calibrating
             previous_preview = runtime.preview
             frame = runtime.ingest(captured, observations, inference_ms=inference_ms, preview=preview)
             if previous_selected is not None and core.selected is None:
                 self.lab.disconnect("Selected detector track lost; select and reload or recalibrate")
-            if collecting or core.job is not None or core.selected is None:
+            if collecting or core.calibrating or core.selected is None:
                 self.lab.disconnect("Preview stopped for calibration; select a face and start when ready")
             raw = {
                 face["subject_id"]: {
@@ -325,7 +325,7 @@ class MouseSession:
         while not self.stop_event.is_set() and (count is None or index < count):
             started = time.perf_counter()
             with self.lock:
-                controls = dict(runtime.demo_controls)
+                controls = runtime.demo_input()
             bgr, observations = demo_image(**controls)
             captured = CapturedImage(session.stamp(), bgr)
             with self.lock:

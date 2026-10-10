@@ -184,7 +184,12 @@ their medians to 0/0.5/1, allowing either raw orientation. Out-of-range values a
 invalid unless an explicit endpoint tolerance (at most 0.1 normalized units)
 permits limited clipping. Eye fitting separately checks closed/open separation,
 places its threshold halfway between the retained groups' nearest boundaries,
-and emits a binary classification. No click dwell occurs in Vision.
+and emits a binary classification. That original fit remains for legacy APIs/profiles.
+The current App guide uses `EyeCalibration.fit_guided`: five separately trimmed open
+poses plus a closed group, followed by fresh reopen validation. It learns two raw
+limits with an uncertainty gap, so low-open poses are represented without forcing
+ambiguous samples closed. See [the exact formulas and timing](../Vision/DETECTION_LAB.md#1-independent-eye-calibration).
+No click dwell occurs in Vision.
 
 Closed or unavailable eyes contribute no gaze. With two usable eyes, gaze must
 agree within an explicit tolerance per axis; accepted values are confidence-

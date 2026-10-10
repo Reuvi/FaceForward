@@ -201,9 +201,16 @@ Vision/.venv/bin/python -m App --source camera \
    and source errors rather than assuming the requested FPS was achieved.
 2. Choose a currently detected subject and press **Use selected subject**. Merely
    displaying a dropdown option does not bind Processing to it.
-3. Open Detection calibration and collect both independent eyes, head targets and
-   tongue training/checks following [the runbook](../Vision/DETECTION_LAB.md).
-   Inspect raw ratios, masks, unavailable periods and both eye combinations.
+3. Test **eyes first** in Detection calibration → 1 Eyes: **Test sound**, then
+   **Start eye calibration**. Follow five open-eye dot positions; close gently at
+   descending tones, reopen at two high tones, and wait for completion tones.
+   Read [the guided procedure](../Vision/DETECTION_LAB.md#1-independent-eye-calibration).
+   Look around with eyes open: both scopes should stay at **0**. Close one eye at
+   a time, then both: each respective trace should reach **1** independently.
+   Gray/unavailable readings produce gaps, not a closed bit. If any pose is labeled
+   incorrectly, **Restart eye calibration** clears bad eye training without changing
+   head/tongue fits. Leaving this active guide cancels it. Later test head targets
+   and tongue training/checks using the same runbook.
 4. Verify each channel becomes valid only after its requirements pass. Open Live
    lab and explicitly Start preview with neutral/open input. Compare raw versus
    processed values; missing channels remain unavailable. Save active profile on

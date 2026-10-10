@@ -23,7 +23,7 @@ not pip. Stop other camera consumers before camera mode. Inference stays local.
 1. On **Vision source & raw signals**, choose your session-local ID and press
    **Use selected subject**; even one face must be selected deliberately.
 2. Open **Detection calibration** and work through **1 Eyes**, **2 Head Y** and
-   **3 Tongue**. Each channel can be tested while others remain uncalibrated.
+   **3 Tongue**. Focus on eyes first; head/tongue testing can wait.
 3. Watch prepare countdown → usable/rejected counts → fit result. Default capture
    is one second preparation plus 1.8 seconds sampling; hold the entire target.
 4. Keep preview stopped while inspecting detections. To test the mapping, open
@@ -40,15 +40,53 @@ App's source tab. Its tunables export is not a full profile; use App for profile
 Do not launch both camera entry points together.
 
 The preview is unmirrored: **your left eye is on the image's right**. Anatomical
-labels never depend on display orientation. Fake checkboxes/sliders affect only
-the synthetic source. Selection, fitting, model/mask logic and all units below are
+labels never depend on display orientation. Mock checkboxes/sliders have been removed
+from this view. The detector demo follows the eye guide automatically. Selection,
+fitting, model/mask logic and all units below are
 shared by the embedded and standalone views.
 
 ## 1. Independent eye calibration
 
-For the anatomical left eye, capture **OPEN**, then **CLOSED**. Do the same for the
-right eye. A helper may click the capture button; the countdown also gives you time
-to close the eye after pressing it yourself. Each fit uses only that eye's samples.
+Press **Test sound**, then **Start eye calibration**. No individual capture buttons
+are needed. Keep your head comfortable and follow the dot with both eyes naturally
+open: center → left → right → up → down. Do not exaggerate or squint. The guide then
+asks you to close **both** eyes gently, and finally reopen for a fresh check. Using
+both eyes for the training pose does not couple their fits or runtime decisions.
+The whole sequence takes about 21 seconds with default settings.
+
+| Cue | Action |
+| --- | --- |
+| One start tone | Calibration has begun; follow the dot |
+| Short tone at each new target | Look toward the new dot, keeping eyes open |
+| Two descending tones | Close both eyes gently; hold until the reopen cue (about 3.3 seconds by default) |
+| Two high tones | Reopen both eyes; keep them comfortably open for the final check |
+| Three rising tones | Both eye fits passed; watch the scopes while testing |
+| Three low tones | Open your eyes; one or both fits need a retry; read the per-eye result |
+| Two high tones then a low tone | Capture cancelled/lost; open your eyes and inspect the screen |
+
+The instruction and countdown are beside the target. Sound is played locally, using
+short generated WAV tones via macOS `afplay`, asynchronous `winsound` on Windows,
+or counted system bells elsewhere. Speaker volume/mute controls still apply; test
+sound first. On the bell fallback, use the visible instruction to distinguish cues.
+There is no audio recording or speech service. If no reopen sound occurs, open your
+eyes after the displayed duration and inspect the screen; source loss cancels capture.
+
+**Restart eye calibration** discards the current eye training and both previous eye
+fits, then starts from center. It leaves head/tongue fits alone. **Cancel** stops the
+sequence without restoring old eye fits. Leaving the Eyes tab or minimizing the window cancels an active
+sequence so unseen instructions cannot collect mislabeled samples. Completed fits
+survive normal tab changes. Settings changes, track loss or Stop source still clear
+all fits as before. Preview stays disarmed during every guided phase.
+
+The program waits for the native UI to display each new prompt before starting its
+clock. Most phases allow `settle_ms` preparation followed by `collect_ms` sampling;
+close/reopen allow at least 1500 ms preparation. Each eye needs `min_samples` usable
+captures and at least 80% usable frames per phase. At most 512 distinct capture
+timestamps are evaluated per eye per phase. A failed eye remains unavailable; the
+other eye can pass independently. The final reopen check uses new frames and needs
+at least 90% of its usable samples classified open. It is a session check, not an
+accuracy score. The guide cannot verify that you actually followed the dot or used
+the correct pose; labels come from the instructions you follow.
 
 The raw measurement is the median distance of three upper/lower eyelid pairs,
 divided by the corner-to-corner eye width, all calculated in pixel coordinates:
@@ -61,28 +99,53 @@ It is a dimensionless ratio, not pixels, probability, or a gaze coordinate. The 
 lid calculation does not depend on iris visibility, which helps when the eye closes.
 The original iris/gaze helpers remain unchanged for later work.
 
-Samples pass image/geometry gates, then each target group is trimmed around its
-median using `3 × 1.4826 × MAD` (minimum radius `1e-9`). At least five points and 80%
-of the target group must remain. The open group must exceed the closed group by
-at least `eye_separation`. The threshold is halfway between the highest retained
-closed sample and the lowest retained open sample. Classification is open at or
-above this boundary and closed below it. The lab shows both target medians and the
-raw threshold.
+Samples pass image/geometry gates. Each open-position group is trimmed **separately**
+around its median using `3 × 1.4826 × MAD` (minimum radius `1e-9`). At least five
+points and 80% of each group must remain. Trimming positions together would discard
+legitimate low-open lids, such as looking down, so the guide never pools before
+trimming. The closed group is trimmed in the same way.
+
+Let `C` be the highest retained closed ratio and `O` the lowest retained open ratio
+across all five positions. Require `G = O − C >= eye_separation` (default 0.015).
+Otherwise reject the fit instead of inventing a dividing line. At runtime:
+
+```text
+ratio <= C + 0.2 G  → closed
+ratio >= O − 0.2 G  → open
+between those limits → uncertain / invalid (no binary decision)
+```
+
+For example, closed samples at 0.04 and a lowest open pose at 0.12 yield a closed
+limit of 0.056 and an open limit of 0.104. Looking down at 0.12 remains open; 0.08
+is uncertain. This is calibrated threshold classification over MediaPipe landmarks,
+not retraining MediaPipe or a new neural eye model. It cannot distinguish two poses
+that produce the same measured ratio, and it does not prove live accuracy.
 
 | Display / field | Meaning |
 | --- | --- |
 | `left/right_raw` | Dimensionless eyelid gap / eye width |
-| `left/right_closed_bit` | **1 closed, 0 open**, unavailable if classification invalid |
+| `left/right_closed_bit` | **1 closed, 0 open**, null if uncertain or unavailable |
 | `left/right_eye_open` | SignalFrame convention: **0 closed, 1 open** |
 | `left/right_quality` | Heuristic image support score, 0–1; not probability of correctness |
-| `left/right_threshold_raw` | Fitted decision boundary, in the same raw ratio units |
+| `left/right_closed_limit_raw`, `left/right_open_limit_raw` | Guided classification limits in raw ratio units |
+| `left/right_threshold_raw` | Midpoint retained for diagnostics/legacy compatibility; new classification uses the two limits |
 
-Test open/open, closed/open, open/closed, then closed/closed. Both closures must
-classify independently. An uncalibrated or unavailable opposite eye must not veto
-the calibrated eye. Natural blinks will appear as short closures here: click dwell,
-debounce, and mouse-button transitions belong to Processing and are not applied.
-There is no temporal smoothing or hysteresis in this binary detector yet; inspect
-threshold chatter during testing before adding any later filters.
+The two dedicated eye scopes show the last eight seconds as sampled steps, without
+interpolating binary values. A missing/uncertain reading, changed subject/calibration,
+or a stale-sized time gap breaks the trace. The raw-ratio scope remains below them.
+
+After calibration, look around while keeping eyes open, then test open/open,
+closed/open, open/closed and closed/closed. Both closures classify independently.
+Brief blinks can appear as short `1` pulses here; click dwell/release debounce belongs
+to Processing. An uncertain eye immediately becomes invalid and releases that eye's
+processed button without suppressing the other eye. No detector hysteresis is used.
+If an open pose still shows closed, export a trace and restart with representative
+comfortable poses; the learned ratio bands cannot resolve every occlusion or gaze angle.
+
+New detector presets use version 2 with the two per-eye raw limits. Version 1 presets
+still load with their original single threshold; the UI requests guided recalibration
+for open-pose coverage. The containing `face_mouse_profile_v1` format is unchanged.
+The legacy per-eye `collect()` API remains for developer regression tests, not UI use.
 
 ## 2. Vertical head movement
 
@@ -212,7 +275,9 @@ Settings JSON contains only the following tunables, not learned face calibration
 The face crop and each eye crop must be in bounds, bright enough, sharp enough,
 and not excessively clipped. Eye crops are centered on the corners, width 1.4×eye
 width and height 0.9×eye width. Lid ratios outside 0–0.65 are rejected. After fitting,
-a ratio above `max(1.8×open_median, open_median+0.04)` is also rejected. A shared bad
+legacy single-threshold fits additionally reject a ratio above
+`max(1.8×open_median, open_median+0.04)`. Guided fits use the feature gate’s 0–0.65
+range, so a high-open pose is not rejected merely because the pooled median is lower. A shared bad
 face image can invalidate both eyes; their calibration and state decisions remain
 independent. These image gates cannot reliably distinguish all occlusions or model
 hallucinations. In particular, glasses glare and a covered eye need live evaluation.
@@ -231,7 +296,8 @@ after the read, before inference. It approximates acquisition and does not accou
 for hidden camera buffering. The status shows actual inter-sample Hz, inference
 milliseconds, feature-processing milliseconds, and capture age at processing.
 
-The UI/preview draw at about 10 Hz independently of input sampling. Three scopes
+The UI/preview draw at about 10 Hz independently of input sampling. Alongside the
+two binary eye scopes, three analog scopes
 show raw eye ratios, raw head measurements, and normalized head/tongue values.
 X uses actual monotonic capture time; lines between samples are display-only.
 There is no detector interpolation, fabricated new sample, or Processing filter.
@@ -242,7 +308,7 @@ values outside those display limits. Invalid normalized measurements are gaps.
 **Export trace CSV** writes at most the last 9,000 scalar samples (about five minutes
 at 30 Hz), initially suggesting ignored `data/private/`. It includes envelope,
 selected subject, calibration generation, head units, raw values, per-channel
-quality, image gate metrics, eye decision thresholds and closed bits, mouth geometry,
+quality, image gate metrics, eye decision thresholds, uncertainty limits and closed bits, mouth geometry,
 tongue candidate/area, validation flags, normalized outputs, validity and reasons.
 It saves no images. Raw geometry can remain visible when quality fails; inspect
 quality/valid flags before interpreting it. Historical trace rows survive Stop;
@@ -271,12 +337,18 @@ python3 -m unittest discover -s tests/integration -v
 python3 -m unittest discover -s tests/tooling -v
 ```
 
-Detector-only checkpoint: **66 Vision tests, 34 Processing tests, 9 integration
-tests and 7 tooling tests passed (116 total)**. The unified update passes **127**
-(66 Vision, 36 Processing, 18 integration, 7 tooling), including the local model. The Vision count includes 21 new detector
-tests and the real local-model blank-frame smoke. Native UI inspection covered
-selection, independent eye capture/classification and the synthetic tongue
-freeze/mark/fit/validation workflow. No physical camera or real OS input was used.
+Guided-eye increment: **136 tests passed** (73 Vision, 36 Processing, 20 integration,
+7 tooling), including the local-model blank-image smoke. New checks cover multiple
+open poses, rejected overlaps, uncertainty bands, independent partial fits, fresh
+reopen failure, prompt acknowledgment, duplicate samples, scope gaps, restart/cancel,
+profile v1/v2 compatibility, and per-eye button release on uncertain input. The
+original unified baseline passed 127 tests.
+
+Native UI inspection with generated pixels covered one-button completion, independent
+binary scopes, the Test sound control, leaving the Eyes tab to cancel, and restarting.
+No physical camera or real OS mouse input was used. Live-person accuracy, whether
+the cues are comfortably audible for the tester, and real gaze variation still need
+user testing. Sound playback remains local and asynchronous on macOS.
 
 The detector tests exercise generated pixels, geometry, independent calibration,
 both closures, both head modes, failed/repeated collection, dark/blurred input,
@@ -309,7 +381,9 @@ and latency. Automated synthetic success does not supply these human measurement
 - `lab_runtime.py`: single source worker, lifecycle, preview and bounded trace export.
 - `lab.py`: reusable native calibration view; embedded in App or standalone.
 - `presets.py`: versioned fitted-parameter validation/serialization; App coordinates storage.
-- `demo_detection.py`: labeled synthetic pixels/landmarks and manual fake inputs.
+- `demo_detection.py`: labeled synthetic pixels/landmarks; fake inputs remain a developer API.
+- `guided_eyes.py`: capture-timed seven-step sequence, independent pose fits and reopen checks.
+- `eye_view.py`: guided target, sound cues and binary scopes; no inference on Tk.
 - `landmarks.py`: optional MediaPipe facial transform extraction; default legacy API unchanged.
 
 No SignalFrame keys were renamed. The workbench marks its internal diagnostics
