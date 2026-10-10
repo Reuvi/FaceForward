@@ -40,9 +40,10 @@ def compact_points(coords):
 
 
 class Scope(ttk.Frame):
-    def __init__(self, parent, title, keys):
+    def __init__(self, parent, title, keys, limits=(0, 1)):
         super().__init__(parent, style="Panel.TFrame", padding=(9, 7))
         self.keys = keys
+        self.limits = limits
         label(self, title, style="Small.TLabel").pack(anchor="w")
         self.canvas = tk.Canvas(self, background=BG, height=106, highlightthickness=0)
         self.canvas.pack(fill="both", expand=True, pady=(5, 0))
@@ -60,8 +61,9 @@ class Scope(ttk.Frame):
             self.size = (width, height)
             self.drawn = None
             canvas.delete("all")
-            for value in (0, 0.5, 1):
-                y = bottom - value * (bottom - top)
+            low, high = self.limits
+            for value in (low, (low + high) / 2, high):
+                y = bottom - (value - low) / (high - low) * (bottom - top)
                 canvas.create_line(left, y, right, y, fill=EDGE)
                 canvas.create_text(3, y, text=str(value), fill=MUTED, anchor="w", font=("Menlo", 8))
             for index in range(5):
@@ -71,8 +73,12 @@ class Scope(ttk.Frame):
                                    fill=MUTED, font=("Menlo", 8))
             self.lines = [canvas.create_line(0, 0, 0, 0, fill=color, width=2 if index == 2 else 1.3,
                                              dash=(3, 3) if index == 1 else ())
-                          for index, color in enumerate((BLUE, AMBER, GREEN))]
+                          for index, color in enumerate((BLUE, AMBER, GREEN)[:len(self.keys)])]
         if not rows:
+            for line in self.lines:
+                canvas.itemconfigure(line, state="hidden")
+            canvas.delete("gap-run")
+            self.drawn = None
             return
         end = rows[-1]["t"]
         visible = [row for row in rows if row["t"] >= end - 8]
@@ -88,7 +94,8 @@ class Scope(ttk.Frame):
                     coords, previous = [], None
                     continue
                 x = left + (row["t"] - end + 8) / 8 * (right - left)
-                y = bottom - value * (bottom - top)
+                low, high = self.limits
+                y = bottom - max(0, min(1, (value - low) / (high - low))) * (bottom - top)
                 if previous is not None and (channel == 0 or "_out" in key and key.startswith(("left", "right"))):
                     coords.extend((x, previous))
                 coords.extend((x, y))
@@ -109,6 +116,10 @@ class Scope(ttk.Frame):
 
 
 class DesktopLab:
+    heading = "Mouse Signal Lab"
+    subtitle = "Native Python · local processing · simulated mouse output"
+    footer = "Mouse preview only    •    Start with centered inputs; Escape stops output"
+
     def __init__(self, root, lab=None):
         self.root = root
         self.lab = lab or Lab()
@@ -125,6 +136,8 @@ class DesktopLab:
         self.drawn_inputs = None
         self.drawn_preview = None
         self.refresh_count = 0
+        self.mock_widgets = []
+        self.input_mode = None
         self.reset_preview()
         root.title("Mouse Signal Lab — Native Python")
         root.geometry("1420x970")
@@ -182,8 +195,8 @@ class DesktopLab:
         header = ttk.Frame(self.root, padding=(22, 17, 22, 8))
         header.pack(fill="x")
         label(header, "FACE CONTROLLER / PROCESSING", foreground=GREEN, font=("Menlo", 9)).grid(row=0, column=0, sticky="w")
-        label(header, "Mouse Signal Lab", style="Title.TLabel").grid(row=1, column=0, sticky="w")
-        label(header, "Native Python · local processing · mock mouse output", foreground=MUTED).grid(row=2, column=0, sticky="w", pady=(3, 0))
+        label(header, self.heading, style="Title.TLabel").grid(row=1, column=0, sticky="w")
+        label(header, self.subtitle, foreground=MUTED).grid(row=2, column=0, sticky="w", pady=(3, 0))
         header.columnconfigure(0, weight=1)
         self.button(header, "Start preview", lambda: self.lab.action({"action": "arm"}), style="Start.TButton").grid(row=1, column=1, padx=5)
         self.button(header, "Stop / Esc", lambda: self.lab.action({"action": "stop"})).grid(row=1, column=2, padx=5)
@@ -204,7 +217,7 @@ class DesktopLab:
         self.build_inspector()
         self.message = tk.StringVar()
         label(self.root, textvariable=self.message, foreground="#ffa79c", wraplength=1300).pack(fill="x", padx=22)
-        label(self.root, "PROCESSING ONLY    •    No camera, browser, JavaScript, network server, or OS mouse injection",
+        label(self.root, self.footer,
               foreground=MUTED, font=("Menlo", 9)).pack(anchor="w", padx=22, pady=(4, 10))
 
     def build_live(self):
@@ -216,6 +229,7 @@ class DesktopLab:
         self.scenario = tk.StringVar(value="Manual controls")
         combo = ttk.Combobox(inputs, textvariable=self.scenario, values=list(SCENARIOS), state="readonly", width=30)
         combo.pack(fill="x", pady=8)
+        self.mock_combo = combo
         combo.bind("<<ComboboxSelected>>", lambda event: self.action("scenario", name=SCENARIOS[self.scenario.get()]))
         maps = ttk.Frame(inputs, style="Panel.TFrame"); maps.pack(fill="x")
         label(maps, "2D pointer matrix", style="Small.TLabel").grid(row=0, column=0, sticky="w")
@@ -232,12 +246,15 @@ class DesktopLab:
         self.eye_vars = {}
         for eye in ("left", "right"):
             var = tk.BooleanVar(value=False); self.eye_vars[eye] = var
-            ttk.Checkbutton(eyes, text=f"{eye.title()} eye closed → {eye} click", variable=var,
-                            command=lambda key=eye: self.lab.control({key: self.eye_vars[key].get()})).pack(anchor="w")
+            widget = ttk.Checkbutton(eyes, text=f"{eye.title()} eye closed → {eye} click", variable=var,
+                                     command=lambda key=eye: self.lab.control({key: self.eye_vars[key].get()}))
+            widget.pack(anchor="w"); self.mock_widgets.append(widget)
         buttons = ttk.Frame(inputs, style="Panel.TFrame"); buttons.pack(fill="x", pady=(3, 0))
         for text, action in (("Blink 120 ms", "blink"), ("Left wink", "left_wink"), ("Right wink", "right_wink")):
-            self.button(buttons, text, lambda action=action: self.lab.action({"action": action})).pack(side="left", padx=(0, 4))
-        self.button(inputs, "Center inputs & open eyes", lambda: self.lab.action({"action": "center"})).pack(fill="x", pady=(7, 0))
+            widget = self.button(buttons, text, lambda action=action: self.lab.action({"action": action}))
+            widget.pack(side="left", padx=(0, 4)); self.mock_widgets.append(widget)
+        widget = self.button(inputs, "Center inputs & open eyes", lambda: self.lab.action({"action": "center"}))
+        widget.pack(fill="x", pady=(7, 0)); self.mock_widgets.append(widget)
 
         preview = ttk.Frame(self.live, style="Panel.TFrame", padding=13)
         preview.grid(row=0, column=1, sticky="nsew")
@@ -259,6 +276,7 @@ class DesktopLab:
         row = ttk.Frame(preview, style="Panel.TFrame"); row.pack(fill="x")
         self.stream_button = self.button(row, "Pause input stream", lambda: self.lab.action({"action": "stream", "enabled": not self.state["streaming"]}))
         self.stream_button.pack(side="left", padx=(0, 7))
+        self.mock_widgets.append(self.stream_button)
         self.button(row, "Calibrate current neutral", lambda: self.lab.action({"action": "calibrate"})).pack(side="left")
         self.boost = tk.StringVar()
         label(preview, textvariable=self.boost, style="Small.TLabel").pack(anchor="w", pady=(6, 0))
@@ -371,11 +389,15 @@ class DesktopLab:
 
     def matrix_input(self, event):
         runtime = self.state["runtime"]
+        if runtime["source"] != "mock":
+            return
         x = min(runtime["columns"] - 1, max(0, int(event.x / self.matrix.winfo_width() * runtime["columns"])))
         y = min(runtime["rows"] - 1, max(0, int(event.y / self.matrix.winfo_height() * runtime["rows"])))
         self.lab.control({"x": x / (runtime["columns"] - 1), "y": y / (runtime["rows"] - 1)})
 
     def vector_input(self, event):
+        if self.state["runtime"]["source"] != "mock":
+            return
         size = self.state["runtime"]["vector_size"]
         index = min(size - 1, max(0, int(event.y / self.vector.winfo_height() * size)))
         self.lab.control({"scroll": index / (size - 1)})
@@ -408,7 +430,7 @@ class DesktopLab:
             self.drawn_inputs = (active, active_y)
         set_var(self.position, f"X {point[0]:.3f}   Y {point[1]:.3f}  / offset = velocity" if point else "No valid pointer sample")
         for eye, var in self.eye_vars.items():
-            set_var(var, state["manual"][eye])
+            set_var(var, state["manual"][eye] if runtime["source"] == "mock" else bool(diag[eye + "_closed"]))
 
     @staticmethod
     def get_path(value, path):
@@ -503,11 +525,18 @@ class DesktopLab:
         if state["trace"]:
             self.after = state["trace"][-1]["id"]
         snap, diag = state["snapshot"], state["snapshot"]["diagnostics"]
+        if self.input_mode != state["runtime"]["source"]:
+            self.input_mode = state["runtime"]["source"]
+            external = self.input_mode == "external"
+            self.mock_combo.configure(state="disabled" if external else "readonly")
+            for widget in self.mock_widgets:
+                widget.configure(state="disabled" if external else "normal")
         set_var(self.status, snap["status"])
         age = "—" if diag["age_ms"] is None else f"{diag['age_ms']:.0f}"
         self.refresh_count += 1
         if self.refresh_count % 5 == 0:
-            set_var(self.timing, f"INPUT {state['runtime']['sample_hz']:g} Hz  →  PROCESS 100 Hz  /  SCOPE 10 Hz  /  AGE {age} ms")
+            source = "VISION / EXTERNAL" if state["runtime"]["source"] == "external" else f"INPUT {state['runtime']['sample_hz']:g} Hz"
+            set_var(self.timing, f"{source}  →  PROCESS 100 Hz  /  SCOPE 10 Hz  /  AGE {age} ms")
         if self.notebook.select() == str(self.live):
             self.draw_inputs(state)
             for name in ("pointer_x", "pointer_y", "scroll_y"):
@@ -518,7 +547,8 @@ class DesktopLab:
             button_text = "Pause input stream" if state["streaming"] else "Resume input stream"
             if self.stream_button.cget("text") != button_text:
                 self.stream_button.configure(text=button_text)
-            set_var(self.scenario, next(name for name, value in SCENARIOS.items() if value == state["scenario"]))
+            set_var(self.scenario, "External input (read only)" if state["runtime"]["source"] == "external"
+                    else next(name for name, value in SCENARIOS.items() if value == state["scenario"]))
             if hasattr(self, "cursor"):
                 x = self.sim["x"] * self.playground.winfo_width(); y = self.sim["y"] * self.playground.winfo_height()
                 x, y = round(x), round(y)

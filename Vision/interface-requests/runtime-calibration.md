@@ -2,6 +2,12 @@
 
 Status: proposal for the integration owner; no shared contract changes.
 
+Integration update: native lifecycle, in-process handoff, and the raw diagnostic
+side channel are adopted in `Contracts/MOUSE_MVP.md` and implemented by App.
+Equal-timestamp/new-sequence frames now work in Processing. The earlier inspection
+notes below are historical. Live calibration collection, validated quality gates,
+and a persisted calibration representation are still pending.
+
 The implementation emits the existing SignalFrame v1 dictionaries/NDJSON and can
 be consumed with mocks immediately. New Python entry points under Vision are
 local until the integrator chooses application wiring. Processing owns profile

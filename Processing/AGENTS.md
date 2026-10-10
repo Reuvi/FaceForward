@@ -11,6 +11,10 @@ and lane documentation here. Put shared-change requests in `interface-requests/`
 - Keep the tester native and local: Python/Tk, no JavaScript, browser, or web server.
   Processing runs independently of drawing; preserve bounded histories and measure
   performance with the headless benchmark before adding runtime dependencies.
+- App now integrates Vision through `Lab.ingest`; see `../App/README.md` and
+  `../Contracts/MOUSE_MVP.md`. Preserve source ownership, actual rejected-input
+  diagnostics, immediate `disconnect`, and equal-timestamp/new-sequence handling.
+  `DesktopLab` remains usable independently; source-specific UI belongs to App.
 - Output is currently `mouse_preview_v0`, pending the emulator teammate's format.
   Preserve `mouse/output.py` as the serialization boundary. Independent output
   sampling differs from the original draft ControlFrame v1; do not silently change

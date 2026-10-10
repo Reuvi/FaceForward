@@ -86,6 +86,12 @@ class AxisFilter:
             self.clear()
             return
         point = (value,) if self.dimensions == 1 else tuple(value)
+        # SignalFrame allows a newer sequence at the same capture timestamp.
+        # Replace that point; do not divide by a zero sample interval.
+        if self.history and timestamp == self.history[-1][0]:
+            self.history[-1] = (timestamp, point)
+            self.valid = True
+            return
         if self.history:
             previous_time, previous = self.history[-1]
             dt = (timestamp - previous_time) / 1000.0
@@ -184,6 +190,7 @@ class MouseProcessor:
 
     def disarm(self, reason="Preview stopped"):
         self.armed = self.enabled = False
+        self.received_ms = None
         self.reason = reason
         self.left.reset()
         self.right.reset()
@@ -202,7 +209,7 @@ class MouseProcessor:
             self.disarm(str(exc))
             return {"accepted": False, "reason": str(exc)}
         if sample.session_id == self.session:
-            if sample.sequence <= self.sequence or (self.sample and sample.timestamp_ms <= self.sample.timestamp_ms):
+            if sample.sequence <= self.sequence or (self.sample and sample.timestamp_ms < self.sample.timestamp_ms):
                 self.rejected += 1
                 return {"accepted": False, "reason": "Duplicate or out-of-order sample"}
         elif self.session is not None:

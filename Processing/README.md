@@ -6,6 +6,12 @@ It is a **native Python/Tk desktop app**, with no JavaScript, browser, web serve
 or network connection. It uses Python's standard library and emits no real OS mouse
 events. The driver's final message format is deliberately still pending.
 
+For **Vision + Processing together**, run `python3 -m App` from the repository
+root. See [the integrated MVP runbook](../App/README.md). The standalone command
+below remains useful for manual one-hot mock tuning. App's external-source mode
+disables those mock controls and displays actual Vision input, including rejected
+frames, without changing filtering or eye polarity.
+
 ## Run it
 
 From the root of the **processing worktree**, using Python 3.9 or newer:
@@ -128,7 +134,9 @@ print(mouse_message(snapshot))
 In a real runtime, call `accept(frame, received_ms)` whenever a detector frame arrives
 and `tick(now_ms)` on a separate regular output clock, including when frames stop.
 Serialize these calls on one thread or protect them with a lock; the lab does that.
-Use the same host monotonic millisecond timebase across producer/processor. Never
+Use the same host monotonic millisecond timebase across producer/processor. Newer
+sequences with equal capture timestamps replace the interpolation point without
+advancing dwell time; regressing times remain invalid. Never
 mix browser `performance.now()`, Unix timestamps, and Python monotonic timestamps.
 For a new host/session, build an explicit clock adapter. No server or transport is
 needed when all three components are Python modules in the same process.
@@ -161,7 +169,8 @@ the desktop start its worker instead of calling `lab.start()` yourself. Its
 standalone window waits for a producer; it does not create a hidden network service.
 `lab.state(after_trace_id)` retrieves only new trace rows for a renderer.
 
-See [the input/output handoff proposal](interface-requests/mouse-prototype.md) for
+See [the adopted native handoff](../Contracts/MOUSE_MVP.md) and
+[the original input/output proposal](interface-requests/mouse-prototype.md) for
 the complete raw example and driver decisions still to make. The final driver
 format belongs in `mouse/output.py`; filtering code should remain unchanged.
 

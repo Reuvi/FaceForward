@@ -10,6 +10,10 @@ lane documentation here. Put requests for shared changes in `interface-requests/
 - Processing's native Python/Tk lab accepts SignalFrame v1 via `Lab.ingest(frame)`
   in external-source mode. Keep Vision's continuous values and `*_eye_open`
   polarity (1 = open); its separate raw adapter uses 1 = closed. App owns wiring.
+- That wiring now runs as `python3 -m App`; read `../App/README.md` and
+  `../Contracts/MOUSE_MVP.md`. `mouse_demo.py` deliberately supplies synthetic
+  values for all four mouse behaviors. Do not confuse that fixture with live
+  head/tongue detection or calibrated camera signals.
 - Keep inference off Tk's UI thread. Detection, processing, and drawing have
   separate cadences; preview work is optional. Avoid growing queues and measure
   overhead with `python3 -m Vision.benchmark` before adding runtime dependencies.

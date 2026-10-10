@@ -6,6 +6,11 @@ not recordings, and are not a functioning pipeline or complete validation suite.
 Choose an implementation language and transport separately; ordinary objects,
 JSON, or newline-delimited JSON can represent the same semantics.
 
+The native Vision + Processing mouse lab now adopts the in-process interfaces in
+[`MOUSE_MVP.md`](MOUSE_MVP.md). It consumes SignalFrame v1 and uses the separately
+named `mouse_preview_v0` output with its own sampling clock. ControlFrame v1 below
+remains a driver draft until the emulator teammate agrees on the adapter.
+
 ## Common rules
 
 - `schema_version` is integer `1`. Required keys must exist; consumers can ignore

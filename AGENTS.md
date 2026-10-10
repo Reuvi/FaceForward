@@ -8,6 +8,12 @@ Later explicit team decisions take precedence over the original brief.
 Read the `AGENTS.md` in every component you will touch, even if your session starts
 at the repository root. User instructions take precedence over this agreement.
 
+Current executable baseline: `python3 -m App` opens the native Vision + Processing
+mouse MVP. Read `App/README.md` and `Contracts/MOUSE_MVP.md` for actual capabilities
+and adopted local interfaces. Keep all four mouse mappings independent, preserve
+invalid detector values, and keep simulated sources explicitly labeled. Camera
+calibration/head/tongue detection and hardware-emulator integration remain pending.
+
 ## Start every task
 
 1. Run `git status --short --branch` and `git worktree list`. Preserve existing work.

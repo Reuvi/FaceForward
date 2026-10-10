@@ -7,6 +7,12 @@ It produces SignalFrame v1 dictionaries or newline-delimited JSON. No Processing
 or Drivers imports are required. Python 3.10+ is required; tested with Python
 3.12.5 on Apple Silicon macOS.
 
+**Integration is now available:** run `python3 -m App` for Vision → Processing in
+one native lab. [App's runbook](../App/README.md) documents the synthetic four-action
+demo, replay, camera/raw-ratio view, subject selection, and remaining live detector
+work. The source camera path below remains uncalibrated. This integration does
+not add a head/tongue detector or invent valid camera controls.
+
 ## Native, local runtime
 
 Runtime inference uses the model already on disk. There is no browser, JavaScript,
@@ -16,10 +22,9 @@ installation and optional model download below are setup steps only.
 The inspected `work/reuvi/processing/mouse-lab` worktree runs a native Python/Tk
 desktop: its processing clock is 100 Hz, readouts up to 20 Hz, and scopes 10 Hz.
 It accepts SignalFrame v1 through its documented `Lab.ingest(frame)` API in
-external-source mode. App can pass our frame dictionary from a detector worker
+external-source mode. App now passes frame dictionaries from a detector worker
 directly into that controller; Tk remains on the main thread. No serialization,
-server, or transport is needed for that path. The full application wiring belongs
-to the integration owner; this inspection did not modify Processing.
+server, or transport is needed for that path.
 
 Preserve continuous gaze/tongue values and the v1 eye convention (1 = open,
 0 = closed). Processing's alternative one-hot/raw format uses different eye
@@ -195,9 +200,11 @@ before adopting cross-lane imports.
 | Binary eyes and calibrated gaze | Geometry, calibration, explicit binding, and synthetic tests implemented; live calibration collection/quality validation pending |
 | Calibrated head pitch/yaw | Pending canonical-model/intrinsics integration and pose/sign checks; signals invalid |
 | Tongue detection | Continuous geometry tested; no validated detector; signals invalid |
-| SignalFrame emitter | Complete v1 records from replay and pipeline; App/Processing integration pending |
+| SignalFrame emitter | Complete v1 records; native App/Processing integration implemented |
 
-No camera, real face recording, or OS input was used during initial verification.
+No camera, real face recording, or OS input was used during initial Vision verification.
+The later integration checks are recorded in [App's handoff](../App/HANDOFF.md) and
+[the shared MVP runbook](../App/README.md).
 No real-world accuracy, false-activation, pose-range, or end-to-end latency claim
 has been established. Next steps are live calibration collection and quality
 evaluation, pose estimation, and a separately validated tongue detector.

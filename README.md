@@ -4,9 +4,29 @@ A hackathon prototype for controlling a computer through a consumer webcam and
 comfortable facial movements. The pipeline separates measurement, personalized
 signal processing, and device output so three teammates can develop independently.
 
-**Repository status:** collaboration scaffold and proposed v1 interfaces. The
-camera detector, processor, desktop UI, and live drivers are not implemented yet.
-The original `Drivers/readme.MD` is preserved.
+**Repository status:** native mouse MVP integrating Vision and Processing. All
+four mouse behaviors work with synthetic/replay signals in the simulated desktop.
+Camera landmarks and raw eye diagnostics are available; live calibration, head
+and tongue detectors, and the real mouse-driver connection are still pending.
+
+## Run the combined native lab
+
+From this repository root, with Python 3.10+ and Tk:
+
+```bash
+python3 -m App
+```
+
+The default is a labeled synthetic Vision demo. Click **Start preview**, then
+**Live lab** to watch independent left/right clicks, pointer motion, scrolling,
+and input/output scopes. **Vision source & raw signals** shows measurements,
+validity, actual source timing, and optional camera diagnostics. There is no
+browser, JavaScript, network service, or real OS mouse injection.
+
+Read [the complete MVP runbook](App/README.md),
+[Processing tuning instructions](Processing/README.md),
+[Vision camera setup](Vision/README.md), and
+[the adopted native handoff](Contracts/MOUSE_MVP.md).
 
 ## Start here
 
@@ -22,7 +42,9 @@ The original `Drivers/readme.MD` is preserved.
    The helper prints the exact directory to open. It requires Python 3.9+ and Git.
    The collaboration setup is available on `main`; fetch before creating a worktree.
 3. Open that worktree and paste the matching [agent starter](docs/AGENT_STARTERS.md).
-4. Implement against the [v1 contracts and fixtures](Contracts/README.md).
+4. Implement against the [v1 contracts and fixtures](Contracts/README.md) and
+   [the mouse MVP integration](Contracts/MOUSE_MVP.md). Use `python3 -m App` for
+   combined work and `python3 -m Processing.mouse` for independent mock tuning.
 
 ## Work areas
 
@@ -45,17 +67,22 @@ worktrees isolate concurrent agents on one computer.
 
 See [the original project notes](docs/ORIGINAL_PROJECT_NOTES.md) for the team's
 source brief and [the project plan](docs/PROJECT_PLAN.md) for organized milestones
-and proposed implementation choices. No application framework or detector model
-has been selected.
+and proposed implementation choices. The current lab uses native Python/Tk;
+the optional local camera backend uses MediaPipe/OpenCV.
 
-## Scaffold checks
+## Checks
 
 ```bash
 python3 tools/new_worktree.py --help
 python3 tools/check_scope.py --help
 python3 -m unittest discover -s tests/tooling -v
+python3 -m unittest discover -s tests/vision -v
+python3 -m unittest discover -s tests/processing -v
+python3 -m unittest discover -s tests/integration -v
+python3 -m App --headless --frames 490
 git diff --check
 ```
 
-Component owners add their own setup and test commands when implementation starts.
-The scope CI check validates changed paths for lane branches; it is not an app test.
+CI runs component/integration tests without camera dependencies. The optional
+model test is enabled with `VISION_MODEL_PATH`; see Vision's README. Scope CI
+checks lane ownership separately. Driver files have not been changed by this MVP.

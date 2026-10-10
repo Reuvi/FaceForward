@@ -16,17 +16,20 @@ def now_ms():
 
 
 class Lab:
-    def __init__(self, config=None):
+    def __init__(self, config=None, *, clock=now_ms):
         self.lock = threading.RLock()
+        self.clock = clock
+        self.locked_source = None
         self.processor = MouseProcessor(config)
         self.runtime = {"sample_hz": 30, "rows": 9, "columns": 9, "vector_size": 11,
                         "pointer_speed": 900, "scroll_speed": 450, "source": "mock", "subject_id": "mock-person"}
         self.manual = {"x": 0.5, "y": 0.5, "scroll": 0.5, "left": False, "right": False}
         self.scenario_name = "manual"
-        self.started = self.scenario_start = now_ms()
+        self.started = self.scenario_start = self.clock()
         self.next_sample = self.started
         self.sample_sequence = 0
         self.last_raw = None
+        self.last_ingest = None
         self.snapshot = self.processor.tick(self.started)
         self.trace = deque(maxlen=2000)
         self.trace_id = 0
@@ -76,11 +79,15 @@ class Lab:
             })
 
     def start(self):
+        if self.thread is not None:
+            raise RuntimeError("Processing clock has already been started")
+        if self.stop_event.is_set():
+            raise RuntimeError("Closed lab cannot be restarted")
         def run():
             deadline = time.monotonic()
             while not self.stop_event.is_set():
                 with self.lock:
-                    self.step(now_ms())
+                    self.step(self.clock())
                 deadline += 0.01
                 self.stop_event.wait(max(0, deadline - time.monotonic()))
                 if time.monotonic() - deadline > 0.1:
@@ -94,6 +101,7 @@ class Lab:
             self.thread.join(timeout=2)
         with self.lock:
             self.processor.disarm("Lab closed")
+            self.snapshot = self.processor.tick(self.clock())
 
     def state(self, after=0):
         with self.lock:
@@ -101,7 +109,8 @@ class Lab:
                     "trace": [row for row in self.trace if row["id"] > after],
                     "raw": self.last_raw, "runtime": self.runtime.copy(), "manual": self.manual.copy(),
                     "config": self.processor.config.to_dict(), "scenario": self.scenario_name,
-                    "streaming": self.streaming, "generation": self.generation}
+                    "streaming": self.streaming, "generation": self.generation,
+                    "input_status": self.last_ingest}
 
     def control(self, values):
         allowed = set(self.manual)
@@ -136,6 +145,8 @@ class Lab:
                     raise ValueError(f"{name} must be an odd integer from 3 to 31")
             if runtime["source"] not in ("mock", "external"):
                 raise ValueError("source must be mock or external")
+            if self.locked_source is not None and runtime["source"] != self.locked_source:
+                raise ValueError("The integrated app owns the input source; use its Vision source tab")
             if not isinstance(runtime["subject_id"], str) or not 1 <= len(runtime["subject_id"]) <= 128:
                 raise ValueError("subject_id must be a nonempty string of at most 128 characters")
             self.processor = MouseProcessor(config, subject_id=runtime["subject_id"])
@@ -143,14 +154,15 @@ class Lab:
             self.trace.clear()
             self.generation += 1
             self.last_raw = None
+            self.last_ingest = None
             self.pulses = {"left": 0.0, "right": 0.0}
-            self.snapshot = self.processor.tick(now_ms())
-            self.next_sample = now_ms()
+            self.snapshot = self.processor.tick(self.clock())
+            self.next_sample = self.clock()
 
     def action(self, values):
         action = values.get("action")
         with self.lock:
-            timestamp = now_ms()
+            timestamp = self.clock()
             if action == "arm":
                 self.processor.arm()
             elif action == "stop":
@@ -187,13 +199,20 @@ class Lab:
                 self.settings({"config": config.to_dict()})
             else:
                 raise ValueError("Unknown action")
-            self.snapshot = self.processor.tick(now_ms())
+            self.snapshot = self.processor.tick(self.clock())
+
+    def disconnect(self, reason):
+        """Release output immediately at source EOF/error/stop, before timeout."""
+        with self.lock:
+            self.processor.disarm(reason)
+            self.snapshot = self.processor.tick(self.clock())
 
     def ingest(self, frame):
         with self.lock:
             if self.runtime["source"] != "external":
                 raise ValueError("Select external source before submitting detector frames")
-            result = self.processor.accept(frame, now_ms())
-            if result["accepted"]:
-                self.last_raw = frame
+            result = self.processor.accept(frame, self.clock())
+            # Show the actual latest input, including subject loss/rejected frames.
+            self.last_raw = frame
+            self.last_ingest = result
             return result

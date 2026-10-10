@@ -1,6 +1,9 @@
 # Mouse prototype: detector and emulator handoff
 
 Status: **implemented within Processing; shared contract revision pending**.
+Native Vision integration is now implemented by App and recorded in
+`Contracts/MOUSE_MVP.md`. The driver format remains pending. The raw one-hot
+alternative described here remains supported; current Vision uses continuous v1.
 This records the latest team discussion and the prototype's assumptions. It does
 not overwrite `Contracts/README.md` or imply that another teammate has accepted a
 message format. Reuvi requested mouse-only experimentation and independent eyes.
@@ -30,7 +33,8 @@ This complete synthetic frame has centered positions, left eye closed, right eye
 ```
 
 Replace the example timestamp with capture time from the same host monotonic
-millisecond clock. Sequence must increase strictly, as must capture timestamps.
+millisecond clock. Sequence must increase strictly; capture timestamps must not
+decrease. Equal capture times replace the interpolation point without adding dwell.
 Use a new session ID when the detector restarts. Subject selection is explicit.
 Null channel values represent missing detection; absent/invalid selected subject
 disables the stream. The default pointer source is tongue; gaze is selectable.

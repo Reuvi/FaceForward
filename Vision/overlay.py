@@ -6,7 +6,8 @@ def display_point(point, width, *, mirrored):
     return (round(width - 1 - x) if mirrored else round(x), round(y))
 
 
-def render_overlay(bgr, observations, frame, *, mirrored=True):
+def render_overlay(bgr, observations, frame, *, mirrored=True,
+                   caption="Uncalibrated diagnostics | q: stop"):
     import cv2
     image = cv2.flip(bgr, 1) if mirrored else bgr.copy()
     height, width = image.shape[:2]
@@ -30,6 +31,6 @@ def render_overlay(bgr, observations, frame, *, mirrored=True):
             lines.append(f"{name} eye raw: {ratios.openness:.3f}" if ratios else f"{name} eye: unavailable")
         for i, text in enumerate(lines):
             cv2.putText(image, text, (x, y + i * 18), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (240, 240, 240), 1)
-    cv2.putText(image, "Uncalibrated diagnostics | q: stop", (10, 24),
+    cv2.putText(image, caption, (10, 24),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 220, 255), 1)
     return image
