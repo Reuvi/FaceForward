@@ -97,3 +97,7 @@ can use an integration branch with the affected owners coordinated.
   teammates' changes. Publish only within the user's authorized scope.
   Instructions and the scope checker are coordination
   aids, not a filesystem sandbox or a guarantee of conflict-free merges.
+
+## Detection research handoff
+
+The unified App also hosts `Detection research`; read `docs/DETECTION_RESEARCH_GUIDE.md` and `Contracts/RESEARCH_LAB.md` before touching it. Vision owns scalar observations/gaze regression; Processing owns gestures/models/mappings; App owns trials, joining, profiles and UI. Keep independent eyes as the default, strict policy explicit, gaze positions separate from relative velocity, graph-held unknowns display-only, and training/validation trials separate. Research profile v2 is additive; preserve v1 loading, disarmed profile loads and fresh gaze validation. Do not claim live accuracy from synthetic tests.

@@ -49,7 +49,7 @@ class LabRuntime:
                 if demo:
                     session = CaptureSession()
                 else:
-                    detector = stack.enter_context(MediaPipeDetector(model, include_pose=True))
+                    detector = stack.enter_context(MediaPipeDetector(model, include_pose=True, include_expressions=True))
                     camera = stack.enter_context(OpenCVCamera(camera_id, fps=fps))
                 self.previous_timestamp = None
                 while not self.stop_event.is_set():

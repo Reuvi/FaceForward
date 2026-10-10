@@ -77,6 +77,7 @@ class UnifiedCalibrationTests(unittest.TestCase):
     def test_guided_pixels_independence_unknown_and_profile_roundtrip(self):
         self.guided_eyes()
         self.assertEqual(set(self.core.eyes),{"left","right"})
+        self.assertEqual(set(self.session.research.processor.fits),{"eyeBlinkLeft","eyeBlinkRight"})
         self.feed(left_ratio=.14,right_closed=True)
         signals=self.session.frame["faces"][0]["signals"]
         self.assertEqual(signals["left_eye_open"]["value"],1)

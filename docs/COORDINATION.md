@@ -233,3 +233,12 @@ observed all four mouse actions and ended disabled with neutral/released output.
 Native synthetic UI inspection confirmed the full-screen target, automatic return,
 and a dark held eye trace alongside an unavailable numeric reading. Scope/whitespace
 checks passed. No live-person calibration accuracy or real driver output was tested.
+
+## Detection research implementation — 2026-10-10
+
+- Owner/lane: Reuvi integration; task `work/reuvi/integration/gesture-research-lab`, base `baaf8c5`.
+- Authorized cross-component handoff: Vision scalar/pose observations and gaze fitting; Processing temporal gesture/model/mapping experiments; App native research tab, labeled data and profiles. Drivers untouched.
+- Contract landed first: `Contracts/RESEARCH_LAB.md`. SignalFrame v1 and original mouse preview unchanged; additive feature packet, research preview and profile v2 (v1 readable).
+- Defaults: independent eyes, release click, 320 ms minimum per eye, 80 ms open confirmation; strict policy and learned gates explicit. No actual OS input.
+- Read `docs/DETECTION_RESEARCH_GUIDE.md` for calibration/trials, exact settings, ownership and test commands. Export human data only to ignored private paths.
+- Follow-up dependencies: real-person held-out evidence, comfortable per-user control mapping and final Drivers delivery/monitor-coordinate agreement. Synthetic tests are implementation evidence only.

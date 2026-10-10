@@ -56,8 +56,13 @@ class IntegratedDesktop(DesktopLab):
         self.preview_seen = -1
         self.table_values = {}
         self.calibration_ui = None
+        self.research_ui = None
         super().__init__(root, session.lab)
         root.title("Face Mouse MVP — Vision + Processing")
+        from .research_view import ResearchView
+        research_page=ttk.Frame(self.notebook)
+        self.notebook.add(research_page,text="Detection research")
+        self.research_ui=ResearchView(research_page,root,session,self.guarded)
         self.notebook.select(self.vision_page)
         self.start_source()
         self.refresh_vision()
@@ -330,8 +335,14 @@ class IntegratedDesktop(DesktopLab):
             self.camera_canvas.coords(self.preview_hint, 240, 20 if self.preview_photo else 180)
         self.vision_after = self.root.after(100, self.refresh_vision)
 
+    def action(self, action_name, **kwargs):
+        if action_name in ("stop", "arm"):
+            with self.session.lock:self.session.research.stop("Main preview control")
+        return super().action(action_name, **kwargs)
+
     def close(self):
         if not self.closed:
+            if self.research_ui is not None:self.research_ui.close()
             if self.calibration_ui is not None:
                 self.calibration_ui.eye_panel.close()
             self.closed = True

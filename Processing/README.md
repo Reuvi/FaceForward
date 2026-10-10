@@ -229,3 +229,7 @@ history means no line. These are rendering rules shared through `LabUI.traces`.
 CSV and processor input remain unchanged: missing inputs stay null/invalid, affected
 buttons release, and affected motion stops. Output traces show the actual released
 or neutral state, even while a raw-input trace visually holds its previous height.
+
+## Experimental temporal recognition
+
+`research/` adds capture-timed blink/wink candidates, optional completed-event classifiers, alternative gesture/dwell/head mappings and ordered preview click events. It consumes the additive face-feature contract through App. It does not change the existing mouse engine or attach an OS driver. See [Detection research guide](../docs/DETECTION_RESEARCH_GUIDE.md) and [contract](../Contracts/RESEARCH_LAB.md). Standalone component tests remain independent of camera hardware.

@@ -8,13 +8,21 @@ import tempfile
 from .config import MouseConfig, number
 
 FORMAT = "face_mouse_profile_v1"
+FORMAT_V2 = "face_mouse_profile_v2"
 MAX_BYTES = 262144
 
 
 def validate_profile(data):
     fields = {"format", "source_kind", "detector", "processing", "preview"}
-    if not isinstance(data, dict) or set(data) != fields or data["format"] != FORMAT:
-        raise ValueError("Expected a face_mouse_profile_v1 with detector and processing sections")
+    if isinstance(data,dict) and data.get("format")==FORMAT_V2:
+        fields.add("research")
+    if not isinstance(data, dict) or set(data) != fields or data["format"] not in (FORMAT,FORMAT_V2):
+        raise ValueError("Expected a face_mouse_profile_v1/v2 with detector and processing sections")
+    if data["format"]==FORMAT_V2:
+        if not isinstance(data["research"],dict):raise ValueError("Research preset must be an object")
+        # App validates feature/gaze fits before binding; storage owns only structure.
+        from Processing.research.settings import settings
+        settings(data["research"].get("settings",{}))
     if data["source_kind"] not in ("camera", "synthetic"):
         raise ValueError("Unknown profile source kind")
     if not isinstance(data["detector"], dict):

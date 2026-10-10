@@ -117,7 +117,7 @@ required. A left-eye-only profile is valid; it does not calibrate the other eye.
 
 | Saved section | Contents |
 | --- | --- |
-| `format`, `source_kind` | `face_mouse_profile_v1`; camera or synthetic |
+| `format`, `source_kind` | `face_mouse_profile_v2` (v1 readable); camera or synthetic |
 | `detector` | Version/algorithm, detector settings, independent eye fits including raw closed/open uncertainty limits, head mode and three-point fit, optional tongue color prototypes/radius/margin |
 | `processing` | Applied mouse mapping, dwell, thresholds, smoothing, response and acceleration settings |
 | `preview` | Simulated pointer and scroll speed |
@@ -207,3 +207,7 @@ combined profile loading is deliberately through the selected-face UI. The emula
 message format, units, transport and OS output remain the next Drivers handoff.
 See [the adopted contract](../Contracts/MOUSE_MVP.md) and
 [main chat coordination](../docs/COORDINATION.md) before changing those boundaries.
+
+## Detection research in this window
+
+The **Detection research** tab shares this capture worker and selected profile. It adds temporal blink/wink recognition, feature and duration graphs, labeled trials, optional event models, alternative gestures/dwell/head control and an optional gaze-calibration experiment. **Start research preview** runs these settings; header **Start preview** returns to the original preview. Stop/Escape stops both. See [Detection research guide](../docs/DETECTION_RESEARCH_GUIDE.md) for exact controls, measurements, limits and validation steps. Saved profiles now use v2 with an additive research section; existing v1 profiles remain readable.

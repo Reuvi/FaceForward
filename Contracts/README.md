@@ -121,3 +121,5 @@ invalid, disable all output. Never reuse a last active sample indefinitely.
 
 Future gamepad controls should extend/version the contract deliberately. Do not
 reuse pointer-axis keys with different meanings in another lane.
+
+The additive [local detection research interface](RESEARCH_LAB.md) defines selected-face scalar features, experimental ordered preview events and profile v2. It preserves the original SignalFrame and mouse-preview contracts.

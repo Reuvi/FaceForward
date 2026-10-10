@@ -164,7 +164,7 @@ comfortable poses; the learned ratio bands cannot resolve every occlusion or gaz
 
 New detector presets use version 2 with the two per-eye raw limits. Version 1 presets
 still load with their original single threshold; the UI requests guided recalibration
-for open-pose coverage. The containing `face_mouse_profile_v1` format is unchanged.
+for open-pose coverage. The detector preset remains compatible; the combined App now writes `face_mouse_profile_v2` with an additive research section and still reads v1.
 The legacy per-eye `collect()` API remains for developer regression tests, not UI use.
 
 ## 2. Vertical head movement
@@ -439,3 +439,7 @@ The combined synthetic GUI completed the guide, returned with both fits ready an
 showed a dark held trace for an unknown left eye while the right remained valid.
 The 490-frame combined demo still exercised all four mouse actions and released
 output at EOF. Human testing of the wider target positions is still required.
+
+## Research measurements in the combined App
+
+App now requests MediaPipe expression coefficients alongside the existing local landmarks/pose. `research_features.py` exposes selected-face, quality-gated scalar measurements and `gaze_research.py` owns optional calibrated viewport regression. The standalone detector remains a component tool. Use **App → Detection research** for labeled blink/wink trials, supporting-feature scopes, model comparisons and gaze target collection. See [Detection research guide](../docs/DETECTION_RESEARCH_GUIDE.md); none of these synthetic checks establish real-person accuracy.

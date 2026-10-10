@@ -325,3 +325,7 @@ Repeatable settings and capture/source timing make it possible to tell a detecto
 problem from a Processing filter or future driver problem. Record what was
 observed, including unavailable features, rather than marking the entire pipeline
 as working because one layer succeeded.
+
+## Temporal detection research increment
+
+See [Detection research testing guide](DETECTION_RESEARCH_GUIDE.md) for blink/wink trial labels, duration histograms, supporting-feature ablations, alternative mappings and gaze evaluation. Native research UI checks are included under `RUN_TK_TESTS=1`. The new benchmark is `python3 -m Processing.research.benchmark`; like other synthetic checks it excludes camera/inference/UI.

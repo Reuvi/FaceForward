@@ -24,6 +24,7 @@ class Observation:
     eyes: dict = field(default_factory=dict)
     # Optional detector-only diagnostics. Legacy camera users do not request pose.
     rotation: object = None
+    expressions: dict = field(default_factory=dict)
 
 
 def observation_from_landmarks(landmarks, width, height):
@@ -72,12 +73,13 @@ def observation_from_landmarks(landmarks, width, height):
 class MediaPipeDetector:
     """Synchronous VIDEO mode: at most one inference in flight, at most two faces."""
 
-    def __init__(self, model_path, *, include_pose=False):
+    def __init__(self, model_path, *, include_pose=False, include_expressions=False):
         self.model_path = Path(model_path).expanduser()
         if not self.model_path.is_file():
             raise FileNotFoundError(f"Face Landmarker model not found: {self.model_path}")
         self.landmarker = None
         self.include_pose = include_pose
+        self.include_expressions = include_expressions
         self._session = self._sequence = self._capture_time = self._inference_time = None
 
     def __enter__(self):
@@ -92,6 +94,7 @@ class MediaPipeDetector:
             running_mode=mp.tasks.vision.RunningMode.VIDEO,
             num_faces=2,
             output_facial_transformation_matrixes=self.include_pose,
+            output_face_blendshapes=self.include_expressions,
         )
         self.landmarker = mp.tasks.vision.FaceLandmarker.create_from_options(self.options)
         return self
@@ -129,6 +132,12 @@ class MediaPipeDetector:
             if len(matrices) == len(observations):
                 for observation, matrix in zip(observations, matrices):
                     observation.rotation = rotation_from_matrix(matrix)
+        if getattr(self,"include_expressions",False):
+            groups = getattr(result, "face_blendshapes", ())
+            if len(groups) == len(observations):
+                for observation, categories in zip(observations, groups):
+                    observation.expressions = {c.category_name: float(c.score) for c in categories
+                                              if finite_number(c.score) and 0 <= c.score <= 1}
         return observations
 
     def close(self):

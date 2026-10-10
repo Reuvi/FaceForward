@@ -86,7 +86,7 @@ class Scope(ttk.Frame):
         channel_runs = []
         for channel, key in enumerate(self.keys):
             samples = ((row["t"], row.get(key), row.get("scope_context", 0)) for row in rows)
-            stepped = channel == 0 or key in ("left_out", "right_out")
+            stepped = channel == 0 or key in ("left_out", "right_out", "eye_overlap") or key.endswith("_qualified")
             runs = []
             for unknown, points in trace_runs(samples, step=stepped, start=end-8):
                 coords = []
@@ -194,8 +194,8 @@ class DesktopLab:
         label(header, self.heading, style="Title.TLabel").grid(row=1, column=0, sticky="w")
         label(header, self.subtitle, foreground=MUTED).grid(row=2, column=0, sticky="w", pady=(3, 0))
         header.columnconfigure(0, weight=1)
-        self.button(header, "Start preview", lambda: self.lab.action({"action": "arm"}), style="Start.TButton").grid(row=1, column=1, padx=5)
-        self.button(header, "Stop / Esc", lambda: self.lab.action({"action": "stop"})).grid(row=1, column=2, padx=5)
+        self.button(header, "Start preview", lambda: self.action("arm"), style="Start.TButton").grid(row=1, column=1, padx=5)
+        self.button(header, "Stop / Esc", lambda: self.action("stop")).grid(row=1, column=2, padx=5)
         self.status = tk.StringVar(value="Preview stopped")
         self.timing = tk.StringVar()
         status = ttk.Frame(self.root, padding=(23, 2, 23, 6)); status.pack(fill="x")

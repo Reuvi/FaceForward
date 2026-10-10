@@ -53,4 +53,13 @@ def demo_image(*, left_closed=False, right_closed=False, head=0.5,
     angle = math.radians((head - 0.5)*40)
     rotation = ((1., 0., 0.), (0., math.cos(angle), -math.sin(angle)), (0., math.sin(angle), math.cos(angle)))
     observation = Observation(Box(165/640, (45+offset)/480, 310/640, 390/480), tuple(points), rotation=rotation)
+    # Explicit synthetic coefficients for the native experiment fixture.
+    for side in ('left','right'):
+        ratio = left_ratio if side == 'left' else right_ratio
+        closed = (left_closed if side == 'left' else right_closed) if ratio is None else ratio < .08
+        for name, value in (('eyeBlink',.95 if closed else .08),('eyeSquint',.65 if closed else .05),
+                            ('cheekSquint',.45 if closed else .04),('browDown',.3 if closed else .03),
+                            ('mouthSmile',.05),('eyeWide',.1)):
+            observation.expressions[name+side.title()] = value
+    observation.expressions.update(browInnerUp=.05,jawOpen=.3)
     return bgr, [observation]

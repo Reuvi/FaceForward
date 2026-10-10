@@ -1,5 +1,12 @@
 # Detection reliability: gesture intent, personal capabilities and head-compensated gaze
 
+Implementation update: the first small-model experiment described here is now available
+in the unified App's Detection research tab. See [implemented behavior and testing guide](DETECTION_RESEARCH_GUIDE.md).
+This design remains the rationale; actual defaults, acceptance rules and limitations are
+specified in that guide. Neural models, nonlinear pose-conditioned thresholds and
+single-eye gaze fallbacks remain conditional follow-ups requiring additional evidence.
+
+
 Proposal dated 2026-10-10, based on runtime commit `6ed296e`. This is an engineering
 plan, not implemented behavior or a claim of live-person accuracy. It responds to
 Reuvi's research notes in the main coordination chat. Keep the native Python/Tk
