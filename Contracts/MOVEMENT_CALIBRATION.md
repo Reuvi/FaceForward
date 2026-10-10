@@ -12,10 +12,20 @@ Raw graphs use physical/detector units; calibrated graphs use personal coordinat
 Tab changes do not change a measurement or recalibrate it. Active guided movement
 collection pauses output and is cancelled if its instructions are hidden.
 
-Head MVP is vertical Y. An explicit selector chooses whole-head image translation
-(nose bridge Y / image height) or nod/pitch (degrees). Changing this choice clears
-only head calibration. A guided neutral/up/down training pass is followed by new
-neutral/up/down checks. Up=0, neutral=.5, down=1 irrespective of pitch sign.
+Head MVP is vertical Y from nod/pitch (degrees), with no measurement-mode choice
+in the calibration UI or its settings editor. A guided neutral/up/down training
+pass is followed by new neutral/up/down checks. Learned comfortable up=0,
+neutral=.5, down=1 irrespective of pitch sign or unequal movement ranges. Each
+half maps linearly to use the full normalized range; no fixed degree range sets
+the output. Raw degree displays use the learned limits once available, while
+normalized graphs stay 0–1. Small overshoot uses the existing endpoint tolerance;
+larger out-of-range or unavailable measurements remain invalid.
+
+Runtime/settings use pitch. Legacy position-mode presets are fully validated
+before converting settings to pitch and removing only the incompatible head fit.
+Compatible eyes/winks/tongue data are retained under their existing rules. Older
+presets without an explicit mode are interpreted as the old position default.
+New saves explicitly name pitch; preset v5 and combined profile v3 are unchanged.
 Head X is reserved and remains unavailable.
 
 Tongue appearance remains experimental local color segmentation with manual

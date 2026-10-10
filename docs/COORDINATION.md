@@ -1,6 +1,15 @@
 # Main chat and agent coordination hub
 
-## Current separate eye guides task
+## Current head pitch range task
+
+Claim: Reuvi integration, `work/reuvi/integration/head-pitch-range`, base
+`d539a78`. Scope: Vision head configuration/calibration/preset migration/display,
+App command wiring, relevant tests and documentation. Remove the head measurement
+choice; use pitch and show learned up/neutral/down as 0/.5/1. Preserve unrelated
+fits and migrate old position presets without treating image fractions as degrees.
+Contract first: [MOVEMENT_CALIBRATION.md](../Contracts/MOVEMENT_CALIBRATION.md).
+
+## Previous separate eye guides handoff (d539a78)
 
 Claim: Reuvi integration, `work/reuvi/integration/separate-eye-guides`, base
 `f4eb12c`. Authorized scope: Vision's eye geometry/appearance guides and rest UI,
