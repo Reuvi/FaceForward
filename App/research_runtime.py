@@ -228,6 +228,17 @@ class ResearchSession:
         if self.fixations and self.fixations.active:
             self.fixations = None
 
+    def restart_source(self):
+        """Keep learned user parameters; reset only live capture/control state."""
+        self.stop("Source restarted; calibration retained")
+        self.processor.reset(clear_context=True)
+        self.packet = None
+        self.guide_groups = {}
+        self.was_guiding = self.calibrating = False
+        self.fixations = None
+        self.gaze_ready = False
+        self.revision += 1  # Discard pending fit results from the previous capture.
+
     def observe(self, frame, packet, base, guide=None, calibrating=False):
         if packet is None:
             self.stop("No selected research subject")
@@ -353,7 +364,7 @@ class ResearchSession:
             <= self.clock() - self.packet["timestamp_ms"]
             <= self.processor.config["stale_ms"]
         ):
-            raise ValueError("Select a fresh face first")
+            raise ValueError("Wait for a fresh face detection first")
         if self.fixations and self.fixations.active:
             raise ValueError("Finish/cancel gaze calibration first")
         if self.processor.trial:

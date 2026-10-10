@@ -34,8 +34,8 @@ python3 -m App
 
 | Source in the app | Purpose | Calibration/profile behavior |
 | --- | --- | --- |
-| Detector demo (synthetic pixels) | Automatically exercise guided eye calibration | Select `subject-0`; Start eye calibration; the fixture follows the guide, then cycles independent closures; saves synthetic profiles |
-| Camera (live calibration) | Test your actual facial measurements | Select your face; calibrate or load a camera profile; validate on your current image |
+| Detector demo (synthetic pixels) | Automatically exercise guided eye calibration | Single user attaches automatically; Start eye calibration; the fixture follows the guide, then cycles independent closures; saves synthetic profiles |
+| Camera (live calibration) | Test your actual facial measurements | Face attaches automatically; calibrate or load a camera profile; validate on your current image |
 | Vision demo (synthetic) | Automatic four-action Processing regression | Supplies prebuilt valid SignalFrames; no detector training or face profile |
 | Vision replay (NDJSON) | Inspect recorded synthetic SignalFrame sequences | Select a subject; preserves input timing; no images or calibration collection |
 
@@ -45,9 +45,9 @@ The requested FPS takes effect on source start; actual Hz and capture age are sh
 
 ## Calibrate, then use the original lab
 
-1. On **Vision source & raw signals**, select your visible ID and press
-   **Use selected subject**. A dropdown choice alone is not selection. A tracker ID
-   is session-local, not biometric identity. Selection resets/disarms Processing.
+1. On **Vision source & raw signals**, start Camera or Detector demo. Your face
+   attaches automatically as **single-user**. No face selection is needed. The app
+   assumes one operator; it does not identify people.
 2. Open **Detection calibration → 1 Eyes**. Set **Rest between steps (seconds)**
    (default 3; 0–30 supported), press **Test sound**, then **Start eye
    calibration**. A temporary full-screen native window opens. Follow the dot with
@@ -67,7 +67,7 @@ The requested FPS takes effect on source start; actual Hz and capture age are sh
    Focus on this eye test before proceeding to head/tongue.
 3. In **2 Head Y**, capture NEUTRAL, UP, DOWN. Default measurement is vertical
    position of the nose bridge divided by image height. For nodding, choose
-   `head_mode: "pitch"` in detector Settings **before** selecting/calibrating; it
+   `head_mode: "pitch"` in detector Settings **before** calibrating; it
    uses degrees from the facial transform. Applying detector settings clears fits.
 4. In **3 Tongue**, capture an EMPTY open mouth, freeze a visible tongue, mark
    tongue-only tissue, and fit the appearance model. Run **Validate ABSENT** with
@@ -109,7 +109,7 @@ in [the detector runbook](../Vision/DETECTION_LAB.md). Transfer functions are in
 
 ### Camera-free calibration exercise
 
-In `detector-demo`, select `subject-0`, then press **Start eye calibration** in
+In `detector-demo`, press **Start eye calibration** in
 Detection calibration. The generated pixels and landmarks follow all seven steps
 without manual switches; after completion the fixture cycles left, right and both
 closures. Start preview to inspect the resulting clicks in Live lab. This exercises
@@ -121,8 +121,8 @@ head/tongue fixtures. For the automatic four-action mouse exercise, use `python3
 ## Saved face + mouse profiles
 
 **Save active profile** writes a versioned local JSON file, by default under ignored
-`local-profiles/`. At least one fitted detector and a fresh selected face are
-required. A left-eye-only profile is valid; it does not calibrate the other eye.
+`local-profiles/`. At least one completed detector fit is required; saving works
+while stopped or while your face is unavailable. A left-eye-only profile is valid; it does not calibrate the other eye.
 
 | Saved section | Contents |
 | --- | --- |
@@ -138,17 +138,24 @@ Detector presets now use version 2; version 1 is accepted with its original sing
 eye threshold. Recalibrate legacy eye profiles to add open-pose coverage.
 Saving does not activate anything; it records the current applied configuration.
 
-To reuse: start the matching source → **Use selected subject** → **Load profile
-for face**. App validates the whole profile before applying it, attaches it to that
-currently selected face, restores Processing settings, and leaves preview stopped.
+To reuse: choose/start the matching Camera or Detector demo source, then click
+**Load saved profile** and choose your JSON. Loading also works after stopping the
+source or while your face is unavailable. App validates the whole profile, applies
+it to the single user, restores Processing settings, and leaves preview stopped.
 Camera and synthetic profiles cannot be mixed. Check eye/head readings again;
 repeat tongue ABSENT and VISIBLE checks under current lighting. If those fail,
 recollect tongue training. Loaded color prototypes do not retain training samples.
 
-Stop, stale input, track loss, restart, selecting a face again, or detector settings
-changes clear the active calibration binding. The saved file remains. Select again
-and explicitly reload/recalibrate; a bystander never inherits it automatically.
-The source tab shows the file name and whether it is attached to the current face.
+Head motion, brief loss, stale frames, Stop source and restart of the same source
+retain your completed eye/head/tongue and research fits in memory. Detection resumes
+when the face returns; click **Start preview** separately to resume mouse testing.
+An unfinished calibration capture is cancelled. Restart requires fresh tongue/gaze
+checks but keeps their models. Changing source kind, applying detector Settings,
+or **Detection calibration → Settings → Reset all calibration** clears the fits.
+Closing the app clears memory: save a JSON first and load it next time.
+The source tab shows the saved profile name independently of tracking status.
+Only one person should use the camera; there is no identity recognition or automatic
+profile choice for different people. Load the appropriate file when changing users.
 After further edits, save again to preserve current values. Detector Settings
 **Save JSON** saves only detector tunables; Transfer settings export saves only
 Processing settings. Neither is a substitute for **Save active profile**.
@@ -156,7 +163,7 @@ Processing settings. Neither is a substitute for **Save active profile**.
 ## Stop and runtime boundaries
 
 **Stop / Escape** immediately disables preview but keeps measurement running.
-**Stop source** also stops capture and clears active calibration. Calibration
+**Stop source** also stops capture and retains completed calibration. Calibration
 captures/changes and profile loading disarm preview. Leaving an active guided Eyes
 sequence cancels it; completed fits survive tab changes.
 Close the window to shut down the source and Processing workers.
@@ -212,7 +219,7 @@ tongue false-positive measurement are still required.
 
 The original automatic demo and replay still work; see [the testing companion](../docs/TESTING_GUIDE.md)
 for their timeline and assertions. `--config` loads Processing tunables only;
-combined profile loading is deliberately through the selected-face UI. The emulator
+combined profile loading is through **Load saved profile** in the source tab. The emulator
 message format, units, transport and OS output remain the next Drivers handoff.
 See [the adopted contract](../Contracts/MOUSE_MVP.md) and
 [main chat coordination](../docs/COORDINATION.md) before changing those boundaries.

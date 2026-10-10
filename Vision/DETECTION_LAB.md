@@ -20,8 +20,8 @@ Requires Python 3.10+, Tk and `Vision/requirements.txt`; tested on Python 3.12.5
 Apple Silicon macOS, MediaPipe 0.10.35 and OpenCV 4.13.0. Tk comes with Python,
 not pip. Stop other camera consumers before camera mode. Inference stays local.
 
-1. On **Vision source & raw signals**, choose your session-local ID and press
-   **Use selected subject**; even one face must be selected deliberately.
+1. On **Vision source & raw signals**, start the source. The single visible face
+   attaches automatically; there is no manual subject selection for camera testing.
 2. Open **Detection calibration** and work through **1 Eyes**, **2 Head Y** and
    **3 Tongue**. Focus on eyes first; head/tongue testing can wait.
 3. Watch prepare countdown → usable/rejected counts → fit result. Default capture
@@ -29,13 +29,15 @@ not pip. Stop other camera consumers before camera mode. Inference stays local.
 4. Keep preview stopped while inspecting detections. To test the mapping, open
    **Live lab**, center/open, then **Start preview**. Calibration changes disarm it.
 5. Use **Save active profile** on the source tab to save fits plus Processing settings.
-   After stop/loss/restart, select again and **Load profile for face**. Tongue needs
-   fresh absent/visible checks. See [profile semantics](../App/README.md#saved-face--mouse-profiles).
+   Motion/loss and same-source restart retain completed fits. Use **Load saved
+   profile** to restore a JSON, including while stopped or without a visible face.
+   Loading/restarting requires fresh tongue absent/visible checks. See [profile semantics](../App/README.md#saved-face--mouse-profiles).
 
 For isolated Vision development only, `python -m Vision.lab --demo` or
 `python -m Vision.lab --camera --model Vision/.local/face_landmarker.task` opens the
 same view with its own source worker and no Processing. With neither flag it opens
-with camera off. Its **Select face**, **Stop / clear**, and source controls replace
+with camera off. Its automatic single-user attachment, **Stop (keep calibration)**,
+and source controls replace
 App's source tab. Its tunables export is not a full profile; use App for profiles.
 Do not launch both camera entry points together.
 
@@ -94,8 +96,8 @@ eyes after the displayed duration and inspect the screen; source loss cancels ca
 fits, then starts from center. It leaves head/tongue fits alone. **Cancel** stops the
 sequence without restoring old eye fits and closes the popup. Leaving the Eyes tab or minimizing the window cancels an active
 sequence so unseen instructions cannot collect mislabeled samples. Completed fits
-survive normal tab changes. Settings changes, track loss or Stop source still clear
-all fits as before. Preview stays disarmed during every guided phase.
+survive normal tab changes, track loss and Stop source. Applying detector Settings
+or Reset all calibration clears fits. Preview stays disarmed during every guided phase.
 
 The program waits for each full-screen rest/target prompt to be mapped and painted
 before starting that phase's clock. Rest uses `eye_rest_ms`, records no geometry or
@@ -184,7 +186,7 @@ The legacy per-eye `collect()` API remains for developer regression tests, not U
 
 Two explicit measurements are supported. Default **position** matches movement
 of the tracked point up/down in the image. To test nodding instead, set
-`"head_mode": "pitch"` in **Settings**, click **Apply settings**, reselect, and
+`"head_mode": "pitch"` in **Settings**, click **Apply settings**, and
 recalibrate. Applying settings clears all channels, so choose the mode first.
 
 | Mode | Raw measurement and units | What changes it |
@@ -354,12 +356,13 @@ in session memory. Real camera video recording/replay is not implemented.
 
 Stop clears outputs immediately. A still-stopping camera worker blocks another
 start until it exits; closing waits at most two seconds for backend cleanup.
-No-face, loss/ambiguity of the selected track, source failure/restart, or age beyond
-`stale_ms` clears selection/calibration. Good frames cannot silently load it again.
-Transient image-quality failure invalidates affected current measurements while
-retaining the selected track's calibration for recovery. IDs are geometric tracks,
-not biometric identities; visually similar people replacing one another without
-an observable gap cannot be guaranteed distinct by this tracker.
+No-face, source failure, or age beyond `stale_ms` clears current measurements and
+cancels unfinished capture, while retaining completed calibration. The sole face
+automatically resumes detection on return. Same-source restart keeps learned fits
+but clears tongue validation; preview remains disarmed. Geometric movement does not
+change the logical `single-user` slot. MediaPipe requests one face; this assumes one
+operator and is not identity recognition. Load a different profile or reset for a
+different person. See [the single-user test guide](../docs/SINGLE_USER_TESTING.md).
 
 ## Tests and remaining live evidence
 

@@ -24,11 +24,14 @@ and lane documentation here. Put shared-change requests in `interface-requests/`
 - Persist local user/device profiles; keep detector parameters separate from device
   mappings. The adopted `face_mouse_profile_v1` is documented in
   `../Contracts/MOUSE_MVP.md`: Processing owns storage/top-level validation,
-  Vision owns detector validation, App owns fresh selected-face binding and disarming.
+  Vision owns detector validation, App owns single-user profile application and disarming;
+  camera reacquisition
+  retains calibration, while loading may occur without a current face.
   Coordinate further shared profile changes with integration.
 - Buttons are states, not repeated clicks. Use elapsed milliseconds for dwell; a
   frame count must not change behavior when sampling rate changes.
-- Only process the explicitly selected subject/profile. Invalid or stale required
+- Only process the subject/profile supplied by App (`single-user` for calibrated
+  camera/demo; explicitly selected IDs for legacy replay). Invalid or stale required
   signals disable affected output; loss of the selected subject disables all output.
 - Own oscilloscope traces and configuration screens; consume Vision's overlay via
   its public interface. App owns startup, camera lifecycle, and final wiring.

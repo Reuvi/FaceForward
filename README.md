@@ -46,6 +46,9 @@ Read [the complete MVP runbook](App/README.md),
 
 ## Read while testing and developing
 
+The app now uses one person: calibration survives head motion, brief loss and same-source
+restart. See [single-user testing and saved-profile instructions](docs/SINGLE_USER_TESTING.md).
+
 - [Raw detection guide](docs/RAW_DETECTION_GUIDE.md): which facial detectors exist,
   how the ML and calibration work, what is missing, and camera-only diagnostics.
 - [Testing companion](docs/TESTING_GUIDE.md): step-by-step exercises, expected

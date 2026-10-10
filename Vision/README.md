@@ -161,7 +161,7 @@ watchdog; the integration lifecycle is still to be agreed.
 - `OpenCVCamera(..., clock=...)` is a context manager returning
   `CapturedImage(envelope, bgr)` from `read()`.
 - `MediaPipeDetector(model_path)` is a context manager. `detect(captured)`
-  returns up to two landmark observations and uncalibrated eye ratios.
+  returns at most one landmark observation and uncalibrated eye ratios.
 - `VisionPipeline.process(captured, observations)` assigns IDs and returns
   a complete SignalFrame. Array order never defines identity.
 - `AxisCalibration.fit(low, center, high, min_separation=...)` fits robust
@@ -178,7 +178,9 @@ watchdog; the integration lifecycle is still to be agreed.
   positions. Nothing currently detects or supplies that centroid.
 
 The legacy pipeline binding is memory-only. App can save the new detector fits in
-a versioned local profile, then explicitly load them for a currently selected face. The pipeline clears its binding on loss, ambiguous
+a versioned local profile and load them for the single user, even without a visible
+face. The App workbench preserves these fits through tracking loss and restart.
+The legacy developer pipeline (separate from that workbench) clears its binding on loss, ambiguous
 reassociation, a long gap, or session change. Reacquisition requires a deliberate
 new binding. A bystander cannot inherit the missing person's binding. The
 geometric tracker is conservative but not a biometric identity verifier; a

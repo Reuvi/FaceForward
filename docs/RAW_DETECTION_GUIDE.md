@@ -1,5 +1,10 @@
 # Raw detection status and where to test it
 
+Current single-user update: calibrated camera/demo attaches the sole face automatically,
+keeps calibration through motion/loss and same-source restart, and supports saved-file
+loading while tracking is paused. Earlier explicit-selection/loss-reset descriptions
+below are historical. See [the current test procedure](SINGLE_USER_TESTING.md).
+
 Updated October 10, 2026: use **Detection calibration inside the combined App**.
 The calibrated measurements now also reach the existing Processing scopes and
 simulated mouse. Keep preview stopped to focus on detection only.

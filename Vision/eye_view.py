@@ -211,9 +211,9 @@ class EyeGuidePanel:
                 self.sounds.play("cancel")
             self.event=None
             self.title.set("Calibration stopped — open your eyes" if self.aborted else "Calibrate eyes in one guided pass")
-            self.instruction.set("Select a visible face if needed, then Start again." if self.aborted else "Start opens a full-screen guide. Follow the dot comfortably.\nThen close gently and reopen at the sound.")
+            self.instruction.set("Wait until your face is visible, then Start again." if self.aborted else "Start opens a full-screen guide. Follow the dot comfortably.\nThen close gently and reopen at the sound.")
             self.progress.set(CUE_LEGEND)
-            self.target.create_text(w/2,h/2,text="Select a face, then press Start",fill="#c2d0df",font=("Arial",14))
+            self.target.create_text(w/2,h/2,text="Look at the camera, then press Start",fill="#c2d0df",font=("Arial",14))
             return
         self.aborted=False
         event=(state["generation"],guide["index"],guide["active"],guide["phase"])

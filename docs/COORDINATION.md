@@ -321,3 +321,29 @@ other controls are unchanged. Writable paths: `Vision/eye_view.py`, this handoff
 Verification: all 6 existing native calibration-window tests pass; the App's `clam`
 theme resolves dark text/arrows on light fields in normal, focused, active and
 disabled states. Compilation, whitespace and integration scope checks pass.
+
+
+## Single-user calibration handoff (October 10)
+
+- Lane/task/branch: integration; persistent single-user detection;
+  `work/reuvi/integration/single-subject`; base `86f8e17`.
+- Contract commit: `38abdc6`. This explicitly supersedes earlier tracker-bound
+  selection and calibration-clear-on-loss behavior at Reuvi's request.
+- Changed: Vision camera options, workbench lifecycle and calibration displays;
+  App single-user attachment, source/research/profile lifecycle and native UI;
+  Vision/integration regressions, active guides, and agent instructions.
+- Implemented: one-face MediaPipe inference, stable logical `single-user`, retained
+  eye/head/tongue/research fits across movement/absence/staleness/restart, automatic
+  detection recovery with preview still stopped, saved-profile loading/export
+  without a current face, and explicit Reset all calibration. Replay retains its
+  legacy selector. Unknown eye holds and per-capture known flags are preserved.
+- Verified: 85 Vision tests including the local model smoke check; 51 integration
+  tests including native Tk; 64 Processing tests; 7 tooling tests. All 207 pass.
+  Changed Python files pass Ruff F checks; integration scope and diff whitespace
+  checks pass. Test commands are the existing unittest discovery commands with
+  `VISION_MODEL_PATH` for Vision and `RUN_TK_TESTS=1` for integration.
+- Runbook: `docs/SINGLE_USER_TESTING.md` covers camera testing, persistence boundaries,
+  save/load, reset, and the implementation. Restart keeps models but requires fresh
+  tongue/gaze validation; changing source kind intentionally clears in-memory fits.
+- Remaining: real-person camera accuracy still needs user testing. The one-person
+  assumption does not identify different people. No OS driver or format changes.

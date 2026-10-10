@@ -396,7 +396,7 @@ class ResearchView:
             or self.core.clock() - self.core.packet["timestamp_ms"]
             > self.core.processor.config["stale_ms"]
         ):
-            raise ValueError("Select a fresh face")
+            raise ValueError("Wait for a fresh face detection")
         for key in ("x", "y"):
             value = self.core.packet["values"].get("face_" + key)
             if value is None:

@@ -7,6 +7,9 @@ from time import monotonic
 from uuid import uuid4
 
 
+# The calibrated app's single operator slot; not a biometric identity.
+SINGLE_SUBJECT = "single-user"
+
 SIGNALS = (
     "gaze_x", "gaze_y", "tongue_x", "tongue_y",
     "left_eye_open", "right_eye_open", "head_x", "head_y",

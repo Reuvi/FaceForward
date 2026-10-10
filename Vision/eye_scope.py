@@ -43,7 +43,7 @@ def draw_eye_scope(canvas, state):
             y=bottom-bit*(bottom-top-30)
             canvas.create_text(8,y,text=title,fill="#adbbcc",anchor="w",font=("Arial",9))
             canvas.create_line(65,y,w-10,y,fill="#354555")
-        for unknown, segment in binary_runs(rows,side+"_closed_bit",state["selected"],state["generation"],state["config"]["stale_ms"],start):
+        for unknown, segment in binary_runs(rows,side+"_closed_bit",state.get("scope_subject",state["selected"]),state["generation"],state["config"]["stale_ms"],start):
             points=[]
             for t,bit in segment:
                 points.extend((65+(t-start)/8000*(w-75),bottom-bit*(bottom-top-30)))

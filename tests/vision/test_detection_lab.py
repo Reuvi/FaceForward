@@ -18,7 +18,7 @@ if AVAILABLE:
     from Vision.features import DetectionConfig, analyze_features, image_quality, pitch_degrees, rotation_from_matrix
     from Vision.lab_runtime import LabRuntime
     from Vision.landmarks import MediaPipeDetector
-    from Vision.signals import Envelope, validate_frame
+    from Vision.signals import SINGLE_SUBJECT, Envelope, validate_frame
     from Vision.tongue import TongueModel, mouth_crop, sample_colors
     from Vision.workbench import DetectorWorkbench
 
@@ -224,17 +224,22 @@ class WorkbenchTests(unittest.TestCase):
         self.assertFalse(self.feed(tongue=True)["tongue_x"]["valid"])
         self.assertEqual(self.core.validation,{})
 
-    def test_no_face_staleness_and_new_session_clear_selection(self):
-        self.eyes();self.feed(blank=True)
+    def test_no_face_staleness_and_restart_preserve_fits_and_auto_attach(self):
+        self.eyes()
+        fits = self.core.export_calibration()
+        generation = self.core.generation
+        self.feed(blank=True)
         self.assertIsNone(self.core.selected)
-        self.assertFalse(self.core.eyes)
-        self.feed();self.core.select(self.core.frame["faces"][0]["subject_id"])
-        self.now+=251
+        self.assertEqual(self.core.export_calibration(), fits)
+        self.assertTrue(self.feed()["left_eye_open"]["valid"])
+        self.assertEqual(self.core.selected, SINGLE_SUBJECT)
+        self.now += 251
         self.assertIsNone(self.core.state()["selected"])
-        self.feed();self.core.select(self.core.frame["faces"][0]["subject_id"])
-        self.session="new-session"
-        self.feed()
-        self.assertIsNone(self.core.selected)
+        self.assertEqual(self.core.export_calibration(), fits)
+        self.session = "new-session"
+        self.assertTrue(self.feed()["right_eye_open"]["valid"])
+        self.assertEqual(self.core.selected, SINGLE_SUBJECT)
+        self.assertEqual(self.core.generation, generation)
 
     def test_poor_visibility_and_failed_recapture_never_reuse_old_fit(self):
         self.eyes()
@@ -245,6 +250,15 @@ class WorkbenchTests(unittest.TestCase):
         self.collect("left_closed",left_closed=True)
         self.assertFalse(self.feed()["left_eye_open"]["valid"])
         self.assertTrue(self.feed()["right_eye_open"]["valid"])
+
+    def test_capture_gap_cancels_unfinished_collection_keeps_other_fits(self):
+        self.eyes()
+        fits = self.core.export_calibration()
+        self.core.collect("head_neutral")
+        self.now += 300
+        self.feed()
+        self.assertIsNone(self.core.job)
+        self.assertEqual(self.core.export_calibration(), fits)
 
     def test_failed_overlap_no_partial_fit_and_atomic_bad_settings(self):
         self.collect("left_open");self.collect("left_closed")
@@ -260,21 +274,20 @@ class WorkbenchTests(unittest.TestCase):
         self.assertNotIn("left_open",self.core.samples)
         self.assertIn("Rejected",self.core.notice)
 
-    def test_selected_loss_does_not_transfer_to_bystander(self):
+    def test_multiple_injected_faces_pause_without_discarding_calibration(self):
         self.eyes()
-        bgr,obs=demo_image()
-        first=obs[0]
-        first.box=replace(first.box,x=.05,width=.35)
-        bystander=replace(first,box=replace(first.box,x=.65,width=.3))
-        # New session explicitly selected with two non-overlapping boxes.
-        self.session="two-faces";self.now+=25;self.sequence+=1
-        self.core.process(CapturedImage(Envelope(self.session,self.sequence,self.now),bgr),[first,bystander])
-        subject=self.core.frame["faces"][0]["subject_id"]
-        self.core.select(subject)
-        self.now+=25;self.sequence+=1
-        self.core.process(CapturedImage(Envelope(self.session,self.sequence,self.now),bgr),[bystander])
+        fits = self.core.export_calibration()
+        bgr, obs = demo_image()
+        first = obs[0]
+        first.box = replace(first.box, x=.05, width=.35)
+        second = replace(first, box=replace(first.box, x=.65, width=.3))
+        self.now += 25; self.sequence += 1
+        frame = self.core.process(CapturedImage(Envelope(self.session, self.sequence, self.now), bgr), [first, second])
+        self.assertEqual(frame["faces"], [])
         self.assertIsNone(self.core.selected)
-        self.assertTrue(all(not item["valid"] for item in self.core.frame["faces"][0]["signals"].values()))
+        self.assertIn("Multiple faces", self.core.notice)
+        self.assertEqual(self.core.export_calibration(), fits)
+        self.assertTrue(self.feed()["left_eye_open"]["valid"])
 
     def test_recalibration_invalidates_immediately_and_blocks_mixed_tongue_jobs(self):
         self.eyes()
@@ -285,13 +298,13 @@ class WorkbenchTests(unittest.TestCase):
         with self.assertRaises(ValueError):self.core.freeze_mouth()
         self.core.cancel()
 
-    def test_duplicate_envelope_clears_and_raises(self):
+    def test_duplicate_envelope_pauses_but_keeps_fits(self):
         self.eyes()
         bgr,obs=demo_image()
         with self.assertRaises(ValueError):
             self.core.process(CapturedImage(Envelope(self.session,self.sequence,self.now),bgr),obs)
         self.assertIsNone(self.core.selected)
-        self.assertFalse(self.core.eyes)
+        self.assertEqual(set(self.core.eyes), {"left", "right"})
 
 
 @unittest.skipUnless(AVAILABLE,"Install Vision requirements for source lifecycle tests")

@@ -145,13 +145,16 @@ class PipelineTests(unittest.TestCase):
     @unittest.skipUnless(all(importlib.util.find_spec(n) for n in ("cv2", "numpy")), "Install Vision requirements for camera adapter")
     def test_camera_adapter_exposes_raw_ratios_without_fabricated_controls(self):
         clock = self.clock
-        observation = Observation(Box(0.1, 0.1, 0.3, 0.4), (), eyes={"left": EyeRatios(0.42, -0.02, 0.24)})
+        from Vision.demo_detection import demo_image
+        image, observations = demo_image()
+        observation = observations[0]
+        observation.eyes["left"] = EyeRatios(0.42, -0.02, 0.24)
 
         class Camera:
             def __init__(self, *args, **kwargs): pass
             def __enter__(self): return self
             def __exit__(self, *args): pass
-            def read(self): return CapturedImage(Envelope("camera-stub", 0, clock()), None)
+            def read(self): return CapturedImage(Envelope("camera-stub", 0, clock()), image)
 
         class Detector(Camera):
             def detect(self, captured): return [observation]
@@ -159,7 +162,7 @@ class PipelineTests(unittest.TestCase):
         with patch("Vision.capture.OpenCVCamera", Camera), patch("Vision.landmarks.MediaPipeDetector", Detector):
             self.session._camera(0, "stub-model", 30, False, 1)
         state = self.session.state()
-        self.assertEqual(state["observations"]["subject-0"]["eyes"]["left"]["openness"], 0.24)
+        self.assertEqual(state["observations"]["single-user"]["eyes"]["left"]["openness"], 0.24)
         self.assertTrue(all(not item["valid"] for item in state["frame"]["faces"][0]["signals"].values()))
 
 

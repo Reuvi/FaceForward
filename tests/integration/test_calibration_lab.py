@@ -1,6 +1,8 @@
 """Pixels → calibrated measurements → real Processing, without camera or OS input."""
 
 from copy import deepcopy
+from dataclasses import replace
+from unittest.mock import patch
 import importlib.util
 import tempfile
 import unittest
@@ -14,7 +16,7 @@ AVAILABLE = all(importlib.util.find_spec(name) is not None for name in ("cv2", "
 if AVAILABLE:
     from Vision.capture import CapturedImage
     from Vision.demo_detection import demo_image
-    from Vision.signals import Envelope
+    from Vision.signals import SINGLE_SUBJECT, Envelope
     from Vision.presets import decode_preset
 
 
@@ -30,13 +32,16 @@ class UnifiedCalibrationTests(unittest.TestCase):
         self.core = self.session.ensure_detector_runtime().workbench
         self.session.detector_command("configure", {"settle_ms":0,"collect_ms":400,"eye_rest_ms":100,"min_samples":8})
         self.feed()
-        self.session.select_subject(self.session.frame["faces"][0]["subject_id"])
+        self.assertEqual(self.core.selected, SINGLE_SUBJECT)
+        self.assertEqual(self.lab.runtime["subject_id"], SINGLE_SUBJECT)
 
-    def feed(self, blank=False, **controls):
+    def feed(self, blank=False, box=None, session_id="test", **controls):
         self.now += 25
         self.sequence += 1
         image, observations = demo_image(**controls)
-        self.session.deliver_detection(CapturedImage(Envelope("test",self.sequence,self.now),image),
+        if box is not None:
+            observations[0].box = replace(observations[0].box, **box)
+        self.session.deliver_detection(CapturedImage(Envelope(session_id,self.sequence,self.now),image),
                                        [] if blank else observations, preview=False)
         self.lab.step(self.now)
         return self.lab.state()["snapshot"]
@@ -86,6 +91,85 @@ class UnifiedCalibrationTests(unittest.TestCase):
         self.feed(left_closed=True)
         for sample in (self.lab.processor.eye_sample,self.session.research.processor.eye_sample):
             self.assertEqual(sample['left'],{'value':0.,'known':False})
+
+    def test_large_box_jump_loss_and_recovery_keep_fits_and_held_unknown_sample(self):
+        self.guided_eyes()
+        detector = self.core.export_calibration()
+        research = self.session.research.profile()
+        generation = self.core.generation
+        # This move/scale change would previously retire the geometric tracker ID.
+        self.feed(box={"x":.01, "y":.01, "width":.1, "height":.1})
+        self.assertEqual(self.core.selected, SINGLE_SUBJECT)
+        self.assertEqual(self.core.export_calibration(), detector)
+        self.lab.action({"action":"arm"}); self.hold()
+        self.assertEqual(self.hold(left_closed=True)["left_click"], 1)
+        self.feed(blank=True)
+        self.assertFalse(self.lab.processor.armed)
+        self.assertEqual(self.lab.state()["message"]["buttons"], {"left":0,"right":0})
+        for sample in (self.lab.processor.eye_sample, self.session.research.processor.eye_sample):
+            self.assertEqual(sample["sequence"], self.sequence)
+            self.assertEqual(sample["left"], {"value":1., "known":False})
+        self.feed(left_closed=True)
+        self.assertTrue(self.core.frame["faces"][0]["signals"]["left_eye_open"]["valid"])
+        self.assertEqual(self.core.export_calibration(), detector)
+        self.assertEqual(self.session.research.profile(), research)
+        self.assertEqual(self.core.generation, generation)
+        self.assertFalse(self.lab.processor.armed)
+        self.lab.action({"action":"arm"})
+        self.assertEqual(self.hold(left_closed=True)["left_click"], 0)
+        self.hold()
+        self.assertEqual(self.hold(left_closed=True)["left_click"], 1)
+
+    def test_same_source_restart_keeps_fits_source_switch_resets(self):
+        self.calibrate()
+        self.guided_eyes()
+        detector = self.core.export_calibration()
+        research = self.session.research.profile()
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)/"saved.json"
+            self.session.save_profile(path)
+            self.session.stop()
+            self.session.save_profile(path)  # Completed calibration can be saved while stopped.
+            with patch("App.mouse_runtime.threading.Thread") as thread:
+                thread.return_value.is_alive.return_value = False
+                self.session.start("detector-demo", preview=False)
+                self.feed(session_id="restarted")
+                self.assertTrue(self.session.state()["profile_bound"])
+                self.assertEqual(self.core.export_calibration(), detector)
+                self.assertEqual(self.session.research.profile(), research)
+                self.assertEqual(self.core.validation, {})
+                self.assertIsNotNone(self.core.tongue_model)
+                self.assertFalse(self.session.research.gaze_ready)
+                self.assertFalse(self.lab.processor.armed)
+                self.session.stop()
+                self.session.start("demo", preview=False)
+                self.assertFalse(self.core.eyes)
+                self.assertFalse(self.session.research.processor.fits)
+                self.assertFalse(self.session.state()["profile_bound"])
+
+    def test_load_saved_calibration_before_first_capture(self):
+        self.guided_eyes()
+        detector = self.core.export_calibration()
+        research = self.session.research.profile()
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)/"saved.json"
+            self.session.save_profile(path)
+            fresh = MouseSession(clock=lambda:self.now)
+            self.addCleanup(fresh.close)
+            fresh.mode = "detector-demo"
+            fresh.load_profile(path)
+            self.assertIsNone(fresh.frame)
+            self.assertEqual(fresh.detector_runtime.workbench.export_calibration(), detector)
+            self.assertEqual(fresh.research.profile(), research)
+            self.assertFalse(fresh.lab.processor.armed)
+            self.assertTrue(fresh.state()["profile_bound"])
+            image, observations = demo_image()
+            fresh.deliver_detection(CapturedImage(Envelope("fresh",0,self.now),image),observations,preview=False)
+            self.assertEqual(fresh.detector_runtime.workbench.selected,SINGLE_SUBJECT)
+            self.assertTrue(fresh.frame["faces"][0]["signals"]["left_eye_open"]["valid"])
+            fresh.detector_command("reset_calibration")
+            self.assertFalse(fresh.detector_runtime.workbench.eyes)
+            self.assertFalse(fresh.state()["profile_bound"])
 
     def test_guided_pixels_independence_unknown_and_profile_roundtrip(self):
         self.guided_eyes()
@@ -210,8 +294,8 @@ class UnifiedCalibrationTests(unittest.TestCase):
             self.assertNotIn("session_id",saved)
             self.assertNotIn("samples",saved["detector"])
             self.feed(blank=True)
-            self.assertFalse(self.session.state()["profile_bound"])
-            with self.assertRaises(ValueError):self.session.load_profile(path)
+            self.assertTrue(self.session.state()["profile_bound"])
+            self.session.load_profile(path)  # Loading works while the face is absent.
             self.feed()
             self.session.select_subject(self.session.frame["faces"][0]["subject_id"])
             self.session.load_profile(path)
@@ -256,19 +340,21 @@ class UnifiedCalibrationTests(unittest.TestCase):
             self.assertTrue(signals["left_eye_open"]["valid"])
             self.assertFalse(signals["right_eye_open"]["valid"])
             self.now+=300
-            with self.assertRaises(ValueError):self.session.load_profile(path)
+            self.session.load_profile(path)  # Stale camera data is not required for loading.
             self.assertIsNone(self.core.selected)
+            self.assertIn("left", self.core.eyes)
+            self.assertFalse(self.lab.processor.armed)
 
-    def test_stop_clears_current_binding_and_output(self):
+    def test_stop_preserves_calibration_and_releases_output(self):
         self.calibrate();self.lab.action({"action":"arm"});self.hold(tongue=True)
         self.assertEqual(self.hold(left_closed=True,tongue=True)["left_click"],1)
         self.session.stop()
         self.assertIsNone(self.core.selected)
-        self.assertFalse(self.core.eyes)
+        self.assertEqual(set(self.core.eyes), {"left", "right"})
         self.assertFalse(self.lab.state()["message"]["enabled"])
         self.assertEqual(self.lab.state()["message"]["buttons"],{"left":0,"right":0})
 
-    def test_stale_profile_read_disarms_and_marks_binding_detached(self):
+    def test_stale_profile_read_disarms_and_keeps_profile(self):
         self.collect("left_open");self.collect("left_closed",left_closed=True)
         with tempfile.TemporaryDirectory() as directory:
             path=Path(directory)/"left.json";self.session.save_profile(path)
@@ -276,7 +362,7 @@ class UnifiedCalibrationTests(unittest.TestCase):
             self.assertEqual(self.hold(left_closed=True)["left_click"],1)
             self.now+=300
             state=self.session.state()
-            self.assertFalse(state["profile_bound"])
+            self.assertTrue(state["profile_bound"])
             self.assertFalse(self.lab.processor.armed)
             self.assertFalse(state["frame"]["faces"][0]["signals"]["left_eye_open"]["valid"])
 

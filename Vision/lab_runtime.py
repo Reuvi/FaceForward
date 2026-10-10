@@ -29,12 +29,18 @@ class LabRuntime:
         self.demo_controls = {}
         self.timing = {}
         self.preview_due = 0
+        self.source_kind = None
 
     def start(self, *, demo=False, model=None, camera_id=0, fps=30):
         with self.lock:
             if self.worker is not None and self.worker.is_alive():
                 raise ValueError("Stop the running source before starting another")
-            self.workbench.disconnect("Starting source; select a subject when visible")
+            kind = "synthetic" if demo else "camera"
+            if self.source_kind is not None and self.source_kind != kind:
+                self.workbench.reset_calibration()
+            self.source_kind = kind
+            self.workbench.disconnect("Starting source; calibration retained. Waiting for the face.")
+            self.workbench.validation.clear()
             self.preview = None
             self.timing = {}
             self.preview_due = 0
@@ -141,7 +147,7 @@ class LabRuntime:
     def stop(self):
         self.stop_event.set()
         with self.lock:
-            self.workbench.disconnect("Stopping source; all calibration cleared")
+            self.workbench.disconnect("Stopping source; calibration retained")
             self.preview = None
         # Do not block Tk on a slow backend. start() rejects a still-running worker.
 
@@ -164,9 +170,10 @@ class LabRuntime:
             needed = {"left_raw", "right_raw", "head_raw", "left_closed_bit", "right_closed_bit",
                       "head_y", "tongue_x", "tongue_y"}
             cutoff = self.workbench.trace[-1]["timestamp_ms"]-8000 if self.workbench.trace else 0
+            scope_subject = state.get("scope_subject", state["selected"])
             for row in reversed(self.workbench.trace):
                 in_view = row["timestamp_ms"] >= cutoff
-                matching = (state["selected"] and row["subject_id"] == state["selected"]
+                matching = (scope_subject and row["subject_id"] == scope_subject
                             and row["calibration_generation"] == state["generation"])
                 if not in_view and (not needed or not matching):
                     break

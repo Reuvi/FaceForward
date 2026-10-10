@@ -1,5 +1,10 @@
 # Mouse MVP testing companion
 
+Current single-user update: calibrated camera/demo attaches the sole face automatically,
+keeps calibration through motion/loss and same-source restart, and supports saved-file
+loading while tracking is paused. Earlier explicit-selection/loss-reset descriptions
+below are historical. See [the current test procedure](SINGLE_USER_TESTING.md).
+
 **Unified lab update (October 10, 2026):** detector calibration is now a tab in
 `App`, using its single source. Calibrated eyes/head/tongue feed the existing lab.
 Start with [App's workflow and profile guide](../App/README.md); see

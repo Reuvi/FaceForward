@@ -18,8 +18,10 @@ lane documentation here. Put requests for shared changes in `interface-requests/
   separate cadences; preview work is optional. Avoid growing queues and measure
   overhead with `python3 -m Vision.benchmark` before adding runtime dependencies.
 - Capture/sample at a configurable rate and report actual timing, not an assumed FPS.
-- Emit SignalFrame v1 with no more than two faces, stable session-local subject IDs,
-  calibrated measurements, and explicit confidence/validity for every signal.
+- Camera inference requests one face. The calibration workbench emits at most one
+  logical `single-user` observation, preserving fits across geometric reassociation,
+  loss, stale frames and same-source restart. Generic v1/replay retains its legacy
+  two-observation capacity. Emit calibrated measurements and explicit confidence/validity for every signal.
 - Track gaze/pupils, tongue position when available, each eye's openness, and head
   horizontal/vertical bias. Mark unsupported/occluded features invalid; do not fake
   a detector. Keep detector feasibility and performance limitations visible.
@@ -28,7 +30,9 @@ lane documentation here. Put requests for shared changes in `interface-requests/
   read `DETECTION_LAB.md` and `../App/README.md`. App invokes `LabRuntime.ingest`
   without starting another worker. Keep the standalone developer entry point.
   Vision owns preset validation; Processing owns atomic profile persistence;
-  App owns selected-face binding. Never auto-arm on load or restore tongue checks.
+  App owns single-user profile lifecycle. Loading/exporting completed fits must not
+  require a visible face; collecting new calibration still requires fresh evidence.
+  Never auto-arm on load or restore tongue checks.
 - Support synthetic/replay input so other lanes can work without owning the camera.
 - Do not select gestures for clicks, send OS input, or import Processing internals.
 - Before handoff, check no face, one/two faces, identity loss/reacquisition, missing

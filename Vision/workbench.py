@@ -6,7 +6,7 @@ from .calibration import AxisCalibration, EyeCalibration
 from .features import DetectionConfig, analyze_features
 from .guided_eyes import GuidedEyes
 from .pipeline import VisionPipeline
-from .signals import invalid, make_face, measurement, monotonic_ms
+from .signals import SINGLE_SUBJECT, invalid, make_face, measurement, monotonic_ms
 from .tongue import TongueModel, TongueResult, mouth_crop, sample_colors
 
 
@@ -46,7 +46,7 @@ class DetectorWorkbench:
         self.positives, self.negatives = [], []
         self.tongue_model = None
         self.validation = {}
-        self.notice = "Start a source and explicitly select a subject"
+        self.notice = "Single user: start a source, then calibrate or load a profile"
         self.reasons = {}
         self.trace = deque(maxlen=9000)
         self.generation = 0
@@ -64,8 +64,12 @@ class DetectorWorkbench:
         self.tongue = TongueResult()
         self.generation += 1
 
-    def disconnect(self, reason="Source stopped; calibration cleared"):
-        self._clear_calibration()
+    def disconnect(self, reason="Source stopped; calibration retained"):
+        """Drop live evidence and unfinished capture, retaining the user's fits."""
+        self.job = None
+        self.eye_guide = None
+        self.crop = self.frozen_crop = None
+        self.tongue = TongueResult()
         self.selected = None
         self.observations = {}
         self.features = {}
@@ -74,49 +78,50 @@ class DetectorWorkbench:
         if self.frame is not None:
             self.frame = dict(self.frame, faces=[make_face(f["subject_id"]) for f in self.frame["faces"]])
 
+    def reset_calibration(self):
+        self._clear_calibration()
+        self.disconnect("Calibration cleared; calibrate or load a saved profile")
+
     def expire(self):
         if self.selected and (self.frame is None or not 0 <= self.clock() - self.frame["timestamp_ms"] <= self.config.stale_ms):
-            self.disconnect("Input stale; select the subject and recalibrate")
+            self.disconnect("Input stale; calibration retained. Waiting for the face.")
 
     def _require_subject(self):
         self.expire()
         if not self.selected:
-            raise ValueError("Select a currently visible subject first")
+            raise ValueError("A fresh visible face is required to collect calibration")
 
     def select(self, subject):
         if self.frame is None or not 0 <= self.clock() - self.frame["timestamp_ms"] <= self.config.stale_ms:
             raise ValueError("Selection needs a fresh camera frame")
         if subject not in self.observations:
             raise ValueError("Select a subject present in the latest frame")
-        self._clear_calibration()
+        # Compatibility for developer callers; selection no longer discards fits.
         self.selected = subject
-        self.features = {}
-        self.notice = f"Selected {subject}; start guided eye calibration"
+        self.notice = "Single user ready; calibrate or load a profile"
 
     def configure(self, values):
         config = DetectionConfig.from_dict(values)
-        self.disconnect("Settings changed; select the subject and recalibrate")
+        self.reset_calibration()
+        self.notice = "Settings changed; recalibrate or load a saved profile"
         self.config = config
         self.pipeline.tracker.max_gap_ms = config.stale_ms
 
     def export_calibration(self):
         from .presets import encode_preset
-        self._require_subject()
         self._require_idle()
         return encode_preset(self)
 
     def load_calibration(self, data):
         from .presets import decode_preset
-        self._require_subject()
         self._require_idle()
         config, eyes, head, tongue = decode_preset(data)
-        if not 0 <= self.clock() - self.frame["timestamp_ms"] <= config.stale_ms:
-            raise ValueError("Profile requires a fresher camera frame")
+        self.expire()
         self._clear_calibration()
         self._invalidate("left_eye_open", "right_eye_open", "head_y", "tongue_x", "tongue_y")
         self.config, self.eyes, self.head, self.tongue_model = config, eyes, head, tongue
         self.pipeline.tracker.max_gap_ms = config.stale_ms
-        self.notice = "Profile bound to selected face. Recheck eyes/head; repeat tongue ABSENT and VISIBLE checks."
+        self.notice = "Profile loaded for single user. Recheck eyes/head; repeat tongue ABSENT and VISIBLE checks."
 
     def _invalidate(self, *keys):
         if self.frame:
@@ -304,20 +309,37 @@ class DetectorWorkbench:
 
     def process(self, captured, observations):
         previous_session = self.session
+        previous_timestamp = self.frame["timestamp_ms"] if self.frame else None
         observations = list(observations)
+        ambiguous = len(observations) > 1
+        # Never choose between people in the single-user calibration path.
+        if ambiguous:
+            observations = []
         try:
             frame = self.pipeline.process(captured, observations)
         except Exception:
-            self.disconnect("Invalid input; calibration cleared")
+            self.disconnect("Invalid input; calibration retained")
             raise
+        # Keep envelope/order validation from the pipeline; geometric reassociation
+        # must not change the user's logical slot or reset downstream eye history.
+        frame["faces"] = [make_face(SINGLE_SUBJECT) for _ in frame["faces"]]
         self.session = frame["session_id"]
         self.frame = frame
         current_observations = {face["subject_id"]: item for face, item in zip(frame["faces"], observations)}
-        if self.selected and (previous_session != self.session or self.selected not in current_observations):
-            self.disconnect("Selected track lost or restarted; select and recalibrate")
+        if previous_session is not None and previous_session != self.session:
+            self.disconnect("Source restarted; calibration retained")
+            self.validation.clear()
+        elif previous_timestamp is not None and frame["timestamp_ms"] - previous_timestamp > self.config.stale_ms:
+            self.disconnect("Capture gap; unfinished capture cancelled, completed calibration retained")
         if not 0 <= self.clock() - frame["timestamp_ms"] <= self.config.stale_ms:
-            self.disconnect("Capture is stale or future-dated; select and recalibrate")
+            self.disconnect("Capture is stale or future-dated; calibration retained")
+        elif not current_observations:
+            self.disconnect("Multiple faces supplied; use one person. Calibration retained." if ambiguous
+                            else "Face unavailable; calibration retained. Waiting for the face.")
         else:
+            if self.selected is None:
+                self.notice = "Single user detected; calibration retained. Calibrate or load a profile if needed."
+            self.selected = SINGLE_SUBJECT
             self.observations = current_observations
         self.features = {}
         self.crop = None
@@ -382,7 +404,7 @@ class DetectorWorkbench:
         frame = self.frame
         signals = next((f["signals"] for f in frame["faces"] if f["subject_id"] == self.selected), {})
         row = {"session_id": frame["session_id"], "sequence": frame["sequence"], "timestamp_ms": frame["timestamp_ms"],
-               "subject_id": self.selected, "calibration_generation": self.generation, "head_mode": self.config.head_mode,
+               "subject_id": SINGLE_SUBJECT, "calibration_generation": self.generation, "head_mode": self.config.head_mode,
                "head_raw_units": "image_height_fraction" if self.config.head_mode == "position" else "degrees",
                "mouth_opening_ratio": self.crop.opening_ratio if self.crop else None,
                "mouth_width_px": self.crop.width_px if self.crop else None,
@@ -416,6 +438,7 @@ class DetectorWorkbench:
     def state(self):
         self.expire()
         return {"frame": self.frame, "selected": self.selected, "notice": self.notice,
+                "scope_subject": SINGLE_SUBJECT,
                 "features": {k: asdict(v) for k, v in self.features.items()}, "reasons": dict(self.reasons),
                 "eyes": {k: asdict(v) for k, v in self.eyes.items()}, "head": asdict(self.head) if self.head else None,
                 "samples": {k: len(v) for k, v in self.samples.items()},

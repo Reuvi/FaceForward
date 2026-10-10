@@ -7,7 +7,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from tkinter import filedialog, ttk
 
-from Processing.mouse.desktop import DesktopLab, Scope, label, set_var, BG, PANEL, TEXT, MUTED, GREEN
+from Processing.mouse.desktop import DesktopLab, Scope, label, set_var, BG, TEXT, MUTED, GREEN
 from Vision.signals import SIGNALS
 
 
@@ -79,7 +79,7 @@ class IntegratedDesktop(DesktopLab):
         style.map("Vision.Treeview", background=[("selected", "#405961")], foreground=[("selected", TEXT)])
         self.calibration_page = ttk.Frame(self.notebook)
         self.notebook.insert(0, self.calibration_page, text="Detection calibration")
-        self.calibration_hint = label(self.calibration_page, "Choose Camera or Detector demo on the Vision source tab; select your face, then calibrate here.")
+        self.calibration_hint = label(self.calibration_page, "Choose Camera or Detector demo on the Vision source tab; your face connects automatically, then calibrate here.")
         self.calibration_hint.pack(pady=30)
         self.vision_page = ttk.Frame(self.notebook, padding=14)
         self.notebook.insert(0, self.vision_page, text="Vision source & raw signals")
@@ -101,13 +101,15 @@ class IntegratedDesktop(DesktopLab):
 
         selection = ttk.Frame(self.vision_page)
         selection.pack(fill="x", pady=10)
-        label(selection, "Subject").pack(side="left", padx=(0, 8))
+        self.replay_selection = ttk.Frame(selection)
+        label(self.replay_selection, "Replay subject").pack(side="left", padx=(0, 8))
         self.subject_var = tk.StringVar()
-        self.subject_combo = ttk.Combobox(selection, textvariable=self.subject_var, values=[], state="readonly", width=28)
+        self.subject_combo = ttk.Combobox(self.replay_selection, textvariable=self.subject_var, values=[], state="readonly", width=28)
         self.subject_combo.pack(side="left", padx=(0, 8))
-        self.button(selection, "Use selected subject", lambda:self.guarded(self.select_subject)).pack(side="left")
-        self.button(selection, "Save active profile", self.save_profile).pack(side="left", padx=8)
-        self.button(selection, "Load profile for face", self.load_profile).pack(side="left")
+        self.button(self.replay_selection, "Use selected subject", lambda:self.guarded(self.select_subject)).pack(side="left")
+        self.save_profile_button = self.button(selection, "Save active profile", self.save_profile)
+        self.save_profile_button.pack(side="left", padx=8)
+        self.button(selection, "Load saved profile", self.load_profile).pack(side="left")
         self.selected_text = tk.StringVar()
         label(selection, textvariable=self.selected_text, foreground=MUTED).pack(side="left", padx=15)
 
@@ -130,7 +132,7 @@ class IntegratedDesktop(DesktopLab):
             self.signal_table.insert("", "end", iid=name, values=(name, "—", "—", "Unavailable"))
         self.signal_table.pack(fill="x")
         self.raw_ratios = tk.StringVar(value="No camera landmarks received")
-        label(signals, "Raw camera ratios / selected subject", style="Heading.TLabel").pack(anchor="w", pady=(13, 6))
+        label(signals, "Raw camera ratios / single user", style="Heading.TLabel").pack(anchor="w", pady=(13, 6))
         label(signals, textvariable=self.raw_ratios, style="Panel.TLabel", font=("Menlo", 10), justify="left", wraplength=520).pack(anchor="w")
         label(signals, "Calibrate in Detection calibration. Valid measurements feed the same Processing lab.\nTongue segmentation is experimental; inspect its mask and validation checks.",
               style="Small.TLabel", wraplength=550).pack(anchor="w", pady=12)
@@ -183,7 +185,7 @@ class IntegratedDesktop(DesktopLab):
             self.guarded(lambda: self.session.save_profile(path))
 
     def load_profile(self):
-        path = filedialog.askopenfilename(parent=self.root, title="Load profile for the selected face", initialdir=str(Path("local-profiles").resolve()),
+        path = filedialog.askopenfilename(parent=self.root, title="Load saved calibration for this user", initialdir=str(Path("local-profiles").resolve()),
                                          filetypes=[("Face + mouse profiles", "*.json")])
         if path:
             if self.guarded(lambda: (self.session.load_profile(path), True)):
@@ -194,7 +196,7 @@ class IntegratedDesktop(DesktopLab):
         data = super().edited_settings()
         current = self.lab.state()["runtime"]
         if any(data["runtime"][key] != current[key] for key in ("source", "subject_id")):
-            raise ValueError("Select the source and face on the Vision source tab")
+            raise ValueError("Choose the source on the Vision source tab; camera uses one user automatically")
         return data
 
     def import_settings(self):
@@ -208,7 +210,7 @@ class IntegratedDesktop(DesktopLab):
             if not isinstance(data, dict):
                 raise ValueError("Settings must be an object")
             if data.get("format") == "face_mouse_profile_v1":
-                raise ValueError("Use Load profile for face on the Vision source tab for a combined profile")
+                raise ValueError("Use Load saved profile on the Vision source tab for a combined profile")
             config = data.get("config", data)
             runtime = dict(data.get("runtime", {})) if "config" in data else {}
             for key in ("source", "subject_id"):
@@ -257,6 +259,10 @@ class IntegratedDesktop(DesktopLab):
             self.camera_canvas.itemconfigure(self.preview_item, image="")
         faces = (frame or {}).get("faces", [])
         ids = tuple(face["subject_id"] for face in faces)
+        if state["mode"] == "replay":
+            self.replay_selection.pack(side="left", before=self.save_profile_button)
+        else:
+            self.replay_selection.pack_forget()
         if tuple(self.subject_combo.cget("values")) != ids:
             self.subject_combo.configure(values=ids)
         # Display a choice, but bind it only when the user presses Use selected.
@@ -267,12 +273,13 @@ class IntegratedDesktop(DesktopLab):
         details = {
             "demo": "SYNTHETIC: all four mouse actions. Click Start preview, then open Live lab. Cycle: short blink → left wink → right wink → both → tongue circle → head up/down. Neutral periods allow arming.",
             "replay": "REPLAY: select a subject explicitly, then Start preview with neutral input. Capture gaps are preserved. EOF stops output; restart the source and re-arm to repeat.",
-            "camera": "LIVE CAMERA: select your face → Detection calibration (or load a profile) → Start preview → Live lab. One camera stream feeds all tabs; no OS mouse output.",
-            "detector-demo": "SYNTHETIC PIXELS: select subject-0, open Detection calibration and Start eye calibration. The fixture follows the guide automatically, then cycles independent closures. No camera or ML.",
+            "camera": "LIVE CAMERA · ONE USER: face connects automatically → Detection calibration (or Load saved profile) → Start preview → Live lab. Calibration survives brief loss and camera restart; no OS mouse output.",
+            "detector-demo": "SYNTHETIC PIXELS · ONE USER: open Detection calibration and Start eye calibration. The fixture follows the guide automatically, then cycles independent closures. No camera or ML.",
         }
         set_var(self.source_detail, state["error"] or details[state["mode"]])
-        set_var(self.selected_text, "Processing subject: " + selected)
-        set_var(self.profile_text, "Profile: " + state["profile_label"] + (" | attached to selected face; preview starts separately" if state["profile_bound"] else " | no saved profile attached; calibrate or load explicitly"))
+        single = state["mode"] in ("camera", "detector-demo")
+        set_var(self.selected_text, ("Single user: " + ("face detected" if ids and fresh else "tracking paused")) if single else "Processing subject: " + selected)
+        set_var(self.profile_text, "Profile: " + state["profile_label"] + (" | saved calibration active; retained while tracking pauses" if state["profile_bound"] else " | Save active profile to keep calibration after closing the app"))
         face = next((face for face in faces if face["subject_id"] == selected), None)
         for name in SIGNALS:
             item = face["signals"][name] if face else None

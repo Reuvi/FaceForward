@@ -14,8 +14,11 @@ and adopted local interfaces. Keep all four mouse mappings independent, preserve
 invalid detector values, and keep simulated sources explicitly labeled. App now embeds
 Vision's calibration UI and uses one capture worker for calibrated eyes, head Y and
 experimental tongue segmentation. Read `Vision/DETECTION_LAB.md` and `App/README.md`.
-Profiles bind only to an explicitly selected fresh face, disarm output and require
-fresh tongue validation. Real-person accuracy and Drivers integration remain pending.
+The camera/detector lab is single-user: automatically attach its sole face as
+`single-user`, preserve completed calibration across motion/loss/staleness and
+same-source restarts, and pause output on missing input. Profiles can load while
+tracking is paused; loading disarms output and requires fresh tongue validation.
+Real-person accuracy and Drivers integration remain pending.
 The standalone tools are optional developer entry points; preserve their independence.
 
 Reuvi's main integration conversation is the coordination hub for other agents.
@@ -85,7 +88,9 @@ can use an integration branch with the affected owners coordinated.
 - Driver-facing magnitudes are finite values in `[0, 1]`, including the endpoints.
   Missing measurements are invalid/null, never fabricated neutral measurements.
 - Tracking loss, invalid control input, stale frames, and a stop action must disable
-  output and release held buttons. Do not silently reassign control to another face.
+  output and release held buttons. Reacquisition must never auto-arm output.
+  The single-user calibrated path assumes
+  the sole observed face is the operator; it does not recognize identity.
 - Keep real camera recordings, face profiles, transcripts, credentials, and local
   calibration data out of Git. Synthetic fixtures belong in the owning test folder.
 

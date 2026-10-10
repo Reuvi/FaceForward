@@ -24,8 +24,8 @@ Vision/.venv/bin/python -m App --source camera \
   --model Vision/.local/face_landmarker.task --fps 30
 ```
 
-1. On **Vision source & raw signals**, choose the visible face and press **Use selected
-   subject**. Merely selecting a dropdown entry does not bind the subject.
+1. On **Vision source & raw signals**, start Camera or Detector demo. The one
+   visible face attaches automatically; motion/loss does not discard calibration.
 2. On **Detection calibration → 1 Eyes**, choose **Rest between steps (seconds)**
    (default 3), test the sound, then start eye calibration.
    The full-screen dot guide collects natural open states at several gaze directions,
@@ -253,13 +253,15 @@ No camera frames or audio are recorded. Store exports under ignored `data/privat
 Retention is bounded: 9000 frame rows (~5 min at 30 Hz), 2000 events, 400 trials and
 256 ordered clicks. Export before earlier frame data rolls off. Trial IDs/labels attach
 at candidate onset; ordinary unlabeled activity is not silently used for fitting.
-Profile/source/face resets clear experiment data; export first if you want to keep it.
+Profile loads, explicit calibration resets and source-kind changes clear experiment
+data; export first. Brief loss and same-source restart retain completed trials and
+learned fits, but abort an active trial/target collection.
 
 The applied v2 face profile adds a `research` section to the detector, Processing and
 preview sections; v1 profiles still load. Research stores settings, expression fits,
 pose bounds and validated model coefficients. It does not store recordings, trials,
 event queues, selected identities or armed state. Loading validates before changing
-active state, binds to the current fresh selected subject, and disarms previews.
+active state, applies to the single user (even while tracking is paused), and disarms previews.
 Synthetic and camera profile restrictions continue to apply. Save **after Apply**.
 
 | Owner / path | Responsibility |
@@ -357,5 +359,6 @@ stay 1 with `unknown / held`, and every fresh capture should retain its own sequ
 and timestamp. There should be no click and no held output button. A known open
 observation should then set the input to 0. Repeat after a known open reading and
 with the other eye; only that eye's history should apply. A full tracking loss stops
-preview and requires selection/profile reattachment, which clears history. Use the
+preview but keeps calibration and input history within the same capture session.
+Detection resumes automatically; mouse preview requires Start preview again. Use the
 CSV `*_input` and `*_input_known` fields to distinguish held input from evidence.

@@ -71,7 +71,7 @@ def observation_from_landmarks(landmarks, width, height):
 
 
 class MediaPipeDetector:
-    """Synchronous VIDEO mode: at most one inference in flight, at most two faces."""
+    """Synchronous VIDEO mode: one inference in flight, one person's face."""
 
     def __init__(self, model_path, *, include_pose=False, include_expressions=False):
         self.model_path = Path(model_path).expanduser()
@@ -92,7 +92,7 @@ class MediaPipeDetector:
                 delegate=mp.tasks.BaseOptions.Delegate.CPU,
             ),
             running_mode=mp.tasks.vision.RunningMode.VIDEO,
-            num_faces=2,
+            num_faces=1,
             output_facial_transformation_matrixes=self.include_pose,
             output_face_blendshapes=self.include_expressions,
         )
@@ -123,8 +123,8 @@ class MediaPipeDetector:
         self._session, self._sequence = envelope.session_id, envelope.sequence
         self._capture_time, self._inference_time = envelope.timestamp_ms, timestamp
         height, width = captured.bgr.shape[:2]
-        if len(result.face_landmarks) > 2:
-            raise ValueError("detector exceeded the two-face contract")
+        if len(result.face_landmarks) > 1:
+            raise ValueError("detector exceeded the single-face limit")
         observations = [observation_from_landmarks(face, width, height) for face in result.face_landmarks]
         if self.include_pose:
             from .features import rotation_from_matrix

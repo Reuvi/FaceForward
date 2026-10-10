@@ -149,3 +149,46 @@ class FullscreenCalibrationTests(unittest.TestCase):
         self.assertEqual(len(set(points[1::2])),1)
         scope.draw([])
         self.assertFalse(scope.canvas.find_withtag("gap-run"))
+
+
+@unittest.skipUnless(os.environ.get("RUN_TK_TESTS") == "1", "Explicit desktop Tk test required")
+class SingleUserWindowTests(unittest.TestCase):
+    def test_live_selection_hidden_replay_selection_available_and_profile_load_stopped(self):
+        import tkinter as tk
+        import tempfile
+        from pathlib import Path
+        from App.desktop import IntegratedDesktop
+        from App.mouse_runtime import MouseSession
+        from Vision.calibration import EyeCalibration
+        root = tk.Tk()
+        session = MouseSession()
+        session.mode = "detector-demo"
+        options = SimpleNamespace(source="detector-demo", replay=None, model=None,
+                                  fps=30, camera_id=0, no_preview=True, subject=None)
+        self.addCleanup(lambda: None if session.closed else session.close())
+        with patch.object(session, "start"):
+            ui = IntegratedDesktop(root, session, options)
+        self.addCleanup(lambda: None if ui.closed else ui.close())
+        root.update()
+        self.assertEqual(ui.replay_selection.winfo_manager(), "")
+        session.mode = "replay"
+        ui.refresh_vision(); root.update()
+        self.assertEqual(ui.replay_selection.winfo_manager(), "pack")
+        session.mode = "detector-demo"
+        ui.refresh_vision(); root.update()
+        self.assertEqual(ui.replay_selection.winfo_manager(), "")
+        core = session.ensure_detector_runtime().workbench
+        core.eyes["left"] = EyeCalibration(.04, .25, .5)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)/"eyes.json"
+            session.save_profile(path)
+            session.detector_command("reset_calibration")
+            self.assertFalse(core.eyes)
+            with patch("App.desktop.filedialog.askopenfilename", return_value=str(path)):
+                ui.load_profile()
+            root.update()
+            self.assertIn("left", core.eyes)
+            self.assertIsNotNone(ui.calibration_ui)
+            self.assertFalse(session.lab.processor.armed)
+            ui.refresh_vision()
+            self.assertIn("saved calibration active", ui.profile_text.get())

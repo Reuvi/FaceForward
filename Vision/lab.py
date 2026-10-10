@@ -27,8 +27,7 @@ class DetectionLab:
             root.geometry("1230x910")
             root.minsize(1100, 830)
         self.source = tk.StringVar(value="Synthetic demo" if args.demo else "Camera")
-        self.subject = tk.StringVar()
-        self.status = tk.StringVar(value="Start a source; then explicitly select your face.")
+        self.status = tk.StringVar(value="Single user: start a source; your face connects automatically.")
         self.source_status = tk.StringVar()
         self.metrics = tk.StringVar()
         self.eye_details = tk.StringVar()
@@ -38,17 +37,14 @@ class DetectionLab:
         outer.pack(fill="both", expand=True)
         bar = ttk.Frame(outer)
         bar.pack(fill="x")
-        self.subject_box = None
         if self.embedded:
             ttk.Label(bar, text="Calibrate the selected Vision source. Then open Live lab.").pack(side="left")
         else:
             ttk.Label(bar, text="DETECTION LAB", font=("Arial",16,"bold")).pack(side="left", padx=(0,20))
             ttk.Combobox(bar, textvariable=self.source, values=("Camera","Synthetic demo"), state="readonly", width=17).pack(side="left")
             ttk.Button(bar, text="Start", command=self.start).pack(side="left", padx=5)
-            ttk.Button(bar, text="Stop / clear", command=self.runtime.stop).pack(side="left")
-            self.subject_box = ttk.Combobox(bar, textvariable=self.subject, state="readonly", width=17)
-            self.subject_box.pack(side="left", padx=(20,5))
-            ttk.Button(bar, text="Select face", command=lambda:self.call("select",self.subject.get())).pack(side="left")
+            ttk.Button(bar, text="Stop (keep calibration)", command=self.runtime.stop).pack(side="left")
+            ttk.Label(bar, text="Single user · automatic face attachment").pack(side="left", padx=10)
         ttk.Button(bar, text="Export trace CSV", command=self.export).pack(side="right")
         ttk.Label(outer,textvariable=self.source_status).pack(anchor="w",pady=5)
         bottom=ttk.Frame(outer);bottom.pack(side="bottom",fill="x",pady=(8,0))
@@ -87,7 +83,7 @@ class DetectionLab:
         row=ttk.Frame(tongue);row.pack(fill="x",pady=3)
         ttk.Button(row,text="2  Freeze visible tongue",command=lambda:self.call("freeze_mouth")).pack(side="left")
         ttk.Button(row,text="3  Fit appearance model",command=lambda:self.call("fit_tongue")).pack(side="right")
-        self.mouth=tk.Label(tongue,bg="#14202c",text="Mouth crop appears after selection",fg="white")
+        self.mouth=tk.Label(tongue,bg="#14202c",text="Mouth crop appears when your face is visible",fg="white")
         self.mouth.pack(pady=6)
         self.mouth.bind("<Button-1>",self.mark_tongue)
         ttk.Button(tongue,text="Mark center patch (if covered by tongue)",command=lambda:self.call("mark_tongue",.5,.5)).pack(fill="x",pady=2)
@@ -98,7 +94,8 @@ class DetectionLab:
         ttk.Button(tongue,text="Reset tongue calibration",command=lambda:self.call("reset_tongue")).pack(fill="x",pady=3)
         ttk.Label(tongue,textvariable=self.tongue_details,justify="left",wraplength=430,font=("Menlo",10)).pack(anchor="w",pady=6)
         settings=self.tab(tabs,"Settings")
-        self.text(settings,"Edit tunables below. Applying clears all calibration and face selection. Saving stores these tunables only; no face profile or images. head_mode is position or pitch. Measurements and defaults are documented in Vision/DETECTION_LAB.md.")
+        self.text(settings,"Edit tunables below. Applying clears calibration; your face reconnects automatically. Saving stores these tunables only. Use Save active profile in the main App to save learned calibration. head_mode is position or pitch.")
+        ttk.Button(settings,text="Reset all calibration",command=lambda:self.call("reset_calibration")).pack(fill="x",pady=5)
         self.settings=tk.Text(settings,width=48,height=26,font=("Menlo",10))
         self.settings.pack(fill="both",expand=True,pady=5)
         self.displayed_config = self.runtime.snapshot()["config"]
@@ -203,13 +200,8 @@ class DetectionLab:
             self.settings.insert("1.0",json.dumps(self.displayed_config,indent=2))
         self.status.set(state["notice"])
         frame=state["frame"] or {"faces":[]}
-        subjects=[f["subject_id"] for f in frame["faces"]]
-        if self.subject_box is not None:
-            self.subject_box.configure(values=subjects)
-            if self.subject.get() not in subjects:
-                self.subject.set(subjects[0] if subjects else "")
         timing=state["timing"]
-        self.source_status.set(f"{state['source']}   |   selected: {state['selected'] or 'none'}   |   " +
+        self.source_status.set(f"{state['source']}   |   single user: {'detected' if state['selected'] else 'waiting for face'}   |   " +
             "   ".join(f"{k}: {v:.1f}" for k,v in timing.items()))
         self.show_image(self.preview,"preview",state["preview"],(320,240))
         self.show_image(self.mouth,"mouth",state["mouth"],(256,192),frozen=state["frozen"])
@@ -226,15 +218,15 @@ class DetectionLab:
                 eye_lines.append(f"closed ≤ {cal['closed_limit']:.3f} | open ≥ {cal['open_limit']:.3f}")
             elif cal:
                 eye_lines.append("Legacy threshold — run guide for open-pose coverage")
-            eye_lines.append(state['reasons'].get(side,'Select a face')+"\n")
+            eye_lines.append(state['reasons'].get(side,'Waiting for face')+"\n")
         self.eye_details.set("\n".join(eye_lines))
         head=state["features"].get("head",{})
-        self.head_details.set(f"Mode: {state['config']['head_mode']}\nRaw: {self.fmt(head.get('value'))}\nNormalized Y: {self.fmt(signals.get('head_y',{}).get('value'))}\nQuality: {head.get('quality',0):.2f}\n{state['reasons'].get('head','Select a face')}\n\nCalibration: {state['head']}\nSamples: " + str({k:v for k,v in state['samples'].items() if k.startswith('head')}))
+        self.head_details.set(f"Mode: {state['config']['head_mode']}\nRaw: {self.fmt(head.get('value'))}\nNormalized Y: {self.fmt(signals.get('head_y',{}).get('value'))}\nQuality: {head.get('quality',0):.2f}\n{state['reasons'].get('head','Waiting for face')}\n\nCalibration: {state['head']}\nSamples: " + str({k:v for k,v in state['samples'].items() if k.startswith('head')}))
         val=state["validation"]
-        self.tongue_details.set(f"{'FROZEN — click tissue' if state['frozen'] else 'LIVE crop / green candidate mask'}\n{state['reasons'].get('tongue','Select a face')}\nCandidate: {state['candidate']}\nPixels: {state['tongue_pixels']}\n" + "\n".join(f"{k}: {'PASS' if v['passed'] else 'FAIL'} ({v['detected_fraction']:.0%}, n={v['samples']})" for k,v in val.items()))
+        self.tongue_details.set(f"{'FROZEN — click tissue' if state['frozen'] else 'LIVE crop / green candidate mask'}\n{state['reasons'].get('tongue','Waiting for face')}\nCandidate: {state['candidate']}\nPixels: {state['tongue_pixels']}\n" + "\n".join(f"{k}: {'PASS' if v['passed'] else 'FAIL'} ({v['detected_fraction']:.0%}, n={v['samples']})" for k,v in val.items()))
         self.metrics.set("\n".join(f"{k:16} {self.fmt(signals.get(k,{}).get('value'))}   {'valid' if signals.get(k,{}).get('valid') else 'unavailable'}" for k in ("left_eye_open","right_eye_open","head_y","tongue_x","tongue_y")))
         draw_eye_scope(self.eye_scope,state)
-        self.draw_scope(state["trace"],state["selected"],state["generation"],state["config"]["head_mode"],state["config"]["stale_ms"])
+        self.draw_scope(state["trace"],state["scope_subject"],state["generation"],state["config"]["head_mode"],state["config"]["stale_ms"])
         self.root.after(100,self.tick)
 
     def draw_scope(self,rows,selected,generation,head_mode,stale_ms):
