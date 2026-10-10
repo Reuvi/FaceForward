@@ -15,6 +15,7 @@ from .landmarks import EYES
 class DetectionConfig:
     settle_ms: float = 1000
     collect_ms: float = 1800
+    eye_rest_ms: float = 3000
     min_samples: int = 12
     stale_ms: float = 250
     min_face_px: float = 80
@@ -38,6 +39,7 @@ class DetectionConfig:
     def __post_init__(self):
         bounds = {
             "settle_ms": (0, 5000), "collect_ms": (300, 10000),
+            "eye_rest_ms": (0, 30000),
             "stale_ms": (80, 2000), "min_face_px": (20, 500),
             "min_eye_px": (4, 100), "min_focus": (1, 1000),
             "min_brightness": (0, 120), "max_brightness": (130, 255),

@@ -175,6 +175,9 @@ without this field load with the default. The Eyes panel edits this duration in
 seconds when starting/restarting the guide, and profiles retain it.
 
 Guide snapshots add `resting` and `phase` (`rest`, `prepare`, `capture`, `complete`).
+`capture_start_ms`/`capture_end_ms` bound the accepted capture timestamps; both are
+null until the pose is presented. Consumers must check these bounds so a delayed
+rest frame cannot train a model after the UI switches to capture.
 During rest, `target` is null, `preparing` is true, and no eye or expression-calibration
 samples are retained. Capture and numeric input delivery continue normally; output
 stays disarmed. Each rest and next pose waits for its prompt to be painted before

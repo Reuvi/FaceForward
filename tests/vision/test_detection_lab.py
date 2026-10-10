@@ -135,9 +135,10 @@ class PixelTests(unittest.TestCase):
         with self.assertRaises(ValueError):sample_colors(self.crop(),xy=(float('nan'),.5))
 
     def test_settings_validate_before_use(self):
-        for key,value in (("stale_ms",float('nan')),("min_samples",True),("head_mode","unknown"),("oops",1)):
+        for key,value in (("stale_ms",float('nan')),("eye_rest_ms",float('nan')),("eye_rest_ms",-1),("eye_rest_ms",30001),("eye_rest_ms",True),("min_samples",True),("head_mode","unknown"),("oops",1)):
             with self.assertRaises(ValueError):DetectionConfig.from_dict({key:value})
         self.assertEqual(DetectionConfig.from_dict(self.config.to_dict()),self.config)
+        self.assertEqual(DetectionConfig.from_dict({}).eye_rest_ms,3000)
 
 
 @unittest.skipUnless(AVAILABLE, "Install Vision/requirements.txt for detector workbench tests")

@@ -291,3 +291,11 @@ related tests and documentation. Default rest is 3 seconds between the seven pos
 editable before Start; rest frames never train either eye geometry or blink fits.
 Live capture/input sampling continues and previews remain disarmed. Preserve
 independent eye fits, profile compatibility and the existing unknown-value hold.
+
+Validation: 131 detector/integration tests pass (84 Vision, 47 integration with
+native Tk enabled). Tests cover all six rests, sample exclusion including delayed
+frames, separate prompt acknowledgment, sound transitions, cancel/restart during
+rest, duration validation, old-profile defaults and continued per-frame input.
+Compilation, whitespace and integration scope checks pass. Real-model blank-image
+initialization passes; no live-person accuracy claim is made. See
+`Vision/DETECTION_LAB.md` for the cue table and adjustable rest control.

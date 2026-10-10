@@ -21,6 +21,8 @@ class GuidedEyes:
         self.index = 0
         self.active = True
         self.start_ms = None
+        self.resting = False
+        self.rest_end_ms = None
         self.last_timestamp = None
         self.groups = {side: [] for side in ("left", "right")}
         self.values = {side: [] for side in self.groups}
@@ -38,12 +40,23 @@ class GuidedEyes:
         # Allow time to hear the cue and pose, including after the closed phase.
         return max(self.config.settle_ms, 1500) if self.step[0] in ("closed", "reopen") else self.config.settle_ms
 
-    def present(self, index, now):
+    def present(self, index, now, phase=None):
         """UI acknowledges the displayed instruction before any timing starts."""
-        if self.active and index == self.index and self.start_ms is None:
+        expected = "rest" if self.resting else "prepare"
+        if not self.active or index != self.index or phase not in (None, expected):
+            return
+        if self.resting:
+            if self.rest_end_ms is None:
+                self.rest_end_ms = now + self.config.eye_rest_ms
+        elif self.start_ms is None:
             self.start_ms = now + self.settle_ms
 
     def feed(self, timestamp, features):
+        if self.active and self.resting:
+            if self.rest_end_ms is not None and timestamp >= self.rest_end_ms:
+                self.resting = False
+                self.rest_end_ms = None
+            return  # Rest and the transition frame never train either eye.
         if (not self.active or self.start_ms is None or timestamp < self.start_ms
                 or self.last_timestamp is not None and timestamp <= self.last_timestamp):
             return
@@ -87,15 +100,26 @@ class GuidedEyes:
         else:
             self.index += 1
             self.start_ms = None
+            self.resting = self.config.eye_rest_ms > 0
+            self.rest_end_ms = None
             self.values = {side: [] for side in self.values}
             self.rejected = {side: 0 for side in self.rejected}
 
     def state(self, now):
-        preparing = self.start_ms is None or now < self.start_ms
-        remaining = (self.settle_ms if self.start_ms is None else max(0, self.start_ms-now)) if preparing else max(0, self.start_ms+self.config.collect_ms-now)
+        waiting = self.rest_end_ms is None if self.resting else self.start_ms is None
+        preparing = self.resting or self.start_ms is None or now < self.start_ms
+        if self.resting:
+            remaining = self.config.eye_rest_ms if waiting else max(0, self.rest_end_ms-now)
+        else:
+            remaining = (self.settle_ms if waiting else max(0, self.start_ms-now)) if preparing else max(0, self.start_ms+self.config.collect_ms-now)
+        phase = "complete" if not self.active else "rest" if self.resting else "prepare" if preparing else "capture"
         return {"active": self.active, "index": self.index, "total": len(STEPS),
-                "name": self.step[0], "instruction": self.step[1], "target": self.step[2],
-                "waiting": self.start_ms is None, "preparing": preparing,
+                "name": self.step[0],
+                "instruction": "Rest your eyes — blink or close them naturally" if self.resting else self.step[1],
+                "target": None if self.resting else self.step[2],
+                "waiting": waiting, "preparing": preparing, "resting": self.resting, "phase": phase,
+                "capture_start_ms": self.start_ms,
+                "capture_end_ms": self.start_ms+self.config.collect_ms if self.start_ms is not None else None,
                 "remaining_ms": remaining, "closed_duration_ms": max(self.config.settle_ms,1500)+self.config.collect_ms,
                 "samples": {s: len(v) for s,v in self.values.items()},
                 "errors": dict(self.errors), "report": self.report,

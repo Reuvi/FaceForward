@@ -26,12 +26,19 @@ Vision/.venv/bin/python -m App --source camera \
 
 1. On **Vision source & raw signals**, choose the visible face and press **Use selected
    subject**. Merely selecting a dropdown entry does not bind the subject.
-2. On **Detection calibration → 1 Eyes**, test the sound, then start eye calibration.
+2. On **Detection calibration → 1 Eyes**, choose **Rest between steps (seconds)**
+   (default 3), test the sound, then start eye calibration.
    The full-screen dot guide collects natural open states at several gaze directions,
    closed states, and a fresh reopening check. Each eye has an independent fit. Follow
-   the audible close/reopen/completion cues. Restart discards the previous eye data;
+   the audible close/reopen/completion cues. Between poses, four low tones and a
+   REST screen let you blink or relax; no eye or blink-coefficient training samples
+   are taken. A rising pair cues the next open pose; three high tones mark capture.
+   After closing, the reopen cue precedes rest. Default duration is about 40 seconds.
+   Restart discards the previous eye data;
    Escape/cancel exits the popup. This sequence now also fits each available MediaPipe
    blink coefficient from its own open/closed observations.
+   Rest can be set to 0–30 seconds; changing it applies on Start/Restart and is saved
+   in the face profile. Existing profiles without this setting use the 3-second default.
 3. On **Detection research → Measurements & preview**, select **Eyes / timing**.
    Check that each eye's closure goes toward **0 when open, 1 when closed**. Brief
    natural blinks should produce short candidates; a comfortable deliberate wink

@@ -10,7 +10,7 @@ from Vision.eye_scope import binary_runs
 
 class GuidedEyeTests(unittest.TestCase):
     def setUp(self):
-        self.config=SimpleNamespace(settle_ms=0,collect_ms=400,min_samples=8,eye_separation=.015)
+        self.config=SimpleNamespace(settle_ms=0,collect_ms=400,eye_rest_ms=0,min_samples=8,eye_separation=.015)
         self.guide=GuidedEyes(self.config)
         self.now=1000
 
@@ -78,6 +78,54 @@ class GuidedEyeTests(unittest.TestCase):
         self.step(quality=0)
         self.assertIn("left",self.guide.errors)
         self.assertIn("right",self.guide.errors)
+
+    def test_rest_excludes_frames_and_next_pose_needs_its_own_acknowledgment(self):
+        self.config.eye_rest_ms=500
+        self.config.settle_ms=100
+        self.step()
+        guide=self.guide
+        state=guide.state(self.now)
+        self.assertEqual(state['phase'],'rest')
+        self.assertIsNone(state['target'])
+        self.assertTrue(state['preparing'])
+        self.assertTrue(state['waiting'])
+        guide.present(guide.index,self.now,'prepare')  # Previous-phase callback.
+        self.assertIsNone(guide.rest_end_ms)
+        guide.present(guide.index,self.now,'rest')
+        for offset in range(0,501,25):
+            guide.feed(self.now+offset,{'left':SimpleNamespace(value=.001,quality=1)})
+        self.assertEqual(guide.values,{'left':[],'right':[]})
+        self.assertEqual(guide.rejected,{'left':0,'right':0})
+        self.assertFalse(guide.resting)
+        self.assertIsNone(guide.start_ms)
+        self.now+=500
+        guide.present(guide.index,self.now,'rest')  # Delayed rest callback.
+        self.assertIsNone(guide.start_ms)
+        guide.present(guide.index,self.now,'prepare')
+        guide.feed(self.now+50,{'left':SimpleNamespace(value=.001,quality=1)})
+        self.assertEqual(guide.values['left'],[])
+        guide.feed(self.now+100,{'left':SimpleNamespace(value=.21,quality=1)})
+        self.assertEqual(guide.values['left'],[.21])
+        self.assertEqual(guide.state(self.now+100)['phase'],'capture')
+
+    def test_all_six_rests_allow_blinks_without_affecting_fits(self):
+        self.config.eye_rest_ms=100
+        rested=set()
+        while self.guide.active:
+            guide=self.guide
+            state=guide.state(self.now)
+            if state['waiting']:
+                guide.present(guide.index,self.now,state['phase'])
+            if guide.resting:
+                rested.add(guide.index)
+            ratio=.001 if guide.resting else .04 if guide.step[0]=='closed' else .25
+            guide.feed(self.now,{s:SimpleNamespace(value=ratio,quality=1) for s in ('left','right')})
+            self.now+=25
+        self.assertEqual(rested,set(range(1,7)))
+        self.assertEqual(set(self.guide.fits),{'left','right'})
+        for side in ('left','right'):
+            self.assertEqual(self.guide.groups[side],[[.25]*16]*5)
+        self.assertEqual(self.guide.state(self.now)['phase'],'complete')
 
     def test_binary_scope_unknown_and_stale_hold_without_inheriting_other_subject(self):
         def row(t,v,subject="one",generation=1):

@@ -269,7 +269,8 @@ class ResearchSession:
             if not self.was_guiding:
                 self.guide_groups = {}
             self.was_guiding = True
-            if not guide["waiting"] and not guide["preparing"]:
+            if (guide.get("phase") == "capture"
+                    and guide["capture_start_ms"] <= t < guide["capture_end_ms"]):
                 group = self.guide_groups.setdefault(guide["name"], [])
                 if len(group) < 512:
                     group.append(dict(values))

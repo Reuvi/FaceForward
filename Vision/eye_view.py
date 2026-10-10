@@ -11,12 +11,17 @@ import tkinter as tk
 from tkinter import ttk
 import wave
 
+CUE_LEGEND = ("Four low tones: rest • Rising pair: next pose • Three high tones: capture\n"
+              "Descending pair: close • Two high tones: reopen • Rising trio: done")
+
 
 class CalibrationSounds:
     """Short local tones; afplay on macOS, asynchronous winsound or Tk fallback."""
     PATTERNS = {"start": (660,), "target": (520,), "close": (440, 330),
                 "reopen": (880, 880), "success": (660, 880, 1100),
-                "retry": (330, 330, 330), "cancel": (880, 880, 330), "test": (660, 880)}
+                "retry": (330, 330, 330), "cancel": (880, 880, 330), "test": (660, 880),
+                "rest": (440, 440, 440, 440), "rest_reopen": (880, 880, 440, 440, 440, 440),
+                "resume": (520, 660), "capture": (1100, 1100, 1100)}
 
     def __init__(self, root):
         self.root = root
@@ -105,7 +110,9 @@ class FullscreenEyeGuide:
             return
         canvas.create_text(w/2, 35, text=title, fill="#e9f1ed", font=("Arial", 23, "bold"), width=w-80)
         canvas.create_text(w/2, 84, text=instruction, fill="#c2d0df", font=("Arial", 16), width=w-100, justify="center")
-        if guide["target"]:
+        if guide["resting"]:
+            canvas.create_text(w/2,h/2,text="REST\nNo calibration samples are being recorded",fill="#75e3a8",font=("Arial",27,"bold"),justify="center",width=w-80)
+        elif guide["target"]:
             x, y = guide["target"]
             x = x*w
             y = 135+y*max(1, h-310)
@@ -135,16 +142,22 @@ class EyeGuidePanel:
         self.aborted = False
         self.fullscreen = None
         self.pending_present = None
+        self.rest_seconds = tk.StringVar(value="3")
+        self.rest_seen = None
         self.title = tk.StringVar(value="Calibrate eyes in one guided pass")
         self.instruction = tk.StringVar(value="Start opens a full-screen guide. Follow the dot comfortably.\nThen close gently and reopen at the sound.")
-        self.progress = tk.StringVar(value="Start tone • low tones: close • two high tones: reopen\nThree rising tones: ready • three low tones: retry")
+        self.progress = tk.StringVar(value=CUE_LEGEND)
         ttk.Label(parent,textvariable=self.title,font=("Arial",17,"bold"),wraplength=465).pack(anchor="w",pady=(4,8))
         ttk.Label(parent,textvariable=self.instruction,font=("Arial",13),wraplength=465,justify="left").pack(anchor="w",pady=(0,8))
         self.target = tk.Canvas(parent,height=190,bg="#14202c",highlightthickness=0)
         self.target.pack(fill="x")
         ttk.Label(parent,textvariable=self.progress,font=("Arial",11),wraplength=465,justify="left").pack(anchor="w",pady=8)
+        rest_row=ttk.Frame(parent);rest_row.pack(fill="x",pady=(0,6))
+        ttk.Label(rest_row,text="Rest between steps (seconds)").pack(side="left")
+        self.rest_input=ttk.Spinbox(rest_row,from_=0,to=30,increment=.5,width=6,textvariable=self.rest_seconds)
+        self.rest_input.pack(side="left",padx=8)
         buttons=ttk.Frame(parent);buttons.pack(fill="x",pady=4)
-        self.start=ttk.Button(buttons,text="Start eye calibration",command=lambda:call("start_eye_guide"))
+        self.start=ttk.Button(buttons,text="Start eye calibration",command=lambda:call("start_eye_guide",self.rest_seconds.get()))
         self.start.pack(side="left")
         ttk.Button(buttons,text="Cancel",command=self.cancel).pack(side="left",padx=5)
         self.test_sound=ttk.Button(buttons,text="Test sound",command=lambda:self.sounds.play("test"))
@@ -172,6 +185,11 @@ class EyeGuidePanel:
 
     def update(self, state):
         guide=state["eye_guide"]
+        rest_ms=state.get("config",{}).get("eye_rest_ms")
+        if rest_ms is not None and rest_ms != self.rest_seen:
+            self.rest_seconds.set(f"{rest_ms/1000:g}")
+            self.rest_seen=rest_ms
+        self.rest_input.configure(state="disabled" if guide and guide["active"] else "normal")
         self.start.configure(text="Restart eye calibration" if guide or state["eyes"] else "Start eye calibration")
         # A sound test must not interrupt the close/reopen instruction cues.
         self.test_sound.configure(state="disabled" if guide and guide["active"] else "normal")
@@ -185,15 +203,17 @@ class EyeGuidePanel:
             self.event=None
             self.title.set("Calibration stopped — open your eyes" if self.aborted else "Calibrate eyes in one guided pass")
             self.instruction.set("Select a visible face if needed, then Start again." if self.aborted else "Start opens a full-screen guide. Follow the dot comfortably.\nThen close gently and reopen at the sound.")
-            self.progress.set("Start tone • low tones: close • two high tones: reopen\nThree rising tones: ready • three low tones: retry")
+            self.progress.set(CUE_LEGEND)
             self.target.create_text(w/2,h/2,text="Select a face, then press Start",fill="#c2d0df",font=("Arial",14))
             return
         self.aborted=False
-        event=(state["generation"],guide["index"],guide["active"])
+        event=(state["generation"],guide["index"],guide["active"],guide["phase"])
         if event != self.event:
             self.event=event
             cue=("success" if guide["passed"]==2 else "retry") if not guide["active"] else (
-                "start" if guide["index"]==0 else guide["name"] if guide["name"] in ("closed","reopen") else "target")
+                ("rest_reopen" if guide["name"]=="reopen" else "rest") if guide["resting"] else
+                "capture" if guide["phase"]=="capture" else
+                "start" if guide["index"]==0 else guide["name"] if guide["name"] in ("closed","reopen") else "resume")
             self.sounds.play("close" if cue=="closed" else cue)
         if not guide["active"]:
             self.dismiss_fullscreen()
@@ -202,11 +222,13 @@ class EyeGuidePanel:
             self.progress.set(guide["report"])
             self.target.create_text(w/2,h/2,text="OPEN = 0     CLOSED = 1\n\nDark = unknown, last value held",fill="#75e3a8",font=("Arial",16,"bold"),justify="center")
             return
-        self.title.set(f"Step {guide['index']+1} / {guide['total']} — {guide['name'].upper()}")
-        self.instruction.set(guide["instruction"] + (f"\nOpen at TWO HIGH TONES (about {guide['closed_duration_ms']/1000:.0f}s)." if guide["name"]=="closed" else "\nKeep your eyes comfortably open; do not squint."))
-        stage="Get ready" if guide["preparing"] else "Sampling — hold this pose"
+        self.title.set(f"Rest before step {guide['index']+1} / {guide['total']}" if guide["resting"] else f"Step {guide['index']+1} / {guide['total']} — {guide['name'].upper()}")
+        self.instruction.set(guide["instruction"] + ("\nThe next sound will tell you to get ready." if guide["resting"] else f"\nOpen at TWO HIGH TONES (about {guide['closed_duration_ms']/1000:.0f}s)." if guide["name"]=="closed" else "\nKeep your eyes comfortably open; do not squint."))
+        stage="Rest — no samples" if guide["resting"] else "Get ready" if guide["preparing"] else "Sampling — hold this pose"
         self.progress.set(f"{stage}: {guide['remaining_ms']/1000:.1f}s\nUsable frames: left {guide['samples']['left']}  /  right {guide['samples']['right']}")
-        if guide["target"]:
+        if guide["resting"]:
+            self.target.create_text(w/2,h/2,text="REST YOUR EYES\nBlink or close naturally\nNo samples recorded",fill="#75e3a8",font=("Arial",17,"bold"),justify="center")
+        elif guide["target"]:
             x,y=guide["target"];x*=w;y*=h
             self.target.create_oval(x-14,y-14,x+14,y+14,fill="#6ed7fe",outline="white",width=2)
             self.target.create_oval(x-3,y-3,x+3,y+3,fill="white",outline="")
@@ -232,4 +254,4 @@ class EyeGuidePanel:
         # before acknowledging; the panel's next update reschedules this callback.
         if not self.fullscreen.canvas.find_all():
             return
-        self.call("present_eye_step",event[1])
+        self.call("present_eye_step",event[1],event[3])

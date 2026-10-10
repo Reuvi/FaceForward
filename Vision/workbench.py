@@ -159,10 +159,16 @@ class DetectorWorkbench:
     def calibrating(self):
         return self.job is not None or bool(self.eye_guide and self.eye_guide.active)
 
-    def start_eye_guide(self):
+    def start_eye_guide(self, rest_seconds=None):
         self._require_subject()
         if self.job is not None:
             raise ValueError("Finish or cancel the current collection first")
+        if rest_seconds is not None:
+            try:
+                rest_ms = float(rest_seconds) * 1000
+            except (ValueError, TypeError) as exc:
+                raise ValueError("Rest between steps must be 0–30 seconds") from exc
+            self.config = replace(self.config, eye_rest_ms=rest_ms)
         self.eyes.clear()
         for target in list(self.samples):
             if target.startswith(("left_", "right_")):
@@ -172,10 +178,10 @@ class DetectorWorkbench:
         self.eye_guide = GuidedEyes(self.config)
         self.notice = "Guided eyes: follow the dot with eyes comfortably open"
 
-    def present_eye_step(self, index):
+    def present_eye_step(self, index, phase=None):
         self.expire()
         if self.eye_guide:
-            self.eye_guide.present(index, self.clock())
+            self.eye_guide.present(index, self.clock(), phase)
 
     def cancel(self):
         self.job = None

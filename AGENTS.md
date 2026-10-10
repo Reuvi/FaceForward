@@ -34,6 +34,11 @@ with known=false on every unknown capture (0 only before any history).
 Raw/calibration data and dark graph holds remain separate. See
 Contracts/RESEARCH_LAB.md. Never feed a plotted hold into control.
 
+Guided eyes now have configurable rest intervals (default 3 seconds), separate rest,
+ready and capture cues, and phase-aware prompt acknowledgments. Rest/preparation
+frames never train eye geometry or blink coefficients; gate by the original capture
+timestamp and guide capture window. Camera/input sampling continues during rest.
+
 ## Start every task
 
 1. Run `git status --short --branch` and `git worktree list`. Preserve existing work.

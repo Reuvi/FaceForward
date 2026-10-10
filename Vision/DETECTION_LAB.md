@@ -54,17 +54,28 @@ comfortable and follow the dot with both eyes naturally
 open: center → left → right → up → down. Do not exaggerate or squint. The guide then
 asks you to close **both** eyes gently, and finally reopen for a fresh check. Using
 both eyes for the training pose does not couple their fits or runtime decisions.
-The whole sequence takes about 21 seconds with default settings.
+Between poses, the screen says **REST** and hides the dot. Blink, close your eyes,
+or relax your gaze naturally; these frames do not enter calibration. Set **Rest
+between steps (seconds)** before Start/Restart: the default is 3 seconds, with
+0–30 seconds supported (0 skips rest). The setting is saved with the active profile.
+There are six rests, so the default sequence takes about 40 seconds.
 
 | Cue | Action |
 | --- | --- |
 | One start tone | Calibration has begun; follow the dot |
-| Short tone at each new target | Look toward the new dot, keeping eyes open |
+| Four low tones | Rest your eyes; no calibration samples are collected |
+| Two rising tones | Rest has ended; look toward the next dot and get ready |
+| Three high tones | Sampling has started; hold the instructed pose |
 | Two descending tones | Close both eyes gently; hold until the reopen cue (about 3.3 seconds by default) |
 | Two high tones | Reopen both eyes; keep them comfortably open for the final check |
 | Three rising tones | Both eye fits passed; watch the scopes while testing |
 | Three low tones | Open your eyes; one or both fits need a retry; read the per-eye result |
 | Two high tones then a low tone | Capture cancelled/lost; open your eyes and inspect the screen |
+
+After the closed pose, two high reopen tones come **before** the four low rest tones,
+so you do not have to keep your eyes shut through the rest period. The final reopen
+pose has its own preparation cue after that rest. During capture, the three-high-tone
+cue means hold the pose already shown; it does not mean reopen during the closed pose.
 
 The guide fills the primary screen reported by Tk, using a temporary borderless
 window; it does not resize the lab or create a second program/camera stream. It
@@ -86,8 +97,10 @@ sequence so unseen instructions cannot collect mislabeled samples. Completed fit
 survive normal tab changes. Settings changes, track loss or Stop source still clear
 all fits as before. Preview stays disarmed during every guided phase.
 
-The program waits for the full-screen target to be mapped and painted before starting its
-clock. Most phases allow `settle_ms` preparation followed by `collect_ms` sampling;
+The program waits for each full-screen rest/target prompt to be mapped and painted
+before starting that phase's clock. Rest uses `eye_rest_ms`, records no geometry or
+blink-coefficient training data, and is followed by a separately acknowledged pose.
+Most poses allow `settle_ms` preparation followed by `collect_ms` sampling;
 close/reopen allow at least 1500 ms preparation. Each eye needs `min_samples` usable
 captures and at least 80% usable frames per phase. At most 512 distinct capture
 timestamps are evaluated per eye per phase. A failed eye remains unavailable; the
@@ -273,6 +286,7 @@ Settings JSON contains only the following tunables, not learned face calibration
 | --- | --- | --- |
 | `settle_ms` | 1000 | Preparation countdown, milliseconds |
 | `collect_ms` | 1800 | Target sample window, milliseconds |
+| `eye_rest_ms` | 3000 | Rest between eye poses, milliseconds; 0 skips, maximum 30000; editable in seconds on Eyes tab |
 | `min_samples` | 12 | Minimum distinct usable capture timestamps per target |
 | `stale_ms` | 250 | Max capture age and tracker gap, milliseconds |
 | `min_face_px` | 80 | Minimum face-box width in pixels |

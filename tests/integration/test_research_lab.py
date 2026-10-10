@@ -115,6 +115,16 @@ class ResearchSessionTests(unittest.TestCase):
             self.assertEqual(rows[-1]["left_input_known"], "False")
             self.assertIn("profile", json.loads((out / "report.json").read_text()))
 
+    def test_guide_rest_and_delayed_rest_frames_never_train_blink_coefficients(self):
+        for phase, capture_offset in (('rest',0),('prepare',0),('capture',25),('capture',0)):
+            self.now+=25
+            frame,packet=observation(self.now-capture_offset,seq=int(self.now),eyeBlinkLeft=.4)
+            guide=dict(active=True,waiting=False,preparing=phase!='capture',phase=phase,
+                       name='left',capture_start_ms=self.now,capture_end_ms=self.now+400)
+            self.core.observe(frame,packet,{},guide=guide,calibrating=True)
+        self.assertEqual(len(self.core.guide_groups['left']),1)
+        self.assertEqual(self.core.guide_groups['left'][0]['eyeBlinkLeft'],.4)
+
     def test_profile_round_trip_is_disarmed_and_validation_is_not_persisted(self):
         profile = self.core.profile()
         self.core.processor.armed = True

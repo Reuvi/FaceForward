@@ -31,9 +31,10 @@ class FullscreenCalibrationTests(unittest.TestCase):
     def call(self, command, *args):
         if command == "start_eye_guide":
             self.generation += 1
-            self.guide = self.Guide(SimpleNamespace(settle_ms=0, collect_ms=400, min_samples=8, eye_separation=.015))
+            self.guide = self.Guide(SimpleNamespace(settle_ms=0, collect_ms=400,
+                eye_rest_ms=float(args[0])*1000 if args else 3000, min_samples=8, eye_separation=.015))
         elif command == "present_eye_step":
-            self.guide.present(args[0], self.now)
+            self.guide.present(args[0], self.now, args[1] if len(args)>1 else None)
         elif command == "cancel":
             self.guide = None
 
@@ -56,9 +57,18 @@ class FullscreenCalibrationTests(unittest.TestCase):
         self.assertEqual(window.winfo_height(), self.root.winfo_screenheight())
         targets = []
         while self.guide.active:
+            if self.guide.resting:
+                self.assertIn('Rest',self.panel.title.get())
+                self.assertIn('no samples',self.panel.progress.get())
+                self.now=self.guide.rest_end_ms
+                self.guide.feed(self.now,{})
+                self.refresh()
+                continue
             targets.append(self.guide.step[2])
             ratio = .04 if self.guide.step[0] == "closed" else .2
             self.now = self.guide.start_ms
+            self.refresh()  # Capture cue fires once on the phase transition.
+            self.refresh()
             for _ in range(16):
                 self.guide.feed(self.now, {s: SimpleNamespace(value=ratio, quality=1) for s in ("left", "right")})
                 self.now += 25
@@ -71,6 +81,28 @@ class FullscreenCalibrationTests(unittest.TestCase):
         self.assertIsNone(self.root.grab_current())
         self.sounds.return_value.play.assert_any_call("reopen")
         self.sounds.return_value.play.assert_any_call("success")
+        cues=[call.args[0] for call in self.sounds.return_value.play.call_args_list]
+        self.assertEqual(cues.count('rest'),5)
+        self.assertEqual(cues.count('rest_reopen'),1)
+        self.assertEqual(cues.count('capture'),7)
+        self.assertEqual(str(self.panel.rest_input['state']),'normal')
+
+    def test_cancel_during_rest_clears_popup_and_restart_timing(self):
+        self.panel.rest_seconds.set('2.5')
+        self.start()
+        self.assertEqual(self.guide.config.eye_rest_ms,2500)
+        self.assertEqual(str(self.panel.rest_input['state']),'disabled')
+        self.now=self.guide.start_ms+400
+        self.guide.feed(self.now,{})
+        self.refresh()
+        self.assertTrue(self.guide.resting)
+        old_event=self.panel.event
+        self.panel.fullscreen.cancel_button.invoke()
+        self.call('start_eye_guide')
+        self.panel.present(old_event)
+        self.assertIsNone(self.guide.start_ms)
+        self.assertIsNone(self.guide.rest_end_ms)
+        self.assertIsNone(self.panel.fullscreen)
 
     def test_escape_cancels_and_restart_has_no_old_timer(self):
         self.start()

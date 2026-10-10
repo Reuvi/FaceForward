@@ -88,7 +88,7 @@ class LabRuntime:
             guide = self.workbench.eye_guide
             controls = dict(self.demo_controls)  # Available to developer scripts only.
             if guide and guide.active:
-                ratio = {"center": .25, "left": .21, "right": .22, "up": .28,
+                ratio = .25 if guide.resting else {"center": .25, "left": .21, "right": .22, "up": .28,
                          "down": .14, "closed": .04, "reopen": .25}[guide.step[0]]
                 controls.update(left_ratio=ratio, right_ratio=ratio*.94)
             elif guide and not controls:

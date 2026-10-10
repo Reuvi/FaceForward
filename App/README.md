@@ -48,15 +48,21 @@ The requested FPS takes effect on source start; actual Hz and capture age are sh
 1. On **Vision source & raw signals**, select your visible ID and press
    **Use selected subject**. A dropdown choice alone is not selection. A tracker ID
    is session-local, not biometric identity. Selection resets/disarms Processing.
-2. Open **Detection calibration → 1 Eyes**. Press **Test sound**, then **Start eye
+2. Open **Detection calibration → 1 Eyes**. Set **Rest between steps (seconds)**
+   (default 3; 0–30 supported), press **Test sound**, then **Start eye
    calibration**. A temporary full-screen native window opens. Follow the dot with
    eyes naturally open through five positions across the screen.
+   Four low tones and a **REST** screen separate the poses: blink or relax freely;
+   no calibration samples are collected. A rising pair announces the next open
+   pose; three high tones mean sampling has begun. The default sequence is about 40 seconds.
    Close both gently at the descending tones, reopen at two high tones, and wait
    for three rising completion tones. Each eye is fitted independently. Watch
    separate binary scopes: **0 open, 1 closed; darker segments hold the last known
    value while the current reading is unknown**. This is display only. The popup
    closes automatically when finished; **Escape** or **Cancel calibration** exits
    early and returns to the same lab window.
+   After closing, the reopen cue comes before the next rest, so you can relax
+   immediately. Capture continues during rest and the mouse preview stays stopped.
    Use **Restart eye calibration** to discard bad eye samples and repeat.
    Focus on this eye test before proceeding to head/tongue.
 3. In **2 Head Y**, capture NEUTRAL, UP, DOWN. Default measurement is vertical

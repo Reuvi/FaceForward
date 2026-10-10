@@ -28,7 +28,7 @@ class UnifiedCalibrationTests(unittest.TestCase):
         self.session.mode = "detector-demo"
         self.addCleanup(self.session.close)
         self.core = self.session.ensure_detector_runtime().workbench
-        self.session.detector_command("configure", {"settle_ms":0,"collect_ms":400,"min_samples":8})
+        self.session.detector_command("configure", {"settle_ms":0,"collect_ms":400,"eye_rest_ms":100,"min_samples":8})
         self.feed()
         self.session.select_subject(self.session.frame["faces"][0]["subject_id"])
 
@@ -67,12 +67,13 @@ class UnifiedCalibrationTests(unittest.TestCase):
         self.session.detector_command("start_eye_guide")
         while self.core.eye_guide.active:
             guide=self.core.eye_guide
-            self.session.detector_command("present_eye_step",guide.index)
-            index=guide.index
-            while guide.active and guide.index==index:
-                controls=self.session.detector_runtime.demo_input()
-                self.feed(**controls)
-                self.assertFalse(self.lab.processor.armed)
+            state=guide.state(self.now)
+            if state['waiting']:
+                self.session.detector_command("present_eye_step",guide.index,state['phase'])
+            controls=self.session.detector_runtime.demo_input()
+            self.feed(**controls)
+            self.assertFalse(self.lab.processor.armed)
+            self.assertEqual(self.lab.processor.eye_sample['sequence'],self.sequence)
 
     def test_restarting_eye_calibration_clears_both_processing_histories(self):
         self.guided_eyes()
@@ -111,6 +112,7 @@ class UnifiedCalibrationTests(unittest.TestCase):
             self.session.save_profile(path)
             detector=read_profile(path)["detector"]
             self.assertEqual(detector["version"],2)
+            self.assertEqual(detector['settings']['eye_rest_ms'],100)
             self.session.load_profile(path)
             self.assertFalse(self.lab.processor.armed)
             self.feed(left_ratio=.09)
@@ -123,6 +125,20 @@ class UnifiedCalibrationTests(unittest.TestCase):
                 del fit["closed_limit"];del fit["open_limit"]
             _,eyes,_,_=decode_preset(detector)
             self.assertIsNone(eyes["left"].closed_limit)
+            detector['settings'].pop('eye_rest_ms')
+            restored,_,_,_=decode_preset(detector)
+            self.assertEqual(restored.eye_rest_ms,3000)
+
+    def test_rest_duration_setting_validates_before_clearing_a_fit(self):
+        self.collect('left_open')
+        self.collect('left_closed',left_closed=True)
+        previous=dict(self.core.eyes)
+        for value in ('bad','-1','31','nan'):
+            with self.assertRaises(ValueError):self.session.detector_command('start_eye_guide',value)
+            self.assertEqual(self.core.eyes,previous)
+        self.session.detector_command('start_eye_guide','2.5')
+        self.assertEqual(self.core.config.eye_rest_ms,2500)
+        self.assertEqual(self.core.eye_guide.config.eye_rest_ms,2500)
 
     def test_guided_restart_cancel_loss_and_mixed_jobs(self):
         self.calibrate()
