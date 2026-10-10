@@ -77,8 +77,10 @@ The requested FPS takes effect on source start; actual Hz and capture age are sh
    acceleration and preview speed. Apply changes and start preview again. Use
    **Save active profile** in the source tab to save the applied settings and fits.
 
-Unknown values stay invalid in the detector, Processing and CSV. A dark held trace
-is not a new measurement or a continued button press. Channels with no prior known
+Unknown detector observations and graph/CSV evidence stay invalid. The explicit
+Processing eye input defaults to closed=0/open with known=false on every captured
+frame; that flag cancels eye timers and never counts as intentional reopening.
+A dark held trace is not a new measurement or a continued button press. Channels with no prior known
 value stay blank; source/subject resets start a new history.
 
 The preview is unmirrored: your left eye appears on the image's right. Both eye
@@ -211,3 +213,5 @@ See [the adopted contract](../Contracts/MOUSE_MVP.md) and
 ## Detection research in this window
 
 The **Detection research** tab shares this capture worker and selected profile. It adds temporal blink/wink recognition, feature and duration graphs, labeled trials, optional event models, alternative gestures/dwell/head control and an optional gaze-calibration experiment. **Start research preview** runs these settings; header **Start preview** returns to the original preview. Stop/Escape stops both. See [Detection research guide](../docs/DETECTION_RESEARCH_GUIDE.md) for exact controls, measurements, limits and validation steps. Saved profiles now use v2 with an additive research section; existing v1 profiles remain readable.
+
+Eye input details: [every-frame neutral eye samples](../docs/DETECTION_RESEARCH_GUIDE.md#eye-input-update-unknown-means-numeric-open-every-frame). Unknown graph colors are unchanged; explicit numeric inputs/known flags appear in the research readout and exports.

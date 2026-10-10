@@ -232,14 +232,7 @@ class ResearchSession:
         if packet is None:
             self.stop("No selected research subject")
             self.packet = None
-            # Keep a timestamped invalid row for display/export; never feed it to timers.
-            self.processor.trace.append(
-                dict(
-                    t=frame["timestamp_ms"] / 1000,
-                    sequence=frame["sequence"],
-                    scope_context=self.processor.context,
-                )
-            )
+            self.processor.feed_unknown(frame, self.clock())
             return
         try:
             validate_packet(packet)
@@ -263,7 +256,7 @@ class ResearchSession:
             and packet["session_id"] == self.packet["session_id"]
             and (
                 packet["sequence"] <= self.packet["sequence"]
-                or t <= self.packet["timestamp_ms"]
+                or t < self.packet["timestamp_ms"]
             )
         ):
             self.stop("Duplicate/out-of-order feature packet")
@@ -329,8 +322,8 @@ class ResearchSession:
             trial = self.processor.trial
             trial["frames"] += 1
             trial["invalid"] += int(
-                values.get("left_closure") is None
-                or values.get("right_closure") is None
+                not self.processor.eye_sample["left"]["known"]
+                or not self.processor.eye_sample["right"]["known"]
             )
 
     def fit_feature(self, key, opened, active):

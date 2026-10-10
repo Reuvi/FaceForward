@@ -101,9 +101,9 @@ More accepted actions than requested can indicate repeated actions; fewer can in
 misses, but check your labels and attempts before attributing the difference to detection.
 
 Unknown plot intervals hold the last known height in a **darker version of the same
-color**. No previous known sample means no invented line. CSV retains nulls/empty
-cells. These display holds and line interpolation never feed gesture timers, models,
-dwell or control. Source/subject/calibration boundaries prevent cross-person plot holds.
+color**. No previous known sample means no invented line. Raw observation columns retain nulls/empty cells. Explicit eye input columns now
+use open/no-action fallback values with unknown flags, as detailed in the eye input
+update below. Display holds and line interpolation never feed timers, models or control. Source/subject/calibration boundaries prevent cross-person plot holds.
 
 ## Temporal recognizer and settings
 
@@ -293,3 +293,49 @@ RUN_TK_TESTS=1 Vision/.venv/bin/python -m unittest discover -s tests/integration
 python3 -m unittest discover -s tests/tooling -v
 Vision/.venv/bin/python -m Processing.research.benchmark
 ```
+
+## Eye input update: unknown means numeric open, every frame
+
+For the current eye-focused MVP, every fresh captured frame supplies two explicit
+numeric eye inputs. Unknown/uncalibrated/ambiguous eyes use **0 = open/no action**, with
+**`known=false`** retained. The other eye continues independently. This includes
+frames where the selected face is unavailable: the sample is neutral, output stops,
+and the app never switches control to another person. There is no dropped frame just
+because an eye is unknown; a stopped camera cannot supply new frames.
+
+The normalized sample is `eye_sample_v1`, with the original capture session, sequence
+and timestamp. Read it from `Lab.ingest(frame)["eye_sample"]` or
+`Lab.state()["eye_sample"]`; research exposes the latest sample through
+`ResearchProcessor.preview()["eye_sample"]`. Original mouse samples are binary;
+research samples contain calibrated closure strength. Both use 0=open, 1=closed.
+The original SignalFrame's raw `*_eye_open` convention stays 1=open and its unknown
+observation stays null/invalid. Transported fallback values do not overwrite evidence.
+
+In **Detection research → Measurements & preview**, the bottom readout shows the last
+captured eye input and whether it is known or **unknown → open**. The scopes keep their
+colors and darker held segments. Those dark graph heights are not the numeric value
+being processed: the explicit fallback is 0. Frames with an ambiguous binary
+classification also use the fallback even if a geometric closure score is available.
+
+CSV separates `left_input`/`right_input` (numeric values every frame),
+`left_input_known`/`right_input_known` (flags), and measured/graph data. Research
+`*_measured_closure` retains the calculated geometry score when available;
+`*_closure` is null for unknown/gated eye input so plots remain dark. A no-face row has
+numeric 0 inputs and unknown flags, without invented measurements. Original mouse
+CSV is sampled at the 100 Hz output clock and identifies its latest captured eye
+sample with `eye_sample_sequence` and `eye_sample_timestamp_ms`; research frame CSV
+has one row per fresh capture. Repeated values remain separate samples. A higher
+sequence at an equal capture timestamp adds a sample but advances no timer.
+Before the first capture, output-clock CSV rows leave eye inputs and capture IDs
+empty; that startup interval does not invent camera samples.
+
+The unknown flag immediately releases a held eye action and cancels any pending
+wink. It **does not count as a real reopening and cannot complete a release-click**.
+A measured open baseline is still required before another gesture. Calibration and
+learned feature models never train on fallback zeros. Malformed, duplicate,
+out-of-order and stale frames do not refresh valid input; face-loss samples remain
+non-controlling even though their numeric eye records are present.
+
+This policy is deliberately specific to eyes. Future head, tongue, pupil and other
+face-component calibrations must choose their own neutral value and validity rules;
+no global replacement of missing values with zero has been introduced.

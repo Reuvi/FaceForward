@@ -226,8 +226,10 @@ Darker segments hold the last known height while an input is unknown. Bright lin
 resume at the next known sample; unknown-to-known transitions jump at that sample,
 without interpolating across the missing interval. No known value in retained
 history means no line. These are rendering rules shared through `LabUI.traces`.
-CSV and processor input remain unchanged: missing inputs stay null/invalid, affected
-buttons release, and affected motion stops. Output traces show the actual released
+Raw CSV observations stay null/invalid. The eye-only input adapter now supplies
+numeric closed=0/open with known=false for unknown eyes on each captured frame;
+separate input/known columns expose that fallback. Unknown still cancels eye timers
+and releases buttons, without counting as intentional reopening. Motion validity is unchanged. Output traces show the actual released
 or neutral state, even while a raw-input trace visually holds its previous height.
 
 ## Experimental temporal recognition

@@ -28,8 +28,10 @@ Update relevant documentation when behavior, settings, or interfaces change.
 Eye calibration now opens a temporary native full-screen dot guide and returns to
 the lab on completion/cancel. `LabUI` owns shared display helpers: unknown plot
 intervals hold the previous known height in a darker color. This is presentation
-only; preserve null/invalid data, CSV and immediate control release. Never feed a
-plotted hold back into detection, Processing or Drivers.
+only; preserve null/invalid observations and immediate control release. The current
+user-requested eye exception is an explicit numeric open/no-action Processing input
+with known=false on every capture; raw/calibration data and dark graph holds remain
+separate. See Contracts/RESEARCH_LAB.md. Never feed a plotted hold into control.
 
 ## Start every task
 

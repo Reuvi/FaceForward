@@ -58,6 +58,19 @@ class FeatureTests(unittest.TestCase):
         self.assertIsNone(v["yaw"])
         self.assertIsNone(v["right_closure"])
 
+    def test_uncertain_eye_retains_raw_closure_and_marks_control_unknown(self):
+        from Vision.research_features import feature_frame
+        from Vision.calibration import EyeCalibration
+
+        core, obs = self.make(left_ratio=0.09, right_ratio=0.16)
+        core.eyes["left"] = EyeCalibration(
+            0.04, 0.25, 0.5, closed_limit=0.07, open_limit=0.12
+        )
+        values = feature_frame(core)["values"]
+        self.assertIsNotNone(values["left_closure"])
+        self.assertEqual(values["left_eye_known"], 0)
+        self.assertEqual(values["right_eye_known"], 1)
+
     def test_yaw_pitch_roll_rotation_order_and_sign(self):
         import numpy as np
         from Vision.research_features import feature_frame

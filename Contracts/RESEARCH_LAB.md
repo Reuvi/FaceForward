@@ -63,3 +63,9 @@ values and `*_input_known` flags. The ordinary 100 Hz output clock remains indep
 of camera rate. No samples are invented when capture stops. This fallback applies to
 eyes only; head, tongue and other facial channels keep their existing invalid-data
 behavior pending their own calibration decisions.
+
+Vision's feature values now include numeric `left_eye_known`/`right_eye_known`
+(0/1) from the calibrated eye classifier. The raw geometry closure score may remain
+finite while this flag is 0; Processing must then supply the numeric open fallback.
+Legacy feature fixtures without these optional flags retain finite-or-null behavior.
+The research trace preserves `*_measured_closure` separately from masked graph values.

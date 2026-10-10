@@ -9,6 +9,7 @@ from .config import MouseConfig, number
 from .engine import MouseProcessor
 from .mocks import SCENARIOS, raw_frame, scenario
 from .output import mouse_message
+from Processing.eye_samples import trace_fields
 
 
 def now_ms():
@@ -61,6 +62,9 @@ class Lab:
             snap, diag = self.snapshot, self.snapshot["diagnostics"]
             point, interpolated = diag["raw_pointer"], diag["interpolated_pointer"]
             self.trace.append({
+                **trace_fields(self.processor.eye_sample),
+                "eye_sample_sequence": self.processor.eye_sample["sequence"] if self.processor.eye_sample else None,
+                "eye_sample_timestamp_ms": self.processor.eye_sample["timestamp_ms"] if self.processor.eye_sample else None,
                 "id": self.trace_id, "t": (timestamp - self.started) / 1000.0,
                 "sample": snap["source_sequence"],
                 "raw_x": point[0] if point else None, "raw_y": point[1] if point else None,
@@ -105,7 +109,7 @@ class Lab:
 
     def state(self, after=0):
         with self.lock:
-            return {"snapshot": self.snapshot, "message": mouse_message(self.snapshot),
+            return {"eye_sample": self.processor.eye_sample, "snapshot": self.snapshot, "message": mouse_message(self.snapshot),
                     "trace": [row for row in self.trace if row["id"] > after],
                     "raw": self.last_raw, "runtime": self.runtime.copy(), "manual": self.manual.copy(),
                     "config": self.processor.config.to_dict(), "scenario": self.scenario_name,
@@ -215,4 +219,4 @@ class Lab:
             # Show the actual latest input, including subject loss/rejected frames.
             self.last_raw = frame
             self.last_ingest = result
-            return result
+            return dict(result, eye_sample=self.processor.eye_sample)

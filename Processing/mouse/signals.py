@@ -45,6 +45,10 @@ def one_hot_matrix(values):
     return points[0] if len(points) == 1 else None
 
 
+class SubjectMissing(ValueError):
+    """A valid capture with no observation for the requested person."""
+
+
 @dataclass(frozen=True)
 class Sample:
     session_id: str
@@ -55,6 +59,14 @@ class Sample:
     right_closed: object
     pointer: object
     scroll: object
+    left_known: bool = True
+    right_known: bool = True
+
+    def __post_init__(self):
+        for side in ("left", "right"):
+            if getattr(self, side + "_closed") is None:
+                object.__setattr__(self, side + "_closed", False)
+                object.__setattr__(self, side + "_known", False)
 
 
 def decode(frame, config, subject_id):
@@ -72,7 +84,7 @@ def decode(frame, config, subject_id):
 
     if frame.get("format") == "raw_mouse_v1":
         if frame.get("subject_id") != subject_id:
-            raise ValueError("Selected subject is missing")
+            raise SubjectMissing("Selected subject is missing")
         def eye(name):
             value = frame.get(name)
             return value == config.closed_value if finite(value) and value in (0, 1) else None
@@ -88,8 +100,10 @@ def decode(frame, config, subject_id):
     if not all(isinstance(face, dict) for face in faces):
         raise ValueError("Invalid face observation")
     selected = [face for face in faces if face.get("subject_id") == subject_id]
+    if not selected:
+        raise SubjectMissing("Selected subject is missing")
     if len(selected) != 1:
-        raise ValueError("Selected subject is missing or ambiguous")
+        raise ValueError("Selected subject is ambiguous")
     signals = selected[0].get("signals")
     if not isinstance(signals, dict):
         raise ValueError("signals must be an object")

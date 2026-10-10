@@ -4,7 +4,8 @@ from collections import deque
 import math
 
 from .config import MouseConfig
-from .signals import decode, finite
+from .signals import decode, finite, SubjectMissing
+from Processing.eye_samples import eye_sample, is_fresh_sample
 
 
 def length(vector):
@@ -29,8 +30,8 @@ class EyeGate:
         self.open_since = None
         self.progress = 0.0
 
-    def sample(self, closed, timestamp):
-        if closed is None:
+    def sample(self, closed, timestamp, *, known=True):
+        if not known or closed is None:
             self.reset()
             return
         if not closed:
@@ -166,6 +167,7 @@ class MouseProcessor:
         self.left = EyeGate(self.config.left_eye)
         self.right = EyeGate(self.config.right_eye)
         self.sample = None
+        self.eye_sample = None
         self.session = None
         self.sequence = -1
         self.received_ms = None
@@ -197,6 +199,17 @@ class MouseProcessor:
         self.pointer.clear()
         self.scroll.clear()
 
+    def record_eyes(self, frame, received_ms, sample=None):
+        """Publish one numeric eye input for every fresh envelope, even without a face."""
+        try:
+            normalized = eye_sample(frame, self.subject_id,
+                sample.left_closed if sample and sample.left_known else None,
+                sample.right_closed if sample and sample.right_known else None)
+        except (ValueError, AttributeError):
+            return
+        if is_fresh_sample(normalized, self.eye_sample, received_ms, self.config.stale_ms):
+            self.eye_sample = normalized
+
     def accept(self, frame, received_ms):
         if not finite(received_ms):
             raise ValueError("received_ms must be finite")
@@ -205,6 +218,8 @@ class MouseProcessor:
             if not 0 <= received_ms - sample.timestamp_ms <= self.config.stale_ms:
                 raise ValueError("Sample is future-dated or stale")
         except ValueError as exc:
+            if isinstance(exc, SubjectMissing):
+                self.record_eyes(frame, received_ms)
             self.rejected += 1
             self.disarm(str(exc))
             return {"accepted": False, "reason": str(exc)}
@@ -224,11 +239,12 @@ class MouseProcessor:
         self.sample = sample
         self.received_ms = received_ms
         self.accepted += 1
+        self.record_eyes(frame, received_ms, sample)
         self.pointer.push(sample.pointer, sample.timestamp_ms)
         self.scroll.push(sample.scroll, sample.timestamp_ms)
         if self.armed:
-            self.left.sample(sample.left_closed, sample.timestamp_ms)
-            self.right.sample(sample.right_closed, sample.timestamp_ms)
+            self.left.sample(sample.left_closed, sample.timestamp_ms, known=sample.left_known)
+            self.right.sample(sample.right_closed, sample.timestamp_ms, known=sample.right_known)
         return {"accepted": True, "reason": "Sample accepted"}
 
     def tick(self, now_ms):
@@ -271,8 +287,8 @@ class MouseProcessor:
             "diagnostics": {
                 "raw_pointer": list(sample.pointer) if sample and fresh and sample.pointer is not None else None,
                 "raw_scroll": sample.scroll if sample and fresh else None,
-                "left_closed": sample.left_closed if sample and fresh else None,
-                "right_closed": sample.right_closed if sample and fresh else None,
+                "left_closed": sample.left_closed if sample and fresh and sample.left_known else None,
+                "right_closed": sample.right_closed if sample and fresh and sample.right_known else None,
                 "left_dwell": self.left.progress, "right_dwell": self.right.progress,
                 "interpolated_pointer": self.pointer.position,
                 "interpolated_scroll": self.scroll.position[0] if self.scroll.position is not None else None,

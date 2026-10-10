@@ -90,6 +90,10 @@ class UnifiedCalibrationTests(unittest.TestCase):
         result=self.feed(left_ratio=.09,right_closed=True)
         self.assertEqual((result["left_click"],result["right_click"]),(0,1))
         self.assertIsNone(self.core.trace[-1]["left_closed_bit"])
+        for sample in (self.lab.state()['eye_sample'],self.session.research.processor.eye_sample):
+            self.assertEqual(sample['sequence'],self.session.frame['sequence'])
+            self.assertEqual(sample['left'],{'value':0.,'known':False})
+            self.assertEqual(sample['right'],{'value':1.,'known':True})
         with tempfile.TemporaryDirectory() as directory:
             path=Path(directory)/"eyes.json"
             self.session.save_profile(path)

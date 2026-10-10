@@ -742,6 +742,7 @@ class ResearchView:
             trials = list(self.core.trials)
             report = self.core.report
             output = dict(p.output)
+            delivered = p.eye_sample
             cursor = list(p.cursor)
             count = p.click_id
             trial = p.trial
@@ -814,8 +815,19 @@ class ResearchView:
             fill=TEXT,
             anchor="ne",
         )
+        eye_text = "Waiting for captured eye samples"
+        if delivered:
+            eye_text = (
+                f"Last capture {delivered['sequence']} eye inputs: "
+                + " / ".join(
+                    f"{side} {delivered[side]['value']:.2f} ({'known' if delivered[side]['known'] else 'unknown → open'})"
+                    for side in ("left", "right")
+                )
+            )
         self.preview_status.set(
-            f"{output.get('format')} · enabled {output.get('enabled')} · buttons {output.get('buttons')} · scroll {output.get('scroll', 0.5):.3f}"
+            eye_text
+            + "\n"
+            + f"{output.get('format')} · enabled {output.get('enabled')} · buttons {output.get('buttons')} · scroll {output.get('scroll', 0.5):.3f}"
         )
         self.update_gaze(fix)
         self.timer = self.root.after(100, self.tick)

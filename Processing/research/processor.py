@@ -7,6 +7,7 @@ from math import exp, hypot
 from .gestures import Gesture, finite
 from .settings import settings
 from .models import predict
+from Processing.eye_samples import eye_sample, is_fresh_sample, trace_fields
 
 
 def validate_packet(packet):
@@ -55,6 +56,7 @@ class ResearchProcessor:
         self.event_id = 0
         self.click_id = 0
         self.context = None
+        self.eye_sample = None
         self.last_sequence = None
         self.last_time = None
         self.trial = None
@@ -139,6 +141,27 @@ class ResearchProcessor:
             )
         )
 
+    def feed_unknown(self, frame, now):
+        """Keep the eye stream continuous on a capture without a selected observation."""
+        normalized = eye_sample(frame, None)
+        if not is_fresh_sample(
+            normalized, self.eye_sample, now, self.config["stale_ms"]
+        ):
+            return False
+        self.reset("No selected research subject")
+        self.eye_sample = normalized
+        self.trace.append(
+            dict(
+                t=frame["timestamp_ms"] / 1000,
+                sequence=frame["sequence"],
+                session_id=frame["session_id"],
+                subject_id=None,
+                scope_context=self.context,
+                **trace_fields(normalized),
+            )
+        )
+        return True
+
     def feed(self, packet, base, now, gaze=None):
         try:
             validate_packet(packet)
@@ -151,7 +174,7 @@ class ResearchProcessor:
             self.reset("Face/calibration changed; start preview", clear_context=True)
             self.context = context
         if self.last_sequence is not None and (
-            packet["sequence"] <= self.last_sequence or t <= self.last_time
+            packet["sequence"] <= self.last_sequence or t < self.last_time
         ):
             self.reset("Duplicate/out-of-order research input")
             return
@@ -181,8 +204,22 @@ class ResearchProcessor:
         )
         stable = t >= self.motion_until and supported
         values = {
-            s: v.get(s + "_closure") if stable else None for s in ("left", "right")
+            s: v.get(s + "_closure")
+            if stable and v.get(s + "_eye_known", 1) == 1
+            else None
+            for s in ("left", "right")
         }
+
+        normalized = eye_sample(
+            packet, packet["subject_id"], values["left"], values["right"]
+        )
+        if not is_fresh_sample(normalized, self.eye_sample, now, c["stale_ms"]):
+            self.reset("Duplicate/out-of-order eye input")
+            return False
+        self.eye_sample = normalized
+        for side in ("left", "right"):
+            if not normalized[side]["known"]:
+                values[side] = None
 
         def expression(key):
             return self.normalize(key, v.get(key)) if stable else None
@@ -201,7 +238,12 @@ class ResearchProcessor:
             scope_context=context,
             pose_speed=motion,
             **v,
+            **trace_fields(normalized),
         )
+        for side in ("left", "right"):
+            # Keep the measured ratio-derived score separate from control/graph validity.
+            row[side + "_measured_closure"] = v.get(side + "_closure")
+            row[side + "_closure"] = values[side]
         row["eye_overlap"] = (
             float(all(values[s] >= c["activation"] for s in ("left", "right")))
             if all(values[s] is not None for s in ("left", "right"))
@@ -242,7 +284,9 @@ class ResearchProcessor:
             before = gate.onset
             event = gate.feed(
                 t,
-                values[channel],
+                normalized[channel]["value"]
+                if channel in ("left", "right")
+                else values[channel],
                 opposite,
                 features,
                 c,
@@ -257,6 +301,9 @@ class ResearchProcessor:
                     + "_min_ms"
                 ],
                 strict=c["policy"] == "strict" and channel in ("left", "right"),
+                known=normalized[channel]["known"]
+                if channel in ("left", "right")
+                else True,
             )
             if before is None and gate.onset is not None:
                 self.event_trials[channel] = deepcopy(self.trial)
@@ -440,6 +487,7 @@ class ResearchProcessor:
         if type(after_click) is not int or not 0 <= after_click <= self.click_id:
             raise ValueError("Invalid click cursor")
         result = deepcopy(self.output)
+        result["eye_sample"] = deepcopy(self.eye_sample)
         result["click_cursor"] = self.click_id
         result["click_gap"] = bool(
             self.clicks and after_click < self.clicks[0]["id"] - 1

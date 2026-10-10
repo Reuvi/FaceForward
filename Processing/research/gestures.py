@@ -31,10 +31,13 @@ class Gesture:
         self.sync_lag = None
         self.overlap_ms = 0.0
 
-    def feed(self, t, value, opposite, features, cfg, minimum, *, strict=False):
+    def feed(
+        self, t, value, opposite, features, cfg, minimum, *, strict=False, known=True
+    ):
         event = None
         if (
-            not finite(value)
+            not known
+            or not finite(value)
             or strict
             and (not finite(opposite) or opposite > cfg["release"])
         ):
@@ -42,7 +45,7 @@ class Gesture:
                 event = self.finish(t, "invalid/opposite eye", False)
             self.reset()
             return event
-        if self.last and not 0 < t - self.last[0] <= cfg["stale_ms"]:
+        if self.last and not 0 <= t - self.last[0] <= cfg["stale_ms"]:
             self.reset()
         if finite(opposite):
             if opposite >= cfg["activation"] and self.opposite_since is None:
@@ -53,7 +56,7 @@ class Gesture:
             self.opposite_since = None
         speed = (
             0
-            if self.last is None
+            if self.last is None or t == self.last[0]
             else (value - self.last[1]) * 1000 / (t - self.last[0])
         )
         dt = 0 if self.last is None else t - self.last[0]

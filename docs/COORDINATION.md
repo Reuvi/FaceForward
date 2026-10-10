@@ -242,3 +242,23 @@ checks passed. No live-person calibration accuracy or real driver output was tes
 - Defaults: independent eyes, release click, 320 ms minimum per eye, 80 ms open confirmation; strict policy and learned gates explicit. No actual OS input.
 - Read `docs/DETECTION_RESEARCH_GUIDE.md` for calibration/trials, exact settings, ownership and test commands. Export human data only to ignored private paths.
 - Follow-up dependencies: real-person held-out evidence, comfortable per-user control mapping and final Drivers delivery/monitor-coordinate agreement. Synthetic tests are implementation evidence only.
+
+## Eye-only neutral sample handoff — 2026-10-10
+
+User requested unknown eye input default to no action while keeping dark graph holds
+and sending a sample each frame. Branch `work/reuvi/integration/eye-neutral-samples`,
+base `e7dfc75`, coordinates Vision uncertainty flags, Processing eye adapters/gates,
+App research handling and tests/docs. Every fresh capture exposes `eye_sample_v1`: numeric
+closure 0 with known=false for unknown. Raw/calibration observations remain invalid.
+The unknown flag cancels a pending wink; it must never complete a release click or
+teach an open baseline. Missing-person captures carry neutral samples while control
+stays disabled. No generic head/tongue fallback; future components need their own policy.
+See the updated research contract and guide for sample/CSV fields and clock semantics.
+
+Validation: 191 tests passed (59 Processing, 82 Vision, 43 integration with native
+Tk enabled, 7 tooling). New coverage checks per-frame unknown samples, independent
+eye uncertainty, loss-of-face samples, release-click cancellation, held-button
+release, equal timestamps, retained raw evidence and CSV startup/export. Real-model
+blank-image initialization passed; real-person detection accuracy still needs live
+testing. Changed runtime modules/new tests pass Ruff; compilation, whitespace and
+integration scope checks pass. Head/tongue and the Drivers handoff remain unchanged.

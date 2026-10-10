@@ -68,6 +68,10 @@ class ResearchSessionTests(unittest.TestCase):
         self.core.observe(frame, None, {})
         self.assertFalse(self.core.processor.armed)
         self.assertNotIn("left_closure", self.core.processor.trace[-1])
+        self.assertEqual(self.core.processor.eye_sample["sequence"], frame["sequence"])
+        self.assertEqual(
+            self.core.processor.eye_sample["left"], {"value": 0.0, "known": False}
+        )
         self.assertEqual(self.core.processor.trace[-1]["t"], self.now / 1000)
 
     def test_join_mismatch_rejected_without_mutating_trace(self):
@@ -106,6 +110,8 @@ class ResearchSessionTests(unittest.TestCase):
             with (out / "frames.csv").open() as handle:
                 rows = list(csv.DictReader(handle))
             self.assertEqual(rows[-1]["left_closure"], "")
+            self.assertEqual(rows[-1]["left_input"], "0.0")
+            self.assertEqual(rows[-1]["left_input_known"], "False")
             self.assertIn("profile", json.loads((out / "report.json").read_text()))
 
     def test_profile_round_trip_is_disarmed_and_validation_is_not_persisted(self):

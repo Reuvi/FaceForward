@@ -62,8 +62,12 @@ def feature_frame(core):
         values[side + "_quality"] = feature.quality if feature else 0
         values[side + "_ratio"] = feature.value if usable else None
         values[side + "_closure"] = None
+        values[side + "_eye_known"] = 0
         fit = core.eyes.get(side)
         if fit and usable:
+            values[side + "_eye_known"] = int(
+                fit.classify(feature.value, feature.quality)["valid"]
+            )
             opened = fit.open_limit if fit.open_limit is not None else fit.opened
             closed = fit.closed_limit if fit.closed_limit is not None else fit.closed
             values[side + "_closure"] = max(
