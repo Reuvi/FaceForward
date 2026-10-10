@@ -1,5 +1,15 @@
 # Main chat and agent coordination hub
 
+## Current head/tongue calibration and raw views task
+
+Claim: Reuvi integration, `work/reuvi/integration/movement-calibration`, base
+`482fa65`. Authorized scope: Vision head/tongue calibration/UI/profiles, App's
+camera setup view and shared capture snapshots, contracts/docs and relevant tests.
+User requests guided head/tongue calibration, position visualization, basic raw
+graphs on the camera tab, and consistent data across tabs. Device-specific transfer
+functions and driver integration remain the next stage. Contract lands first:
+[MOVEMENT_CALIBRATION.md](../Contracts/MOVEMENT_CALIBRATION.md).
+
 ## Current simplified wink calibration task
 
 Reuvi asks to remove Detection research and train blink-versus-wink appearance in
