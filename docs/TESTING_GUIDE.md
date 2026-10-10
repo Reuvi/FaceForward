@@ -122,8 +122,12 @@ grid resolution when examining finer dead-zone behavior.
 
 The Vision table uses **eye open = 1**, but the processing eye scopes use
 **eye closed = 1**. This is an intentional adapter conversion. Raw position 0.75
-does not imply output velocity 0.75. Gaps mean unavailable input; zero is a valid
-measurement and must not be used as the missing-data marker.
+does not imply output velocity 0.75. **Darker segments mean unknown input, held at
+the last known height for display only.** Valid data resumes in the normal color;
+a never-observed channel stays blank. Zero is a valid measurement, never a missing
+data marker. Numeric readouts and CSV keep unknowns empty/invalid; Processing still
+releases invalid buttons and neutralizes affected motion. A dark raw-eye line at 1
+must not be read as a continued click.
 
 **Freeze scope** freezes the displayed Processing history, not the producer or
 output. Use Stop if you want output disabled. **Export CSV** saves the frozen
@@ -202,12 +206,15 @@ Vision/.venv/bin/python -m App --source camera \
 2. Choose a currently detected subject and press **Use selected subject**. Merely
    displaying a dropdown option does not bind Processing to it.
 3. Test **eyes first** in Detection calibration → 1 Eyes: **Test sound**, then
-   **Start eye calibration**. Follow five open-eye dot positions; close gently at
+   **Start eye calibration**. A temporary full-screen guide opens. Follow five
+   open-eye dot positions; close gently at
    descending tones, reopen at two high tones, and wait for completion tones.
    Read [the guided procedure](../Vision/DETECTION_LAB.md#1-independent-eye-calibration).
    Look around with eyes open: both scopes should stay at **0**. Close one eye at
    a time, then both: each respective trace should reach **1** independently.
-   Gray/unavailable readings produce gaps, not a closed bit. If any pose is labeled
+   Unknown readings produce a darker hold of the previous height, not a new
+   closed bit. Completion returns to the lab automatically; Escape or the popup
+   Cancel button exits early. If any pose is labeled
    incorrectly, **Restart eye calibration** clears bad eye training without changing
    head/tongue fits. Leaving this active guide cancels it. Later test head targets
    and tongue training/checks using the same runbook.

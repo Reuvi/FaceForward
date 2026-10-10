@@ -205,3 +205,31 @@ strict wink mode must not silently become an opposite-eye veto in the default.
 Recommended order: observe/labeled trials → temporal intent prototype → capability
 profiles → gaze feasibility → explicit pointer/Drivers handoff. Keep all work in
 owning lanes and coordinate feature/profile/event contracts before integration.
+
+
+## Full-screen eye guide and unknown trace display — 2026-10-10
+
+Main-chat implementation on `work/reuvi/integration/fullscreen-eye-guide`, based on
+`93d4ddd`. Scope: Vision guide/scopes and snapshot display history, Processing graph
+renderer, App window cleanup/raw graph context, shared `LabUI` presentation helpers,
+regression tests and documentation. This is an explicitly coordinated integration
+change across those UI surfaces.
+
+- Start eye calibration opens a temporary full-screen native dot guide; sound cues,
+  the seven existing phases and independent fitting remain. Escape/Cancel exits;
+  completion/retry/loss/shutdown closes the popup and returns to the lab.
+- Sample timing waits for the displayed full-screen prompt. No extra camera or web UI.
+- Unknown graph intervals use a darker channel color at the previous known height.
+  Current values stay unknown and CSV stays null; control invalidation/release is
+  unchanged. `LabUI.traces` is presentation only and must never feed Drivers.
+- No profile/schema, classifier threshold, gesture policy or hardware mapping changes.
+
+See [testing steps](../Vision/DETECTION_LAB.md#1-independent-eye-calibration).
+
+Validation for this increment: **150 tests passed** — 74 Vision (including the
+local-model blank-image smoke), 36 Processing, 33 integration (including five
+opt-in native Tk checks), and 7 tooling. The 490-frame demo accepted all frames,
+observed all four mouse actions and ended disabled with neutral/released output.
+Native synthetic UI inspection confirmed the full-screen target, automatic return,
+and a dark held eye trace alongside an unavailable numeric reading. Scope/whitespace
+checks passed. No live-person calibration accuracy or real driver output was tested.

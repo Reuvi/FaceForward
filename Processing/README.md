@@ -219,3 +219,13 @@ The 10,000-tick synthetic benchmark on this Mac (Python 3.12.5) measured about
 43 microseconds mean / 57 microseconds p95 for decoding plus processing per tick.
 That excludes UI rendering, detector inference, OS scheduling, and driver latency.
 Re-run the benchmark on the target device; these are measurements, not timing guarantees.
+
+## Unknown values in scopes
+
+Darker segments hold the last known height while an input is unknown. Bright lines
+resume at the next known sample; unknown-to-known transitions jump at that sample,
+without interpolating across the missing interval. No known value in retained
+history means no line. These are rendering rules shared through `LabUI.traces`.
+CSV and processor input remain unchanged: missing inputs stay null/invalid, affected
+buttons release, and affected motion stops. Output traces show the actual released
+or neutral state, even while a raw-input trace visually holds its previous height.

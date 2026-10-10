@@ -5,7 +5,7 @@ import unittest
 
 from Vision.calibration import EyeCalibration
 from Vision.guided_eyes import GuidedEyes
-from Vision.eye_scope import binary_segments
+from Vision.eye_scope import binary_runs
 
 
 class GuidedEyeTests(unittest.TestCase):
@@ -79,9 +79,16 @@ class GuidedEyeTests(unittest.TestCase):
         self.assertIn("left",self.guide.errors)
         self.assertIn("right",self.guide.errors)
 
-    def test_binary_scope_steps_do_not_bridge_invalid_stale_or_other_subject(self):
+    def test_binary_scope_unknown_and_stale_hold_without_inheriting_other_subject(self):
         def row(t,v,subject="one",generation=1):
             return dict(timestamp_ms=t,left_closed_bit=v,subject_id=subject,calibration_generation=generation)
         rows=[row(0,0),row(50,1),row(100,None),row(150,0),row(500,1),row(550,1,"other"),row(600,0),row(650,1,generation=2)]
-        segments=binary_segments(rows,"left_closed_bit","one",1,250)
-        self.assertEqual(segments,[((0,0),(50,0),(50,1))])
+        runs=binary_runs(rows,"left_closed_bit","one",1,250)
+        self.assertEqual(runs, [
+            (False, [(0,0),(50,0),(50,1)]),
+            (True, [(50,1),(100,1),(150,1)]),
+            (False, [(150,1),(150,0)]),
+            (True, [(150,0),(500,0)]),
+            (False, [(500,0),(500,1)]),
+        ])
+        self.assertIsNone(rows[2]["left_closed_bit"])

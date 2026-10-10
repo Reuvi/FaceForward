@@ -139,3 +139,17 @@ before accepting captures. `DetectorWorkbench.calibrating` includes both legacy
 collections and all active guided phases; App disarms throughout. Restart drops
 both eye fits/samples but preserves unrelated head/tongue fits. Leaving the active
 Eyes view cancels the guide; loss/staleness clears calibration as before.
+
+
+### Full-screen guide and unknown trace display
+
+The eye guide uses a temporary native full-screen window owned by the existing Tk
+application. Presentation acknowledgment waits for that window's target to be mapped
+and painted. Completion, retry, cancellation, source loss and shutdown dismiss it;
+Escape cancels. The same worker, fits and saved profile are used.
+
+Plotting may hold a previous value in a darker color during an unknown interval.
+This is presentation only, never a SignalFrame measurement or a Processing input.
+Numeric values, validity, CSV, release/disarm behavior and all wire formats remain
+unchanged. No inferred value is inserted into a trace row. Never promote a plotted
+hold to a driver command.

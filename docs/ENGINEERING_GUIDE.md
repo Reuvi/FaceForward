@@ -412,7 +412,10 @@ is rejected.
   binary-eye rules.
 - CSV exports Processing trace rows, not camera images, raw landmark-ratio
   history, or every original detector frame. Missing values appear as blank
-  fields/gaps. Source stop leaves historical evidence visible and labeled.
+  fields. Graphs hold the last known height in a darker channel color during
+  unknown intervals; `LabUI.traces` is a shared presentation helper only. It never
+  changes measurements, validity, control timers or CSV. Source stop leaves
+  historical evidence visible and labeled.
 - Actual source Hz uses recent delivery times (up to 60). Capture timestamps are
   taken after camera `read()`, before inference; camera buffering is not measured.
   Requested FPS can differ substantially from delivered FPS.

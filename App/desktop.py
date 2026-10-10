@@ -306,14 +306,15 @@ class IntegratedDesktop(DesktopLab):
         token = (frame["session_id"], frame["sequence"], selected) if frame else None
         if token and token != self.vision_sequence:
             self.vision_sequence = token
-            row = {"t": frame["timestamp_ms"] / 1000}
+            row = {"t": frame["timestamp_ms"] / 1000, "scope_context": (frame["session_id"], selected, detector_state["generation"] if detector_state else None)}
             for eye in ("left", "right"):
                 ratios = eyes.get(eye, {})
                 for field, key in (("open", "openness"), ("x", "horizontal"), ("y", "vertical")):
                     row[f"{eye}_{field}"] = ratios.get(key) if fresh else None
             if detector_state is not None:
                 for eye in ("left", "right"):
-                    row[eye + "_open"] = detector_state["features"].get(eye, {}).get("value") if fresh else None
+                    feature = detector_state["features"].get(eye, {})
+                    row[eye + "_open"] = feature.get("value") if fresh and feature.get("quality", 0) > 0 else None
             self.vision_history.append(row)
         if self.notebook.select() == str(self.vision_page):
             for scope in self.raw_scopes:
@@ -332,7 +333,7 @@ class IntegratedDesktop(DesktopLab):
     def close(self):
         if not self.closed:
             if self.calibration_ui is not None:
-                self.calibration_ui.eye_panel.sounds.close()
+                self.calibration_ui.eye_panel.close()
             self.closed = True
             self.session.close()
             self.root.destroy()

@@ -158,10 +158,24 @@ class LabRuntime:
         with self.lock:
             state = deepcopy(self.workbench.state())
             rows=[]
+            # Include at most one older seed per plotted channel. A long unknown
+            # interval can then retain its last display height after that capture
+            # leaves the 8-second view, without sending the full history to Tk.
+            needed = {"left_raw", "right_raw", "head_raw", "left_closed_bit", "right_closed_bit",
+                      "head_y", "tongue_x", "tongue_y"}
+            cutoff = self.workbench.trace[-1]["timestamp_ms"]-8000 if self.workbench.trace else 0
             for row in reversed(self.workbench.trace):
-                if rows and row["timestamp_ms"] < rows[0]["timestamp_ms"]-8000:
+                in_view = row["timestamp_ms"] >= cutoff
+                matching = (state["selected"] and row["subject_id"] == state["selected"]
+                            and row["calibration_generation"] == state["generation"])
+                if not in_view and (not needed or not matching):
                     break
-                rows.append(row)
+                available = {key for key in needed if matching and row.get(key) is not None
+                             and (not key.endswith("_raw") or row.get(key[:-4]+"_quality", 0) > 0)}
+                if in_view or available:
+                    rows.append(row)
+                if not in_view:
+                    needed -= available
             state.update(source=self.source, timing=dict(self.timing), preview=self.preview,
                          trace=list(reversed(rows)))
             crop = self.workbench.frozen_crop or self.workbench.crop

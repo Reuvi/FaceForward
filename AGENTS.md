@@ -25,6 +25,12 @@ and `docs/TESTING_GUIDE.md` for expected test behavior. These documents describe
 dated baseline; check current code and commits before assuming an item is unchanged.
 Update relevant documentation when behavior, settings, or interfaces change.
 
+Eye calibration now opens a temporary native full-screen dot guide and returns to
+the lab on completion/cancel. `LabUI` owns shared display helpers: unknown plot
+intervals hold the previous known height in a darker color. This is presentation
+only; preserve null/invalid data, CSV and immediate control release. Never feed a
+plotted hold back into detection, Processing or Drivers.
+
 ## Start every task
 
 1. Run `git status --short --branch` and `git worktree list`. Preserve existing work.

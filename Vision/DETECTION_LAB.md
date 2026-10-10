@@ -48,7 +48,9 @@ shared by the embedded and standalone views.
 ## 1. Independent eye calibration
 
 Press **Test sound**, then **Start eye calibration**. No individual capture buttons
-are needed. Keep your head comfortable and follow the dot with both eyes naturally
+are needed. A temporary **full-screen native guide** opens over the lab, with a
+large target, centered instructions, countdown and Cancel button. Keep your head
+comfortable and follow the dot with both eyes naturally
 open: center → left → right → up → down. Do not exaggerate or squint. The guide then
 asks you to close **both** eyes gently, and finally reopen for a fresh check. Using
 both eyes for the training pose does not couple their fits or runtime decisions.
@@ -64,7 +66,13 @@ The whole sequence takes about 21 seconds with default settings.
 | Three low tones | Open your eyes; one or both fits need a retry; read the per-eye result |
 | Two high tones then a low tone | Capture cancelled/lost; open your eyes and inspect the screen |
 
-The instruction and countdown are beside the target. Sound is played locally, using
+The guide fills the primary screen reported by Tk, using a temporary borderless
+window; it does not resize the lab or create a second program/camera stream. It
+returns to the same lab automatically after success or a retry result. **Escape**
+or **Cancel calibration** exits immediately. On a multi-monitor setup, use the
+primary display for this guide; per-monitor target selection is not implemented.
+
+Instructions are centered above the target and the countdown below it. Sound is played locally, using
 short generated WAV tones via macOS `afplay`, asynchronous `winsound` on Windows,
 or counted system bells elsewhere. Speaker volume/mute controls still apply; test
 sound first. On the bell fallback, use the visible instruction to distinguish cues.
@@ -73,12 +81,12 @@ eyes after the displayed duration and inspect the screen; source loss cancels ca
 
 **Restart eye calibration** discards the current eye training and both previous eye
 fits, then starts from center. It leaves head/tongue fits alone. **Cancel** stops the
-sequence without restoring old eye fits. Leaving the Eyes tab or minimizing the window cancels an active
+sequence without restoring old eye fits and closes the popup. Leaving the Eyes tab or minimizing the window cancels an active
 sequence so unseen instructions cannot collect mislabeled samples. Completed fits
 survive normal tab changes. Settings changes, track loss or Stop source still clear
 all fits as before. Preview stays disarmed during every guided phase.
 
-The program waits for the native UI to display each new prompt before starting its
+The program waits for the full-screen target to be mapped and painted before starting its
 clock. Most phases allow `settle_ms` preparation followed by `collect_ms` sampling;
 close/reopen allow at least 1500 ms preparation. Each eye needs `min_samples` usable
 captures and at least 80% usable frames per phase. At most 512 distinct capture
@@ -131,8 +139,20 @@ that produce the same measured ratio, and it does not prove live accuracy.
 | `left/right_threshold_raw` | Midpoint retained for diagnostics/legacy compatibility; new classification uses the two limits |
 
 The two dedicated eye scopes show the last eight seconds as sampled steps, without
-interpolating binary values. A missing/uncertain reading, changed subject/calibration,
-or a stale-sized time gap breaks the trace. The raw-ratio scope remains below them.
+interpolating binary values. A missing/uncertain reading or a stale-sized time gap
+holds the previous known height in a **darker version of that eye's color**. The
+next valid value resumes the bright trace with a jump at its capture time. There
+is no ramp through an unknown interval. A changed subject/session/calibration clears
+that visual hold; a never-observed channel stays blank. The current label still
+says UNKNOWN, and CSV/control values remain null/invalid. A dark line at 1 therefore
+does **not** mean the eye is classified closed or that a button stays down.
+
+Analog scopes use the same dark-hold convention. For raw geometry, a failing image
+quality gate counts as unknown for plotting, while the numeric/CSV raw value remains
+available as diagnostic evidence. The renderer can seed a hold from retained history
+before the left edge of the graph (at most eight extra original rows in a snapshot,
+from the existing bounded 9,000-row history). It never modifies a capture or adds
+synthetic control samples. Stopping capture freezes its historical time axis.
 
 After calibration, look around while keeping eyes open, then test open/open,
 closed/open, open/closed and closed/closed. Both closures classify independently.
@@ -303,7 +323,8 @@ X uses actual monotonic capture time; lines between samples are display-only.
 There is no detector interpolation, fabricated new sample, or Processing filter.
 The displayed raw scope ranges are 0–0.4 for eyes, 0–1 for image head position,
 −45–45 degrees for pitch, and 0–1 for normalized values. Numeric readings/CSV retain
-values outside those display limits. Invalid normalized measurements are gaps.
+values outside those display limits. Invalid normalized measurements are dark
+holds for display only; they remain invalid/null in the data.
 
 **Export trace CSV** writes at most the last 9,000 scalar samples (about five minutes
 at 30 Hz), initially suggesting ignored `data/private/`. It includes envelope,
@@ -383,7 +404,8 @@ and latency. Automated synthetic success does not supply these human measurement
 - `presets.py`: versioned fitted-parameter validation/serialization; App coordinates storage.
 - `demo_detection.py`: labeled synthetic pixels/landmarks; fake inputs remain a developer API.
 - `guided_eyes.py`: capture-timed seven-step sequence, independent pose fits and reopen checks.
-- `eye_view.py`: guided target, sound cues and binary scopes; no inference on Tk.
+- `eye_view.py`: temporary full-screen target, sound cues and guide lifecycle; no inference on Tk.
+- `eye_scope.py` and `../LabUI/traces.py`: shared display-only unknown holds; no changes to measurement validity.
 - `landmarks.py`: optional MediaPipe facial transform extraction; default legacy API unchanged.
 
 No SignalFrame keys were renamed. The workbench marks its internal diagnostics
@@ -397,3 +419,23 @@ for the local VIDEO task and optional transform;
 [OpenCV morphology](https://docs.opencv.org/4.13.0/d9/d61/tutorial_py_morphological_ops.html)
 for the mask opening/closing operations. Our thresholds, gates, and validation
 criteria above are prototype engineering choices, not claims from those sources.
+
+### Full-screen / unknown-display regression evidence
+
+This later UI increment passed 150 tests: 74 Vision including the local-model smoke,
+36 Processing, 33 integration and 7 tooling. The integration total includes five
+native Tk tests enabled with `RUN_TK_TESTS=1`; headless CI skips those five unless a
+display is explicitly provided. They cover completion and return, Escape/restart,
+source loss, cancellation before prompt acknowledgment, and dark trace rendering.
+The new trace checks cover unknown holds, initial blanks, context resets, stale
+intervals, nonfinite values, bounded historical seeds and unchanged input values.
+
+```bash
+RUN_TK_TESTS=1 Vision/.venv/bin/python -m unittest discover \
+  -s tests/integration -p test_calibration_window.py -v
+```
+
+The combined synthetic GUI completed the guide, returned with both fits ready and
+showed a dark held trace for an unknown left eye while the right remained valid.
+The 490-frame combined demo still exercised all four mouse actions and released
+output at EOF. Human testing of the wider target positions is still required.

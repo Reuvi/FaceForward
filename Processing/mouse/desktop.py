@@ -6,6 +6,8 @@ import json
 import tkinter as tk
 from tkinter import filedialog, ttk
 
+from LabUI.traces import darker, trace_runs
+
 from .controller import Lab
 
 
@@ -81,38 +83,32 @@ class Scope(ttk.Frame):
             self.drawn = None
             return
         end = rows[-1]["t"]
-        visible = [row for row in rows if row["t"] >= end - 8]
-        # Separate runs avoid drawing fabricated connections over invalid samples.
         channel_runs = []
         for channel, key in enumerate(self.keys):
-            runs, coords, previous = [], [], None
-            for row in visible:
-                value = row[key]
-                if value is None:
-                    if len(coords) >= 4:
-                        runs.append(coords)
-                    coords, previous = [], None
-                    continue
-                x = left + (row["t"] - end + 8) / 8 * (right - left)
+            samples = ((row["t"], row.get(key), row.get("scope_context", 0)) for row in rows)
+            stepped = channel == 0 or key in ("left_out", "right_out")
+            runs = []
+            for unknown, points in trace_runs(samples, step=stepped, start=end-8):
+                coords = []
                 low, high = self.limits
-                y = bottom - max(0, min(1, (value - low) / (high - low))) * (bottom - top)
-                if previous is not None and (channel == 0 or "_out" in key and key.startswith(("left", "right"))):
-                    coords.extend((x, previous))
-                coords.extend((x, y))
-                previous = y
-            if len(coords) >= 4:
-                runs.append(coords)
-            channel_runs.append([compact_points(points) for points in runs])
+                for timestamp, value in points:
+                    x = left + (timestamp-end+8)/8*(right-left)
+                    y = bottom - max(0, min(1, (value-low)/(high-low)))*(bottom-top)
+                    coords.extend((x, y))
+                runs.append((unknown, compact_points(coords)))
+            channel_runs.append(runs)
         if channel_runs == self.drawn:
             return
         self.drawn = channel_runs
         canvas.delete("gap-run")
         for channel, runs in enumerate(channel_runs):
-            canvas.itemconfigure(self.lines[channel], state="normal" if runs else "hidden")
-            if runs:
-                canvas.coords(self.lines[channel], *runs[-1])
-                for points in runs[:-1]:
-                    canvas.create_line(*points, fill=(BLUE, AMBER, GREEN)[channel], width=1.3, tags="gap-run")
+            canvas.itemconfigure(self.lines[channel], state="hidden")
+            color = (BLUE, AMBER, GREEN)[channel]
+            for unknown, points in runs:
+                canvas.create_line(*points, fill=darker(color) if unknown else color,
+                                   width=2 if channel == 2 else 1.3,
+                                   dash=(3, 3) if channel == 1 else (), tags="gap-run")
+
 
 
 class DesktopLab:
@@ -282,7 +278,7 @@ class DesktopLab:
         label(preview, textvariable=self.boost, style="Small.TLabel").pack(anchor="w", pady=(6, 0))
 
         scope_header = ttk.Frame(self.live, padding=(0, 10, 0, 6)); scope_header.grid(row=1, column=0, columnspan=2, sticky="ew")
-        label(scope_header, "03  Signal scope   /   last 8 seconds", font=("Helvetica Neue", 11, "bold")).pack(side="left")
+        label(scope_header, "03  Signal scope / 8 s • dark = unknown hold", font=("Helvetica Neue", 11, "bold")).pack(side="left")
         self.button(scope_header, "Export CSV", self.export_trace).pack(side="right", padx=(6, 0))
         self.freeze_button = self.button(scope_header, "Freeze scope", self.freeze)
         self.freeze_button.pack(side="right", padx=(6, 12))

@@ -82,6 +82,7 @@ Read [the complete MVP runbook](App/README.md),
 | `Processing/` | Profiles, thresholds, smoothing, mappings, oscilloscope/settings UI | Processing lane |
 | `Drivers/` | Mock output, mouse/keyboard, speech trigger, later gamepad adapter | Drivers lane |
 | `App/` | Composition, lifecycle, active-subject selection, camera/driver startup | Integration owner |
+| `LabUI/` | Shared display-only trace rendering helpers; never control input | Integration owner |
 | `Contracts/` | Versioned message semantics and synthetic examples | Integration owner |
 | `tests/<lane>/` | Component-owned tests | Corresponding lane |
 | `tests/integration/` | Full mock-pipeline checks | Integration owner |

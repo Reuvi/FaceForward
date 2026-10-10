@@ -9,7 +9,8 @@ from tkinter import filedialog, messagebox, ttk
 import cv2
 
 from .eye_view import EyeGuidePanel
-from .eye_scope import draw_eye_scope
+from .eye_scope import draw_eye_scope, scope_samples
+from LabUI.traces import darker, trace_runs
 from .features import DetectionConfig
 from .lab_runtime import LabRuntime
 
@@ -233,10 +234,10 @@ class DetectionLab:
         self.tongue_details.set(f"{'FROZEN — click tissue' if state['frozen'] else 'LIVE crop / green candidate mask'}\n{state['reasons'].get('tongue','Select a face')}\nCandidate: {state['candidate']}\nPixels: {state['tongue_pixels']}\n" + "\n".join(f"{k}: {'PASS' if v['passed'] else 'FAIL'} ({v['detected_fraction']:.0%}, n={v['samples']})" for k,v in val.items()))
         self.metrics.set("\n".join(f"{k:16} {self.fmt(signals.get(k,{}).get('value'))}   {'valid' if signals.get(k,{}).get('valid') else 'unavailable'}" for k in ("left_eye_open","right_eye_open","head_y","tongue_x","tongue_y")))
         draw_eye_scope(self.eye_scope,state)
-        self.draw_scope(state["trace"],state["selected"],state["generation"],state["config"]["head_mode"])
+        self.draw_scope(state["trace"],state["selected"],state["generation"],state["config"]["head_mode"],state["config"]["stale_ms"])
         self.root.after(100,self.tick)
 
-    def draw_scope(self,rows,selected,generation,head_mode):
+    def draw_scope(self,rows,selected,generation,head_mode,stale_ms):
         canvas=self.scope;canvas.delete("all")
         width=max(400,canvas.winfo_width())
         height=max(180,canvas.winfo_height())
@@ -244,26 +245,23 @@ class DetectionLab:
         specs=[("Raw eye ratio: left cyan / right orange (0–0.4)",(("left_raw","#6ed7fe"),("right_raw","#ffa663")),0,.4),
                ("Raw head Y: " + ("image fraction (0–1)" if head_mode=="position" else "pitch degrees (−45–45)"),(("head_raw","#b18bff"),),0 if head_mode=="position" else -45,1 if head_mode=="position" else 45),
                ("Normalized: head purple / tongue X green / Y yellow (0–1)",(("head_y","#b18bff"),("tongue_x","#75e3a8"),("tongue_y","#f2d66f")),0,1)]
-        start=rows[0]["timestamp_ms"] if rows else 0
-        span=max(1,rows[-1]["timestamp_ms"]-start) if rows else 1
+        start=rows[-1]["timestamp_ms"]-8000 if rows else 0
+        span=8000
         for index,(label,series,low,high) in enumerate(specs):
             top=5+index*band
             bottom=top+band-10
             canvas.create_text(8,top,text=label,fill="white",anchor="nw",font=("Arial",9))
             canvas.create_line(10,bottom,width-10,bottom,fill="#45515d")
             for key,color in series:
-                points=[]
-                for row in rows:
-                    value=row.get(key) if row.get("subject_id")==selected and selected and row.get("calibration_generation")==generation else None
-                    if value is None:
-                        if len(points)>=4: canvas.create_line(*points,fill=color,width=2)
-                        points=[];continue
-                    points.extend((10+(row["timestamp_ms"]-start)/span*(width-20),bottom-(max(low,min(high,value))-low)/(high-low)*(band-33)))
-                if len(points)>=4: canvas.create_line(*points,fill=color,width=2)
-        canvas.create_text(width-8,height-2,text=f"{span/1000:.1f}s of capture time; connecting lines are display only",fill="#aab8c8",anchor="se",font=("Arial",9))
+                for unknown, segment in trace_runs(scope_samples(rows,key,selected,generation),max_gap=stale_ms,start=start):
+                    points=[]
+                    for timestamp,value in segment:
+                        points.extend((10+(timestamp-start)/span*(width-20),bottom-(max(low,min(high,value))-low)/(high-low)*(band-33)))
+                    canvas.create_line(*points,fill=darker(color) if unknown else color,width=2)
+        canvas.create_text(width-8,height-2,text="Last 8 s • dark = unknown hold (display only)",fill="#aab8c8",anchor="se",font=("Arial",9))
 
     def close(self):
-        self.eye_panel.sounds.close()
+        self.eye_panel.close()
         self.runtime.close();self.root.destroy()
 
 

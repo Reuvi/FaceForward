@@ -49,10 +49,14 @@ The requested FPS takes effect on source start; actual Hz and capture age are sh
    **Use selected subject**. A dropdown choice alone is not selection. A tracker ID
    is session-local, not biometric identity. Selection resets/disarms Processing.
 2. Open **Detection calibration → 1 Eyes**. Press **Test sound**, then **Start eye
-   calibration**. Follow the dot with eyes naturally open through five positions.
+   calibration**. A temporary full-screen native window opens. Follow the dot with
+   eyes naturally open through five positions across the screen.
    Close both gently at the descending tones, reopen at two high tones, and wait
    for three rising completion tones. Each eye is fitted independently. Watch
-   separate binary scopes: **0 open, 1 closed, gaps uncertain/unavailable**.
+   separate binary scopes: **0 open, 1 closed; darker segments hold the last known
+   value while the current reading is unknown**. This is display only. The popup
+   closes automatically when finished; **Escape** or **Cancel calibration** exits
+   early and returns to the same lab window.
    Use **Restart eye calibration** to discard bad eye samples and repeat.
    Focus on this eye test before proceeding to head/tongue.
 3. In **2 Head Y**, capture NEUTRAL, UP, DOWN. Default measurement is vertical
@@ -72,6 +76,10 @@ The requested FPS takes effect on source start; actual Hz and capture age are sh
 7. Use **Transfer settings** for click dwell, dead zones, smoothing, sensitivity,
    acceleration and preview speed. Apply changes and start preview again. Use
    **Save active profile** in the source tab to save the applied settings and fits.
+
+Unknown values stay invalid in the detector, Processing and CSV. A dark held trace
+is not a new measurement or a continued button press. Channels with no prior known
+value stay blank; source/subject resets start a new history.
 
 The preview is unmirrored: your left eye appears on the image's right. Both eye
 classifiers and both Processing timers stay independent. Holding both can activate
