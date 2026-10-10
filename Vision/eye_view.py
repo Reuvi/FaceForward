@@ -154,7 +154,16 @@ class EyeGuidePanel:
         ttk.Label(parent,textvariable=self.progress,font=("Arial",11),wraplength=465,justify="left").pack(anchor="w",pady=8)
         rest_row=ttk.Frame(parent);rest_row.pack(fill="x",pady=(0,6))
         ttk.Label(rest_row,text="Rest between steps (seconds)").pack(side="left")
-        self.rest_input=ttk.Spinbox(rest_row,from_=0,to=30,increment=.5,width=6,textvariable=self.rest_seconds)
+        # The app's light foreground otherwise lands on the spinbox's light field.
+        style=ttk.Style(parent)
+        style.configure("EyeRest.TSpinbox",fieldbackground="#e4ece9",foreground="#142026",
+                        insertcolor="#142026",background="#cfdbd6",arrowcolor="#142026",
+                        selectbackground="#365d6a",selectforeground="#ffffff",padding=5)
+        style.map("EyeRest.TSpinbox",foreground=[("disabled","#465b62")],
+                  fieldbackground=[("disabled","#cbd6d2")],
+                  arrowcolor=[("disabled","#465b62"),("active","#142026")])
+        self.rest_input=ttk.Spinbox(rest_row,from_=0,to=30,increment=.5,width=6,
+                                  textvariable=self.rest_seconds,style="EyeRest.TSpinbox")
         self.rest_input.pack(side="left",padx=8)
         buttons=ttk.Frame(parent);buttons.pack(fill="x",pady=4)
         self.start=ttk.Button(buttons,text="Start eye calibration",command=lambda:call("start_eye_guide",self.rest_seconds.get()))

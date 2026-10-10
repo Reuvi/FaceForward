@@ -299,3 +299,14 @@ rest, duration validation, old-profile defaults and continued per-frame input.
 Compilation, whitespace and integration scope checks pass. Real-model blank-image
 initialization passes; no live-person accuracy claim is made. See
 `Vision/DETECTION_LAB.md` for the cue table and adjustable rest control.
+
+## Rest-duration field contrast — 2026-10-10
+
+Integration branch `work/reuvi/integration/rest-field-contrast`, base `05d7251`,
+fixes the shared Vision eye-guide spinbox's light-on-light inherited colors.
+Scoped `EyeRest.TSpinbox` styling uses dark text/caret/arrows on a light field,
+with explicit readable disabled and selected colors. Calibration behavior and
+other controls are unchanged. Writable paths: `Vision/eye_view.py`, this handoff.
+Verification: all 6 existing native calibration-window tests pass; the App's `clam`
+theme resolves dark text/arrows on light fields in normal, focused, active and
+disabled states. Compilation, whitespace and integration scope checks pass.
