@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "session_id": "synthetic-session-1",
+  "sequence": 0,
+  "timestamp_ms": 1000.0,
+  "faces": [
+    {
+      "subject_id": "synthetic-person-1",
+      "signals": {
+        "gaze_x": { "value": 0.5, "confidence": 0.95, "valid": true },
+        "gaze_y": { "value": 0.5, "confidence": 0.95, "valid": true },
+        "tongue_x": { "value": null, "confidence": 0.0, "valid": false },
+        "tongue_y": { "value": null, "confidence": 0.0, "valid": false },
+        "left_eye_open": { "value": 1.0, "confidence": 0.95, "valid": true },
+        "right_eye_open": { "value": 1.0, "confidence": 0.95, "valid": true },
+        "head_x": { "value": 0.5, "confidence": 0.95, "valid": true },
+        "head_y": { "value": 0.5, "confidence": 0.95, "valid": true }
+      }
+    }
+  ]
+}

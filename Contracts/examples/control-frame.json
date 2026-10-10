@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "session_id": "synthetic-session-1",
+  "sequence": 0,
+  "timestamp_ms": 1000.0,
+  "subject_id": "synthetic-person-1",
+  "enabled": false,
+  "buttons": {
+    "left_click": 0.0,
+    "right_click": 0.0,
+    "delete": 0.0,
+    "insert": 0.0,
+    "speech_to_text": 0.0
+  },
+  "axes": {
+    "pointer_x": 0.5,
+    "pointer_y": 0.5,
+    "scroll_y": 0.5
+  }
+}
