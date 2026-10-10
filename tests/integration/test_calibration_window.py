@@ -107,6 +107,10 @@ class FullscreenCalibrationTests(unittest.TestCase):
     def test_escape_cancels_and_restart_has_no_old_timer(self):
         self.start()
         old = self.panel.fullscreen.window
+        # Synthetic key events need an active native window on macOS. The lab
+        # may be in the background when the suite was launched from a terminal.
+        old.focus_force()
+        self.root.update()
         old.event_generate("<Escape>")
         self.root.update()
         self.assertIsNone(self.guide)
@@ -153,6 +157,81 @@ class FullscreenCalibrationTests(unittest.TestCase):
 
 @unittest.skipUnless(os.environ.get("RUN_TK_TESTS") == "1", "Explicit desktop Tk test required")
 class SingleUserWindowTests(unittest.TestCase):
+    def close_ui(self, ui):
+        if ui.closed:
+            return
+        # Each test owns a separate Tk interpreter. Dispose scheduled redraws
+        # before destroying it so they cannot fire while the next test runs.
+        for callback in ui.root.tk.call("after", "info"):
+            ui.root.after_cancel(callback)
+        ui.close()
+
+    def test_separate_wink_button_and_visible_rest_countdown_keep_eye_geometry(self):
+        import tkinter as tk
+        from App.desktop import IntegratedDesktop
+        from App.mouse_runtime import MouseSession
+        from Vision.calibration import EyeCalibration
+        from Vision.capture import CapturedImage
+        from Vision.demo_detection import demo_image
+        from Vision.signals import Envelope
+        now = [1000.]
+        session = MouseSession(clock=lambda: now[0]); session.mode = "detector-demo"
+        root = tk.Tk()
+        options = SimpleNamespace(source="detector-demo", replay=None, model=None,
+                                  fps=30, camera_id=0, no_preview=True, subject=None)
+        with patch.object(session, "start"), patch("Vision.eye_view.CalibrationSounds"):
+            ui = IntegratedDesktop(root, session, options)
+            self.addCleanup(self.close_ui, ui)
+            root.geometry("1420x850")
+            session.detector_command("configure", dict(settle_ms=0, collect_ms=300,
+                                                         eye_rest_ms=3000, min_samples=5))
+            core = session.detector_runtime.workbench
+            sequence = 0
+            def feed():
+                nonlocal sequence
+                sequence += 1; now[0] += 25
+                image, observations = demo_image(**session.detector_runtime.demo_input())
+                session.deliver_detection(CapturedImage(Envelope("split-eye",sequence,now[0]),image), observations, preview=False)
+                view.tick(); root.update()
+            ui.notebook.select(ui.calibration_page); ui.open_calibration(); root.update()
+            view = ui.calibration_ui
+            feed()
+            panel = view.eye_panel
+            self.assertEqual(str(panel.wink_start["state"]), "disabled")
+            # A completed or loaded geometry fit makes the second stage available.
+            core.eyes = {side: EyeCalibration(.04,.25,.5) for side in ("left", "right")}
+            eyes = dict(core.eyes)
+            feed()
+            self.assertEqual(str(panel.wink_start["state"]), "normal")
+            self.assertTrue(panel.wink_start.winfo_ismapped())
+            panel.wink_start.invoke(); view.tick(); root.update()
+            while True:
+                feed()
+                state = core.eye_guide.state(now[0])
+                if state["resting"] and not state["waiting"]: break
+                self.assertLess(sequence, 200)
+            self.assertEqual(state["kind"], "winks")
+            self.assertEqual(state["total"], 14)
+            popup = panel.fullscreen.canvas
+            def label(tag):
+                return popup.itemcget(popup.find_withtag(tag)[0], "text")
+            self.assertIn("3s", label("rest-countdown"))
+            self.assertIn("smile, talk", label("rest-instruction"))
+            for _ in range(44): feed()
+            self.assertIn("2s", label("rest-countdown"))
+            self.assertEqual(core.eye_guide.state(now[0])["samples"], {"left":0,"right":0})
+            countdown = popup.bbox("rest-countdown")
+            instruction = popup.bbox("rest-instruction")
+            self.assertLess(countdown[3], instruction[1])
+            self.assertGreaterEqual(instruction[0], 0)
+            self.assertLessEqual(instruction[2], popup.winfo_width())
+            panel.cancel(); view.tick(); root.update()
+            self.assertIsNone(panel.fullscreen)
+            self.assertEqual(core.eyes, eyes)
+            self.assertEqual(str(panel.wink_start["state"]), "normal")
+            self.assertIn("retained", panel.instruction.get())
+            self.assertFalse(session.lab.processor.armed)
+
     def test_head_guide_shared_raw_graphs_and_cancel_on_tab_change(self):
         import tkinter as tk
         from App.desktop import IntegratedDesktop
@@ -166,7 +245,7 @@ class SingleUserWindowTests(unittest.TestCase):
         options=SimpleNamespace(source="detector-demo",replay=None,model=None,fps=30,camera_id=0,no_preview=True,subject=None)
         with patch.object(session,"start"),patch("Vision.movement_view.CalibrationSounds"):
             ui=IntegratedDesktop(root,session,options)
-            self.addCleanup(lambda:None if ui.closed else ui.close())
+            self.addCleanup(self.close_ui, ui)
             root.geometry("1420x850")
             session.detector_command("configure",dict(settle_ms=0,collect_ms=300,movement_rest_ms=0,min_samples=5))
             sequence=0
@@ -214,7 +293,7 @@ class SingleUserWindowTests(unittest.TestCase):
         self.addCleanup(lambda: None if session.closed else session.close())
         with patch.object(session, "start"):
             ui = IntegratedDesktop(root, session, options)
-        self.addCleanup(lambda: None if ui.closed else ui.close())
+        self.addCleanup(self.close_ui, ui)
         root.update()
         self.assertNotIn("Detection research",[ui.notebook.tab(t,"text") for t in ui.notebook.tabs()])
         self.assertNotIn("config.left_eye.dwell_ms",ui.setting_vars)

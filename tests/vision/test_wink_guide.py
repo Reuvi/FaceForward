@@ -21,60 +21,67 @@ class WinkGuideTests(unittest.TestCase):
             )
         )
         now = 1000
-        while guide.active:
-            state = guide.state(now)
-            if state["waiting"]:
-                guide.present(guide.index, now, state["phase"])
-            state = guide.state(now)
-            ratios = {"left": 0.25, "right": 0.25}
-            vectors = {s: vector(opened=True) for s in ratios}
-            if state["wink_training"]:
-                if state["phase"] == "capture":
-                    fraction = (now - state["capture_start_ms"]) / (
-                        state["capture_end_ms"] - state["capture_start_ms"]
-                    )
-                    role, kind, _, _ = PROMPTS[guide.wink_index]
-                    for side in ratios:
-                        closed = (
-                            kind == "blinks" and 0.2 <= (fraction * 4) % 1 < 0.45
-                        ) or (kind == side and 0.2 <= fraction < 0.75)
-                        ratios[side] = 0.04 if closed else 0.25
-                        wink = (
-                            kind == side
-                            and closed
-                            and not (side == "right" and confuse_right)
+        for stage in ("geometry", "winks"):
+            if stage == "winks":
+                self.assertEqual(set(guide.fits), {"left", "right"})
+                self.assertFalse(guide.models)
+                self.assertEqual(guide.state(now)["total"], 7)
+                guide = EyeCalibrationFlow(guide.config, eyes=guide.fits)
+                self.assertEqual(guide.state(now)["total"], 14)
+            while guide.active:
+                state = guide.state(now)
+                if state["waiting"]:
+                    guide.present(guide.index, now, state["phase"])
+                state = guide.state(now)
+                ratios = {"left": 0.25, "right": 0.25}
+                vectors = {s: vector(opened=True) for s in ratios}
+                if state["wink_training"]:
+                    if state["phase"] == "capture":
+                        fraction = (now - state["capture_start_ms"]) / (
+                            state["capture_end_ms"] - state["capture_start_ms"]
                         )
-                        if (
-                            bad_check
-                            and role == "check"
-                            and kind == "blinks"
-                            and closed
-                        ):
-                            wink = True
-                        vectors[side] = vector(wink, opened=not closed)
-                    if missing and kind == "relaxed":
-                        vectors["left"] = None
+                        role, kind, _, _ = PROMPTS[guide.wink_index]
+                        for side in ratios:
+                            closed = (
+                                kind == "blinks" and 0.2 <= (fraction * 4) % 1 < 0.45
+                            ) or (kind == side and 0.2 <= fraction < 0.75)
+                            ratios[side] = 0.04 if closed else 0.25
+                            wink = (
+                                kind == side
+                                and closed
+                                and not (side == "right" and confuse_right)
+                            )
+                            if (
+                                bad_check
+                                and role == "check"
+                                and kind == "blinks"
+                                and closed
+                            ):
+                                wink = True
+                            vectors[side] = vector(wink, opened=not closed)
+                        if missing and kind == "relaxed":
+                            vectors["left"] = None
+                    else:
+                        # Poisoned rest/preparation appearances must not teach either label.
+                        vectors = {s: [900.0] * 8 for s in ratios}
                 else:
-                    # Poisoned rest/preparation appearances must not teach either label.
-                    vectors = {s: [900.0] * 8 for s in ratios}
-            else:
-                ratio = {
-                    "center": 0.25,
-                    "left": 0.21,
-                    "right": 0.22,
-                    "up": 0.28,
-                    "down": 0.14,
-                    "closed": 0.04,
-                    "reopen": 0.25,
-                }[state["name"]]
-                ratios = {s: ratio for s in ratios}
-            guide.feed(
-                now,
-                {s: SimpleNamespace(value=v, quality=1) for s, v in ratios.items()},
-                vectors,
-            )
-            now += 25
-            self.assertLess(now, 100000)
+                    ratio = {
+                        "center": 0.25,
+                        "left": 0.21,
+                        "right": 0.22,
+                        "up": 0.28,
+                        "down": 0.14,
+                        "closed": 0.04,
+                        "reopen": 0.25,
+                    }[state["name"]]
+                    ratios = {s: ratio for s in ratios}
+                guide.feed(
+                    now,
+                    {s: SimpleNamespace(value=v, quality=1) for s, v in ratios.items()},
+                    vectors,
+                )
+                now += 25
+                self.assertLess(now, 100000)
         return guide
 
     def test_full_flow_trains_checks_and_excludes_rest(self):

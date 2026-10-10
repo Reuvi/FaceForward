@@ -115,8 +115,11 @@ can use an integration branch with the affected owners coordinated.
 
 Read `Contracts/EYE_INTENT.md` and `docs/EYE_CALIBRATION_GUIDE.md`. Detection research
 is removed from the unified App; its retained modules are legacy/developer code.
-One full-screen guide collects independent eye geometry, natural blink/wink
-appearances and separate check windows. Same-eye facial features classify each
+Two separately started full-screen guides collect eye open/closed geometry and
+blink/wink appearances with fresh checks. Retrying/cancelling/failing blink training
+retains completed eye geometry. New geometry clears dependent wink models, and
+provisional geometry cannot seed wink training before its reopen check. Rest screens
+show the countdown and upcoming instruction together. Same-eye facial features classify each
 captured frame. No duration/speed, opposite-eye gate, dwell or release delay may
 control the calibrated wink path. ON persists while a wink is recognized; open or
 recognized blink is OFF; unknown is held numeric input with known=false and released

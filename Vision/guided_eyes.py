@@ -116,6 +116,7 @@ class GuidedEyes:
         return {"active": self.active, "index": self.index, "total": len(STEPS),
                 "name": self.step[0],
                 "instruction": "Rest your eyes — blink or close them naturally" if self.resting else self.step[1],
+                "next_instruction": self.step[1],
                 "target": None if self.resting else self.step[2],
                 "waiting": waiting, "preparing": preparing, "resting": self.resting, "phase": phase,
                 "capture_start_ms": self.start_ms,

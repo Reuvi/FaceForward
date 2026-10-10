@@ -10,8 +10,10 @@ range** after loading/restarting. Eye classification is unchanged.
 
 
 This is the current eye workflow in the local Python/Tk App. The separate
-Detection research tab has been removed. One guided calibration learns eye shape,
-natural blinks and intentional winks, then checks each eye on new movements.
+Detection research tab has been removed. Two separately started guides learn
+eye open/closed geometry, then natural blinks versus intentional winks. The second
+stage can fail, be cancelled or restarted without repeating the first. Both stages
+include fresh checks. Existing saved eye geometry can seed blink/wink training.
 An intentional wink produces **1 while held**, and reopening produces **0**.
 A recognized natural blink stays **0**. There is no minimum wink duration,
 release delay, cooldown or opposite-eye gate in this calibrated camera path.
@@ -34,11 +36,13 @@ It verifies the software connection, not accuracy on a real person.
    **single-user** is attached. The preview is unmirrored: your left eye is on
    the image's right.
 2. Open **Detection calibration → 1 Eyes**. Set **Rest between steps** (default
-   3 seconds), try **Test sound**, then press **Start eye calibration**.
+   3 seconds), try **Test sound**, then press **Start eye open/closed**.
 3. A temporary full-screen window opens. Follow the dot with comfortably open
    eyes at five positions, gently close both eyes when instructed, then reopen.
-   This establishes a separate open/closed geometry range for each eye.
-4. Follow the **Learn blink/wink** prompts: blink gently several times, then
+   This establishes a separate open/closed geometry range for each eye and checks
+   reopening on new frames. The popup closes. You may save this geometry-only
+   profile with **Save active profile** before continuing.
+4. Press **Start blinks & winks**. Follow the **Learn blink/wink** prompts: blink gently several times, then
    keep a relaxed face while smiling/talking/looking slightly around. Perform
    three separate left winks and three right winks when prompted.
 5. Follow **Check on new movements**: repeat natural blinks and relaxed movements,
@@ -47,7 +51,10 @@ It verifies the software connection, not accuracy on a real person.
 6. The popup closes automatically. Read each eye's result and inspect its scopes.
    Only an eye that passes is enabled for wink recognition.
 
-There are 21 steps, about 2½ minutes at default timings, including rests.
+The first guide has seven steps (about 40 seconds); the second has fourteen
+(about two minutes), including rests at default timings. They do not start each
+other automatically. The blink/wink button requires at least one completed eye
+geometry fit. Each eye remains independently enabled only when its checks pass.
 During each wink prompt, begin with both eyes open, wait for the three high
 capture tones, wink the named eye once, briefly hold, then reopen naturally
 within that capture window. Holding briefly provides several training images;
@@ -55,14 +62,23 @@ there is no runtime minimum hold time. Natural-blink windows need at least
 three observed blinks in training and two in checking. Do not force or exaggerate
 these blinks to imitate a wink.
 
-Four low tones mean **REST**: blink or relax freely; nothing is collected.
+Four low tones mean **REST**: blink or relax freely; nothing is collected. A large
+central countdown shows the seconds left, with **Next:** and the upcoming movement
+directly beneath it. Read that instruction while resting; wait for preparation
+and capture cues before doing it. The same countdown also appears in the lab panel.
 A rising pair means prepare; three high tones mean capture. The geometry phase's
 descending cue means close gently, and two high tones mean reopen. Completion
 and retry have distinct cues. Read the next movement during preparation; the
 timer starts only after its instruction is displayed. Capture continues while
 resting, but rest/preparation images never enter training. Preview stays stopped.
-Escape/Cancel exits the guide. **Restart eye calibration** discards the eye fits
-and starts a clean pass; head and tongue fits remain.
+Escape/Cancel exits the active guide. If blink training went wrong, press
+**Restart blinks & winks**: it clears only wink models/training and keeps completed
+eye geometry, head and tongue fits. Cancel or face loss during that stage also
+keeps eye geometry. Failed wink models stay unavailable until their checks pass.
+**Restart eye open/closed** is for bad geometry; it clears both geometry and the
+wink models that depend on it. Cancelling incomplete geometry does not promote
+provisional fits before the fresh reopen check. Head/tongue fits remain.
+Both start actions stop preview and reset the Processing eye-input history.
 
 ## Verify before enabling preview
 
@@ -82,7 +98,7 @@ seconds. The score is a model decision score, not a calibrated probability.
 
 Repeat these checks beyond the guided samples. A passed guide is only a small
 personal calibration check, not evidence of general accuracy. If blinks trigger
-ON, use Restart and repeat with comfortable, representative movements and clear
+ON, use **Restart blinks & winks** and repeat with comfortable, representative movements and clear
 lighting. If the appearances cannot be separated reliably, the eye should remain
 unavailable. Do not compensate by exaggerating movements beyond comfort.
 
@@ -142,9 +158,11 @@ cannot distinguish intentions that look identical; do not claim it can.
 Use **Save active profile**, then **Load saved profile** in the source tab.
 Completed models survive head motion, temporary loss and same-source restarts.
 Files can load while stopped or without a face; loading leaves preview stopped.
-New files use `face_mouse_profile_v3` and detector preset v3, storing per-eye
+New files use `face_mouse_profile_v3` and detector preset v5, storing per-eye
 geometry, model parameters and check counts, with Processing/head/tongue settings.
-They contain no images or raw training vectors. Recheck under current lighting.
+They contain no images or raw training vectors. A geometry-only profile is valid;
+load it and start Blinks & winks without repeating the dot guide. Recheck under
+current lighting.
 Tongue validation still has to be repeated after loading.
 
 Old v1/v2 profiles remain readable, but they have no per-frame wink models.

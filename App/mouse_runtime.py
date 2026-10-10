@@ -69,7 +69,7 @@ class MouseSession:
             return self.detector_runtime
 
     def detector_command(self, name, *args):
-        allowed = {"start_eye_guide", "present_eye_step", "start_movement_guide", "present_movement_step",
+        allowed = {"start_eye_guide", "start_wink_guide", "present_eye_step", "start_movement_guide", "present_movement_step",
                    "set_head_mode", "collect", "cancel", "freeze_mouth", "mark_tongue", "fit_tongue", "reset_tongue", "configure", "reset_calibration"}
         if name not in allowed:
             raise ValueError("Unsupported calibration command")
@@ -78,7 +78,7 @@ class MouseSession:
                 raise ValueError("Choose Camera or Detector demo in Vision source first")
             runtime = self.ensure_detector_runtime()
             self.lab.disconnect("Calibration changed; start preview again when ready",
-                                clear_eye_history=name in ("start_eye_guide", "configure", "collect", "fit_tongue", "reset_tongue", "reset_calibration"))
+                                clear_eye_history=name in ("start_eye_guide", "start_wink_guide", "configure", "collect", "fit_tongue", "reset_tongue", "reset_calibration"))
             result = runtime.command(name, *args)
             validation_only = name == "collect" and args and args[0] in ("validate_absent", "validate_visible")
             if name not in ("freeze_mouth", "cancel", "present_eye_step", "present_movement_step") and not validation_only:

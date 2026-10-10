@@ -111,7 +111,10 @@ class FullscreenEyeGuide:
         canvas.create_text(w/2, 35, text=title, fill="#e9f1ed", font=("Arial", 23, "bold"), width=w-80)
         canvas.create_text(w/2, 84, text=instruction, fill="#c2d0df", font=("Arial", 16), width=w-100, justify="center")
         if guide["resting"]:
-            canvas.create_text(w/2,h/2,text="REST\nNo calibration samples are being recorded",fill="#75e3a8",font=("Arial",27,"bold"),justify="center",width=w-80)
+            seconds = math.ceil(guide["remaining_ms"] / 1000)
+            canvas.create_text(w/2,h*.38,text=f"REST · {seconds}s",fill="#75e3a8",font=("Arial",48,"bold"),justify="center",width=w-80,tags="rest-countdown")
+            canvas.create_text(w/2,h*.51,text="Next: " + guide.get("next_instruction", guide["instruction"]),fill="#ffffff",font=("Arial",23,"bold"),justify="center",width=w-120,tags="rest-instruction")
+            canvas.create_text(w/2,h*.63,text="Relax now. Wait for the ready and capture tones.\nNo calibration samples are being recorded.",fill="#c2d0df",font=("Arial",16),justify="center",width=w-120)
         elif guide["target"]:
             x, y = guide["target"]
             x = x*w
@@ -144,11 +147,13 @@ class EyeGuidePanel:
         self.pending_present = None
         self.rest_seconds = tk.StringVar(value="3")
         self.rest_seen = None
-        self.title = tk.StringVar(value="Calibrate eyes in one guided pass")
-        self.instruction = tk.StringVar(value="One guide: eye shapes, gentle blinks, left/right winks, then fresh checks.\nRest and sound cues separate each movement.")
+        self.title = tk.StringVar(value="Two separate calibration stages")
+        self.instruction = tk.StringVar(value="1. Eye open/closed geometry. 2. Blinks & winks.\nRetrying blinks/winks keeps your eye geometry.")
+        self.fit_status = tk.StringVar()
         self.progress = tk.StringVar(value=CUE_LEGEND)
         ttk.Label(parent,textvariable=self.title,font=("Arial",17,"bold"),wraplength=465).pack(anchor="w",pady=(4,8))
         ttk.Label(parent,textvariable=self.instruction,font=("Arial",13),wraplength=465,justify="left").pack(anchor="w",pady=(0,8))
+        ttk.Label(parent,textvariable=self.fit_status,wraplength=465,justify="left").pack(anchor="w",pady=(0,6))
         self.target = tk.Canvas(parent,height=100,bg="#14202c",highlightthickness=0)
         self.target.pack(fill="x")
         ttk.Label(parent,textvariable=self.progress,font=("Arial",11),wraplength=465,justify="left").pack(anchor="w",pady=8)
@@ -165,9 +170,11 @@ class EyeGuidePanel:
         self.rest_input=ttk.Spinbox(rest_row,from_=0,to=30,increment=.5,width=6,
                                   textvariable=self.rest_seconds,style="EyeRest.TSpinbox")
         self.rest_input.pack(side="left",padx=8)
+        self.start=ttk.Button(parent,text="1  Start eye open/closed",command=lambda:call("start_eye_guide",self.rest_seconds.get()))
+        self.start.pack(fill="x",pady=3)
+        self.wink_start=ttk.Button(parent,text="2  Start blinks & winks",command=lambda:call("start_wink_guide",self.rest_seconds.get()),state="disabled")
+        self.wink_start.pack(fill="x",pady=3)
         buttons=ttk.Frame(parent);buttons.pack(fill="x",pady=4)
-        self.start=ttk.Button(buttons,text="Start eye calibration",command=lambda:call("start_eye_guide",self.rest_seconds.get()))
-        self.start.pack(side="left")
         ttk.Button(buttons,text="Cancel",command=self.cancel).pack(side="left",padx=5)
         self.test_sound=ttk.Button(buttons,text="Test sound",command=lambda:self.sounds.play("test"))
         self.test_sound.pack(side="right")
@@ -194,12 +201,22 @@ class EyeGuidePanel:
 
     def update(self, state):
         guide=state["eye_guide"]
+        kind=guide.get("kind", "winks" if guide.get("wink_training") else "geometry") if guide else None
+        active=bool(guide and guide["active"])
+        busy=bool(state.get("calibrating") and not active)
+        eyes=state["eyes"]
+        models=state.get("wink_models", {})
+        self.fit_status.set("Eye open/closed: " + (", ".join(eyes) if eyes else "needs calibration") +
+                            "\nBlinks & winks: " + (", ".join(models) if models else "needs training"))
         rest_ms=state.get("config",{}).get("eye_rest_ms")
         if rest_ms is not None and rest_ms != self.rest_seen:
             self.rest_seconds.set(f"{rest_ms/1000:g}")
             self.rest_seen=rest_ms
         self.rest_input.configure(state="disabled" if guide and guide["active"] else "normal")
-        self.start.configure(text="Restart eye calibration" if guide or state["eyes"] else "Start eye calibration")
+        self.start.configure(text="1  Restart eye open/closed" if eyes or kind=="geometry" else "1  Start eye open/closed",
+                             state="disabled" if busy or active and kind!="geometry" else "normal")
+        self.wink_start.configure(text="2  Restart blinks & winks" if models or kind=="winks" else "2  Start blinks & winks",
+                                  state="disabled" if not eyes or busy or active and kind!="winks" else "normal")
         # A sound test must not interrupt the close/reopen instruction cues.
         self.test_sound.configure(state="disabled" if guide and guide["active"] else "normal")
         self.target.delete("all")
@@ -210,13 +227,13 @@ class EyeGuidePanel:
                 self.aborted=True
                 self.sounds.play("cancel")
             self.event=None
-            self.title.set("Calibration stopped — open your eyes" if self.aborted else "Calibrate eyes in one guided pass")
-            self.instruction.set("Wait until your face is visible, then Start again." if self.aborted else "One guide: eye shapes → blinks/winks → fresh checks.\nBegin each wink with eyes open, then wink after the capture tone.")
+            self.title.set("Calibration stopped — open your eyes" if self.aborted else "Two separate calibration stages")
+            self.instruction.set("Completed eye geometry is retained during blink/wink retries. Choose the stage to restart." if self.aborted else "First calibrate Eye open/closed; then start Blinks & winks.\nRestarting geometry clears its dependent wink models.")
             self.progress.set(CUE_LEGEND)
-            self.target.create_text(w/2,h/2,text="Look at the camera, then press Start",fill="#c2d0df",font=("Arial",14))
+            self.target.create_text(w/2,h/2,text="Eye geometry ready · start Blinks & winks" if eyes else "Look at the camera, then start Eye open/closed",fill="#c2d0df",font=("Arial",13),width=w-20)
             if state.get("wink_models") and not self.aborted:
                 self.title.set("Wink calibration ready")
-                self.instruction.set("Check natural blinks and held winks in the scopes. Restart to learn a new calibration.")
+                self.instruction.set("Check natural blinks and held winks in the scopes. Restart Blinks & winks to keep your eye geometry.")
                 self.progress.set("Checked eye models: "+", ".join(state["wink_models"]))
                 self.target.delete("all")
                 self.target.create_text(w/2,h/2,text="WINK = 1 · OPEN / BLINK = 0",fill="#75e3a8",font=("Arial",16,"bold"))
@@ -232,19 +249,22 @@ class EyeGuidePanel:
             self.sounds.play("close" if cue=="closed" else cue)
         if not guide["active"]:
             self.dismiss_fullscreen()
-            self.title.set("Wink calibration ready" if guide["passed"]==2 else "Check each eye’s calibration result")
-            self.instruction.set("Watch eye closure and wink output separately. Natural blinks should leave wink output at 0.")
+            geometry=kind=="geometry"
+            self.title.set(("Eye open/closed ready" if geometry else "Blinks & winks ready") if guide["passed"]==2 else "Check each eye’s calibration result")
+            self.instruction.set("Eye geometry is retained. Start Blinks & winks separately when ready." if geometry and eyes else
+                                 "Retry Eye open/closed with a clear view." if geometry else
+                                 "Eye geometry retained. Retry only Blinks & winks if needed.")
             self.progress.set(guide["report"])
-            self.target.create_text(w/2,h/2,text="WINK = 1     OPEN / BLINK = 0\n\nNo minimum wink duration\nDark = unknown, last value held",fill="#75e3a8",font=("Arial",16,"bold"),justify="center")
+            self.target.create_text(w/2,h/2,text="EYE OPEN / CLOSED\nGeometry stage complete" if geometry else "WINK = 1     OPEN / BLINK = 0\nNo minimum wink duration\nDark = unknown, last value held",fill="#75e3a8",font=("Arial",16,"bold"),justify="center")
             return
         self.title.set(f"Rest before step {guide['index']+1} / {guide['total']}" if guide["resting"] else f"Step {guide['index']+1} / {guide['total']} — {guide.get('stage', 'Eye shape')} · {guide['name'].upper()}")
-        self.instruction.set(guide["instruction"] + ("\nThe next sound will tell you to get ready." if guide["resting"] else
+        self.instruction.set(guide["instruction"] + ("\nNext: " + guide.get("next_instruction", "Wait for the next instruction") if guide["resting"] else
             "\nBegin with eyes open. Perform the movement AFTER three high capture tones." if guide.get("wink_training") else
             f"\nOpen at TWO HIGH TONES (about {guide['closed_duration_ms']/1000:.0f}s)." if guide["name"]=="closed" else "\nKeep your eyes comfortably open; do not squint."))
         stage="Rest — no samples" if guide["resting"] else "Get ready" if guide["preparing"] else "Sampling — follow the instruction"
         self.progress.set(f"{stage}: {guide['remaining_ms']/1000:.1f}s\nUsable frames: left {guide['samples']['left']}  /  right {guide['samples']['right']}")
         if guide["resting"]:
-            self.target.create_text(w/2,h/2,text="REST YOUR EYES\nBlink or close naturally\nNo samples recorded",fill="#75e3a8",font=("Arial",17,"bold"),justify="center")
+            self.target.create_text(w/2,h/2,text=f"REST · {math.ceil(guide['remaining_ms']/1000)}s\nNo samples recorded",fill="#75e3a8",font=("Arial",24,"bold"),justify="center",tags="rest-countdown")
         elif guide["target"]:
             x,y=guide["target"];x*=w;y*=h
             self.target.create_oval(x-14,y-14,x+14,y+14,fill="#6ed7fe",outline="white",width=2)
@@ -271,4 +291,4 @@ class EyeGuidePanel:
         # before acknowledging; the panel's next update reschedules this callback.
         if not self.fullscreen.canvas.find_all():
             return
-        self.call("present_eye_step",event[1],event[3])
+        self.call("present_eye_step",event[1],event[3],event[0])

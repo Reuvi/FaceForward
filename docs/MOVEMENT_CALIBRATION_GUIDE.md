@@ -116,6 +116,8 @@ previous range; completed unrelated eye/head/tongue fits remain. A brief face
 loss during normal tracking preserves completed calibration. Rest/preparation
 frames never train either range. Low tones mean rest, a rising pair means
 prepare, three high tones mean capture, and success/retry have separate cues.
+During rest, the guide title counts down and the next movement instruction stays
+visible below it. Wait for the capture tones before holding that position.
 
 Save using **Save active profile** in the camera tab. Detector preset v5 records
 the color-tip measurement and its personal range; the enclosing

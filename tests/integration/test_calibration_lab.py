@@ -104,13 +104,17 @@ class UnifiedCalibrationTests(unittest.TestCase):
         self.assertTrue(self.core.movement_guide.passed,self.core.notice)
 
     def guided_eyes(self):
-        self.session.detector_command("start_eye_guide")
+        for command in ("start_eye_guide", "start_wink_guide"):
+            self.session.detector_command(command)
+            self.finish_eye_guide()
+
+    def finish_eye_guide(self, **overrides):
         while self.core.eye_guide.active:
             guide=self.core.eye_guide
             state=guide.state(self.now)
             if state['waiting']:
                 self.session.detector_command("present_eye_step",guide.index,state['phase'])
-            controls=self.session.detector_runtime.demo_input()
+            controls=dict(self.session.detector_runtime.demo_input(), **overrides)
             self.feed(**controls)
             self.assertFalse(self.lab.processor.armed)
             self.assertEqual(self.lab.processor.eye_sample['sequence'],self.sequence)
@@ -124,6 +128,71 @@ class UnifiedCalibrationTests(unittest.TestCase):
         self.feed(left_closed=True)
         for sample in (self.lab.processor.eye_sample,):
             self.assertEqual(sample['left'],{'value':0.,'known':False})
+
+    def test_failed_blink_training_retries_without_changing_other_calibration(self):
+        self.calibrate()
+        eyes = dict(self.core.eyes)
+        head, tongue = self.core.head, self.core.tongue_model
+        tongue_range = deepcopy(self.core.tongue_range)
+        self.lab.action({"action":"arm"}); self.hold()
+        self.assertEqual(self.feed(left_closed=True)["left_click"], 1)
+        self.session.detector_command("start_wink_guide")
+        self.assertFalse(self.lab.processor.armed)
+        self.assertIsNone(self.lab.processor.eye_sample)
+        self.assertFalse(self.core.winks)
+        # Incorrect blink capture: never actually close either eye.
+        self.finish_eye_guide(left_closed=False, right_closed=False, natural_blink=False)
+        self.assertFalse(self.core.winks)
+        self.assertIn("Too few train blinks", self.core.notice)
+        self.assertEqual(self.core.eyes, eyes)
+        self.assertIs(self.core.head, head)
+        self.assertIs(self.core.tongue_model, tongue)
+        self.assertEqual(self.core.tongue_range, tongue_range)
+        self.session.detector_command("start_wink_guide")
+        self.assertEqual(self.core.eye_guide.state(self.now)["total"], 14)
+        self.finish_eye_guide()
+        self.assertEqual(set(self.core.winks), {"left", "right"}, self.core.notice)
+        self.assertEqual(self.core.eyes, eyes)
+
+    def test_geometry_can_be_saved_loaded_and_survives_wink_cancel_and_loss(self):
+        with self.assertRaises(ValueError): self.session.detector_command("start_wink_guide")
+        self.session.detector_command("start_eye_guide")
+        self.finish_eye_guide()
+        self.assertEqual(self.core.eye_guide.state(self.now)["total"], 7)
+        self.assertFalse(self.core.winks)
+        eyes = dict(self.core.eyes)
+        self.assertEqual(set(eyes), {"left", "right"})
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)/"eye-geometry.json"
+            self.session.save_profile(path)
+            self.session.detector_command("reset_calibration")
+            self.session.load_profile(path)
+        self.assertEqual(self.core.eyes, eyes)
+        for end in ("cancel", "loss"):
+            self.feed()
+            self.session.detector_command("start_wink_guide")
+            old_generation = self.core.generation
+            self.session.detector_command("start_wink_guide")
+            self.session.detector_command("present_eye_step", 0, "prepare", old_generation)
+            self.assertIsNone(self.core.eye_guide.start_ms)
+            if end == "cancel": self.session.detector_command("cancel")
+            else: self.feed(blank=True)
+            self.assertEqual(self.core.eyes, eyes)
+            self.assertIsNone(self.core.eye_guide)
+            self.assertFalse(self.core.winks)
+
+    def test_incomplete_geometry_cannot_seed_wink_training(self):
+        self.session.detector_command("start_eye_guide")
+        while self.core.eye_guide.step[0] != "reopen":
+            guide = self.core.eye_guide
+            state = guide.state(self.now)
+            if state["waiting"]: self.session.detector_command("present_eye_step", guide.index, state["phase"])
+            self.feed(**self.session.detector_runtime.demo_input())
+        self.assertTrue(self.core.eye_guide.fits)  # Provisional, before fresh reopen check.
+        self.assertFalse(self.core.eyes)
+        with self.assertRaises(ValueError): self.session.detector_command("start_wink_guide")
+        self.session.detector_command("cancel")
+        with self.assertRaises(ValueError): self.session.detector_command("start_wink_guide")
 
     def test_large_box_jump_loss_and_recovery_keep_fits_and_held_unknown_sample(self):
         self.guided_eyes()

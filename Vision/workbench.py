@@ -208,16 +208,21 @@ class DetectorWorkbench:
         return (self.job is not None or bool(self.eye_guide and self.eye_guide.active)
                 or bool(self.movement_guide and self.movement_guide.active))
 
-    def start_eye_guide(self, rest_seconds=None):
+    def _eye_guide_config(self, rest_seconds, kind):
         self._require_subject()
-        if self.job is not None or self.movement_guide and self.movement_guide.active:
+        if (self.job is not None or self.movement_guide and self.movement_guide.active
+                or self.eye_guide and self.eye_guide.active and self.eye_guide.kind != kind):
             raise ValueError("Finish or cancel the current collection first")
         if rest_seconds is not None:
             try:
                 rest_ms = float(rest_seconds) * 1000
             except (ValueError, TypeError) as exc:
                 raise ValueError("Rest between steps must be 0–30 seconds") from exc
-            self.config = replace(self.config, eye_rest_ms=rest_ms)
+            return replace(self.config, eye_rest_ms=rest_ms)
+        return self.config
+
+    def start_eye_guide(self, rest_seconds=None):
+        self.config = self._eye_guide_config(rest_seconds, "geometry")
         self.eyes.clear()
         self.winks.clear()
         for target in list(self.samples):
@@ -226,11 +231,22 @@ class DetectorWorkbench:
         self._invalidate("left_eye_open", "right_eye_open")
         self.generation += 1
         self.eye_guide = EyeCalibrationFlow(self.config)
-        self.notice = "Guided eyes: follow the dot with eyes comfortably open"
+        self.notice = "Eye open/closed calibration: follow the dot. Train blinks/winks separately afterward."
 
-    def present_eye_step(self, index, phase=None):
+    def start_wink_guide(self, rest_seconds=None):
+        config = self._eye_guide_config(rest_seconds, "winks")
+        if not self.eyes:
+            raise ValueError("Complete eye open/closed calibration before starting Blinks & winks")
+        self.config = config
+        self.winks.clear()
+        self._invalidate("left_eye_open", "right_eye_open")
+        self.generation += 1
+        self.eye_guide = EyeCalibrationFlow(self.config, eyes=self.eyes)
+        self.notice = "Blinks & winks: eye open/closed calibration retained. Retry this stage independently."
+
+    def present_eye_step(self, index, phase=None, generation=None):
         self.expire()
-        if self.eye_guide:
+        if self.eye_guide and (generation is None or generation == self.generation):
             self.eye_guide.present(index, self.clock(), phase)
 
     def cancel(self):
@@ -477,16 +493,18 @@ class DetectorWorkbench:
             self._guide_movement(frame["timestamp_ms"])
             if self.eye_guide and self.eye_guide.active:
                 self.eye_guide.feed(frame["timestamp_ms"], self.features, self.wink_vectors)
-                self.eyes = dict(self.eye_guide.fits)
                 if not self.eye_guide.active:
-                    self.winks = dict(self.eye_guide.models)
+                    if self.eye_guide.kind == "geometry":
+                        self.eyes = dict(self.eye_guide.fits)
+                    else:
+                        self.winks = dict(self.eye_guide.models)
                     self.notice = self.eye_guide.report
             values = {}
             for side in ("left", "right"):
                 feature, calibration = self.features[side], self.eyes.get(side)
                 reason = feature.reason
                 if calibration is None:
-                    reason = "Complete guided eye calibration"
+                    reason = "Complete Eye open/closed calibration"
                 elif feature.quality > 0 and feature.value is not None:
                     if (calibration.closed_limit is not None
                             or feature.value <= max(calibration.opened * 1.8, calibration.opened + 0.04)):

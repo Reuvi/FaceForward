@@ -221,21 +221,17 @@ Vision/.venv/bin/python -m App --source camera \
 
 1. Confirm a camera image and landmark overlay appear; read **actual** source Hz
    and source errors rather than assuming the requested FPS was achieved.
-2. Choose a currently detected subject and press **Use selected subject**. Merely
-   displaying a dropdown option does not bind Processing to it.
+2. Camera/Detector demo automatically attaches `single-user`. Confirm it is visible.
 3. Test **eyes first** in Detection calibration → 1 Eyes: **Test sound**, then
-   **Start eye calibration**. A temporary full-screen guide opens. Follow five
-   open-eye dot positions; close gently at
-   descending tones, reopen at two high tones, and wait for completion tones.
-   Read [the guided procedure](../Vision/DETECTION_LAB.md#1-independent-eye-calibration).
-   Look around with eyes open: both scopes should stay at **0**. Close one eye at
-   a time, then both: each respective trace should reach **1** independently.
-   Unknown readings produce a darker hold of the previous height, not a new
-   closed bit. Completion returns to the lab automatically; Escape or the popup
-   Cancel button exits early. If any pose is labeled
-   incorrectly, **Restart eye calibration** clears bad eye training without changing
-   head/tongue fits. Leaving this active guide cancels it. Later test head targets
-   and tongue training/checks using the same runbook.
+   **Start eye open/closed**. Follow the seven dot/closed/reopen steps. When the
+   popup closes, start **Blinks & winks** separately. Natural blinks should pulse
+   the anatomical closure trace but leave wink output at 0; held intentional winks
+   produce independent ON samples. The central rest countdown displays the next
+   instruction; rest/preparation frames never train. Use **Restart blinks & winks**
+   after a bad blink capture to keep geometry. Only **Restart eye open/closed**
+   discards geometry and dependent wink models. See [the current eye procedure](EYE_CALIBRATION_GUIDE.md).
+   Escape/Cancel or leaving an active guide cancels unfinished work. Later test
+   head targets and tongue training/checks using the same detector runbook.
 4. Verify each channel becomes valid only after its requirements pass. Open Live
    lab and explicitly Start preview with neutral/open input. Compare raw versus
    processed values; missing channels remain unavailable. Save active profile on

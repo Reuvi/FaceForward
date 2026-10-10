@@ -49,7 +49,7 @@ shared by the embedded and standalone views.
 
 ## 1. Independent eye calibration
 
-Press **Test sound**, then **Start eye calibration**. No individual capture buttons
+Press **Test sound**, then **Start eye open/closed**. No individual capture buttons
 are needed. A temporary **full-screen native guide** opens over the lab, with a
 large target, centered instructions, countdown and Cancel button. Keep your head
 comfortable and follow the dot with both eyes naturally
@@ -60,9 +60,12 @@ Between poses, the screen says **REST** and hides the dot. Blink, close your eye
 or relax your gaze naturally; these frames do not enter calibration. Set **Rest
 between steps (seconds)** before Start/Restart: the default is 3 seconds, with
 0–30 seconds supported (0 skips rest). The setting is saved with the active profile.
-This is only the seven-step geometry portion. It is followed automatically by
-natural blink/relaxed-face captures, three wink attempts per eye and separate
-checks with two new winks per eye. The whole guide is 21 steps, about 2½ minutes.
+The seven-step geometry guide now finishes and closes its popup (about 40 seconds).
+Press **Start blinks & winks** separately for fourteen appearance/check steps:
+natural blinks and relaxed face, three wink attempts per eye, then fresh checks
+with two new winks per eye (about two minutes). A failed or cancelled second stage
+keeps the completed geometry. During rest, a large central countdown and the next
+instruction are shown together; wait for capture tones before moving.
 See [current eye calibration instructions](../docs/EYE_CALIBRATION_GUIDE.md) before
 testing. Collection times schedule samples; they never gate runtime wink ON/OFF.
 
@@ -96,12 +99,15 @@ sound first. On the bell fallback, use the visible instruction to distinguish cu
 There is no audio recording or speech service. If no reopen sound occurs, open your
 eyes after the displayed duration and inspect the screen; source loss cancels capture.
 
-**Restart eye calibration** discards the current eye training and both previous eye
-fits, then starts from center. It leaves head/tongue fits alone. **Cancel** stops the
-sequence without restoring old eye fits and closes the popup. Leaving the Eyes tab or minimizing the window cancels an active
-sequence so unseen instructions cannot collect mislabeled samples. Completed fits
-survive normal tab changes, track loss and Stop source. Applying detector Settings
-or Reset all calibration clears fits. Preview stays disarmed during every guided phase.
+**Restart eye open/closed** clears geometry and its dependent wink models.
+**Restart blinks & winks** clears only the blink/wink models and training; geometry,
+head and tongue fits remain. **Cancel** closes the active popup. Cancelling geometry
+before its reopen check does not make provisional fits available for wink training.
+Leaving the Eyes tab or minimizing cancels an active guide; completed unrelated
+fits survive. Completed eye geometry can be saved before starting blink training.
+Applying detector Settings or Reset all calibration clears fits. Preview stays
+disarmed during every guided phase. Late prompt acknowledgments from an earlier
+calibration generation cannot start a new guide's timer.
 
 The program waits for each full-screen rest/target prompt to be mapped and painted
 before starting that phase's clock. Rest uses `eye_rest_ms`, records no geometry or

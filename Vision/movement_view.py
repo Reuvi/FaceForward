@@ -446,10 +446,14 @@ class MovementPanel:
             )
             self.sounds.play(cue)
         self.title.set(
+            f"{self.kind.title()} · REST {guide['remaining_ms']/1000:.1f}s"
+            if guide["phase"] == "rest" else
             f"{self.kind.title()} · {guide['index'] + 1}/{guide['total']} · {guide['role'].title()}"
         )
         self.instruction.set(
-            guide["instruction"] if guide["active"] else guide["report"]
+            (guide["instruction"] + "\nNext: " + guide["next_instruction"]
+             if guide["phase"] == "rest" else guide["instruction"])
+            if guide["active"] else guide["report"]
         )
         self.progress.set(
             f"{guide['phase'].upper()} · {guide['remaining_ms'] / 1000:.1f}s · {guide['samples']} usable / {guide['rejected']} unavailable"

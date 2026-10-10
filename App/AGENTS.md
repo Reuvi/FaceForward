@@ -29,7 +29,9 @@ Collection also disarms preview. Preserve invalid controls until each detector i
 Do not report synthetic success as live detector accuracy or driver completion.
 
 The active App has one preview and no Detection research tab/session. Embed the
-complete blink/wink guide in Detection calibration. Read `../Contracts/EYE_INTENT.md`.
+separate Eye open/closed and Blinks & winks guides in Detection calibration.
+Blink retries must preserve completed geometry; both start commands disarm and
+reset Processing eye history. Persist geometry-only profiles without requiring winks. Read `../Contracts/EYE_INTENT.md`.
 Hide legacy eye timer controls in App; legacy component/replay formats retain them.
 Save profile v3 without research; accept validated v1/v2 files without reviving their
 research runtime. Never restore old event models as frame classifiers.

@@ -48,14 +48,13 @@ The requested FPS takes effect on source start; actual Hz and capture age are sh
 1. On **Vision source & raw signals**, start Camera or Detector demo. Your face
    attaches automatically as **single-user**. No face selection is needed. The app
    assumes one operator; it does not identify people.
-2. Open **Detection calibration → 1 Eyes**, set rest time, try **Test sound**,
-   then **Start eye calibration**. The temporary full-screen guide covers open
-   poses, gentle closed/reopen geometry, natural blinks, three winks per eye,
-   then separate checks with new blinks and two winks per eye. Rest and sound cues
-   separate movements. The 21-step flow takes about 2½ minutes at default timings.
-   Follow [the eye testing guide](../docs/EYE_CALIBRATION_GUIDE.md) for exact cues,
-   acceptance rules, measurements and troubleshooting. Restart discards bad eye
-   training without clearing head/tongue fits. Focus on eyes before proceeding.
+2. Open **Detection calibration → 1 Eyes**, set rest time, and try **Test sound**.
+   Press **Start eye open/closed** for the seven geometry steps (about 40 seconds).
+   When it returns to the lab, press **Start blinks & winks** for fourteen separate
+   appearance/check steps (about two minutes). The rest screen shows a large
+   countdown and the next instruction. **Restart blinks & winks** keeps eye
+   geometry; **Restart eye open/closed** clears geometry and its dependent wink
+   models. Head/tongue fits remain. Follow [the eye testing guide](../docs/EYE_CALIBRATION_GUIDE.md).
 3. In **2 Head Y**, select **position** (vertical image translation) or **pitch**
    (nodding), then **Start head position guide**. Follow neutral/up/down and a
    separate repeat for checking. The selector resets only head calibration.
@@ -103,10 +102,11 @@ in [the detector runbook](../Vision/DETECTION_LAB.md). Transfer functions are in
 
 ### Camera-free calibration exercise
 
-In `detector-demo`, press **Start eye calibration** in
-Detection calibration. The generated pixels and landmarks follow all 21 steps
-without manual switches; after completion the fixture cycles left, right and both
-closures. Start preview to inspect the resulting clicks in Live lab. This exercises
+In `detector-demo`, run **Start eye open/closed** and then **Start blinks & winks**
+in Detection calibration. The generated pixels and landmarks follow each stage
+without manual switches. The first stage closes its popup and waits for you to
+start the second. After completion the fixture cycles left, right and both
+closures. Start preview to inspect clicks in Live lab. This exercises
 wiring, not real-face accuracy. Mock checkboxes/sliders are removed from calibration; the old mock eye checkboxes
 are also hidden in App’s Live lab. Standalone Processing retains its developer controls.
 Head and tongue guides also receive automatic synthetic targets. During EMPTY capture

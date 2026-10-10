@@ -126,7 +126,9 @@ model test is enabled with `VISION_MODEL_PATH`; see Vision's README. Scope CI
 checks lane ownership separately. Driver files have not been changed by this MVP.
 
 The native app now learns **blinks versus intentional winks inside eye calibration**.
-A single full-screen guide trains and checks each eye independently. Recognized
+Separate full-screen guides calibrate eye open/closed geometry and blinks/winks.
+Retrying the second retains the first. Rest screens show a large countdown and
+the upcoming instruction together. Recognized
 winks produce ON samples while held, with no duration threshold. Detection research
 has been removed from the app. See [the eye calibration/testing guide](docs/EYE_CALIBRATION_GUIDE.md).
 All output remains a simulated preview.

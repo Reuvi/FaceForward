@@ -268,6 +268,7 @@ class MovementGuide:
             instruction="Rest comfortably — no training samples"
             if self.resting
             else instruction,
+            next_instruction=instruction,
             samples=sum(v is not None for v in self.values),
             rejected=sum(v is None for v in self.values),
             report=self.report,

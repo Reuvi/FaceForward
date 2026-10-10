@@ -37,7 +37,9 @@ lane documentation here. Put requests for shared changes in `interface-requests/
 - The coordinated eye exception is `../Contracts/EYE_INTENT.md`: Vision owns
   independent per-frame wink appearance calibration/classification and the additive
   intent sample, while preserving raw anatomical openness. Do not map OS events or
-  import Processing internals. Keep the unified guide, no time/opposite-eye features,
+  import Processing internals. Keep two independent guide stages in the same eye tab, preserving geometry on
+  blink/wink retry/cancel/failure. Show rest countdown and next instruction together.
+  Keep no time/opposite-eye features,
   separate validation windows, model uncertainty and per-eye failure visible.
 - Before handoff, check no face, one/two faces, identity loss/reacquisition, missing
   features, orientation/mirroring, and sample timing. Document setup/run/test commands

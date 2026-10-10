@@ -1,6 +1,6 @@
-"""One full-screen flow: eye geometry, labeled appearances, fresh checks."""
+"""Separately started geometry and blink/wink guides with shared capture timing."""
 
-from .guided_eyes import GuidedEyes, STEPS
+from .guided_eyes import GuidedEyes
 from .wink_model import fit, check
 
 
@@ -40,10 +40,14 @@ PROMPTS = prompts()
 
 
 class EyeCalibrationFlow:
-    def __init__(self, config):
+    def __init__(self, config, *, eyes=None):
+        if eyes is not None and not eyes:
+            raise ValueError("Complete eye open/closed calibration before blinks and winks")
         self.config = config
-        self.geometry = GuidedEyes(config)
-        self.wink_index = None
+        self.kind = "geometry" if eyes is None else "winks"
+        self.geometry = GuidedEyes(config) if eyes is None else None
+        self.calibrated_eyes = dict(eyes or {})
+        self.wink_index = None if eyes is None else 0
         self.active = True
         self.start_ms = self.rest_end_ms = self.last_timestamp = None
         self.resting = False
@@ -62,18 +66,18 @@ class EyeCalibrationFlow:
 
     @property
     def fits(self):
-        return self.geometry.fits
+        return self.geometry.fits if self.geometry is not None else self.calibrated_eyes
 
     @property
     def groups(self):
-        return self.geometry.groups
+        return self.geometry.groups if self.geometry is not None else {}
 
     @property
     def index(self):
         return (
             self.geometry.index
             if self.wink_index is None
-            else len(STEPS) + self.wink_index
+            else self.wink_index
         )
 
     @property
@@ -105,11 +109,10 @@ class EyeCalibrationFlow:
             self.geometry.feed(t, features)
             if not self.geometry.active:
                 self.errors = dict(self.geometry.errors)
-                self.wink_index = 0
-                self.resting = self.config.eye_rest_ms > 0
-                if not self.fits:
-                    self.active = False
-                    self.report = self.geometry.report
+                self.active = False
+                self.report = self.geometry.report
+                if self.fits:
+                    self.report += " · Eye open/closed ready. Start Blinks & winks when ready."
             return
         if not self.active:
             return
@@ -226,7 +229,8 @@ class EyeCalibrationFlow:
         if self.wink_index is None:
             state = self.geometry.state(now)
             state.update(
-                total=len(STEPS) + len(PROMPTS), stage="Eye shape", wink_training=False
+                kind=self.kind, stage="Eye open/closed", wink_training=False,
+                report=self.report if not self.active else state["report"],
             )
             return state
         role, kind, instruction, _ = PROMPTS[self.wink_index]
@@ -255,11 +259,13 @@ class EyeCalibrationFlow:
         return dict(
             active=self.active,
             index=self.index,
-            total=len(STEPS) + len(PROMPTS),
+            total=len(PROMPTS),
+            kind=self.kind,
             name=kind,
             instruction="Rest your eyes — no training samples"
             if self.resting
             else instruction,
+            next_instruction=instruction,
             target=None if self.resting else (0.5, 0.5),
             waiting=waiting,
             preparing=preparing,

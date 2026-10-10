@@ -10,6 +10,38 @@ geometry. Show a central rest countdown together with the next instruction.
 Contract first: [EYE_INTENT.md](../Contracts/EYE_INTENT.md). Keep one worker,
 independent sampled eye intent, saved fits and capture-timestamp gating.
 
+Implementation handoff:
+
+- Two separately started native guides: `1  Start eye open/closed` (7 steps) and
+  `2  Start blinks & winks` (14 steps). Geometry completion returns to the lab;
+  it does not automatically start appearance training.
+- Blink/wink failure, cancellation, restart and tracking loss preserve completed
+  eye geometry and head/tongue fits. Restarting geometry clears dependent wink
+  models. Provisional geometry is not promoted until the reopen check completes.
+- Geometry-only profiles can be saved and loaded before starting wink training.
+  Detector preset v5 and combined profile v3 remain unchanged; compatible saved
+  geometry and wink models still load without retraining for this UI change.
+- Rest screens show a large decreasing countdown beside the next movement
+  instruction. Head/tongue rest panels also show the countdown and upcoming pose.
+  Rest/preparation captures remain excluded from training. Eye prompt acknowledgments
+  carry the source generation so an old popup cannot acknowledge a new guide.
+- Test procedure: [EYE_CALIBRATION_GUIDE.md](EYE_CALIBRATION_GUIDE.md). Per-frame
+  independent wink classification, Processing transfer functions and Drivers are
+  unchanged. Real-person accuracy and comfort have not been remeasured.
+
+Validation: **250 unique tests passed**: 109 Vision (including the local MediaPipe
+blank-image smoke), 65 integration (20 calibration tests plus 45 remaining tests,
+including 9 native Tk checks), 69 Processing and 7 tooling. Native checks verify
+countdown changes, readable non-overlapping instructions, separate stage buttons,
+Escape/cancel and retained geometry. Integration covers failed wink training,
+retry, cancellation, loss, geometry-only save/load, stale acknowledgments and
+rejection of incomplete geometry. Native teardown cancels test-owned timers.
+
+The 490-frame headless mouse demo accepted all frames, observed left/right/pointer/
+scroll and released output at EOF. Changed Python files pass Ruff F checks;
+whitespace and integration scope checks pass against `f4eb12c`. Contract landed
+first in `433da90`; retain the feature branch when fast-forwarding main.
+
 ## Previous tongue-tip handoff (f4eb12c)
 
 Claim: Reuvi integration, `work/reuvi/integration/tongue-tip`, base `0123b8d`.
