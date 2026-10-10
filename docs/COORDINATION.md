@@ -1,5 +1,16 @@
 # Main chat and agent coordination hub
 
+## Current simplified wink calibration task
+
+Reuvi asks to remove Detection research and train blink-versus-wink appearance in
+the eye calibration flow, without duration-based recognition. Confirmed: per-frame
+ON while holding a recognized wink, OFF on reopening; eyes remain independent.
+Claim: integration, `work/reuvi/integration/wink-calibration`, base `e5d0daa`.
+Scope: Vision calibration/features/models/UI, Processing intent adapter/gate and
+profile compatibility, App wiring/UI, their tests and shared documentation.
+Contract: `Contracts/EYE_INTENT.md`, committed before implementation. This supersedes
+the default research/dwell workflow below; Drivers remain unchanged.
+
 ## Current single-user lifecycle change (October 10)
 
 Reuvi requests one subject instead of simultaneous people, preservation of
