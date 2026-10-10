@@ -192,3 +192,16 @@ collect user testing observations before expanding head/tongue work.
 Validation: 136 tests passed (73 Vision including local model smoke, 36 Processing,
 20 integration, 7 tooling). Native synthetic UI completed the guide, plotted both
 binary channels, and cancelled/restarted correctly. No live-person accuracy claim.
+
+## Proposed detection reliability work — 2026-10-10
+
+Read [DETECTION_RELIABILITY_PLAN.md](DETECTION_RELIABILITY_PLAN.md) before changing
+blink/wink semantics, adding facial substitutes, or implementing head-compensated
+gaze. This proposal was checked against runtime `6ed296e` and primary research.
+It is documentation only: current independent eye gates, tongue pointer and
+head-Y scroll are unchanged. Gesture policy remains a user/profile decision;
+strict wink mode must not silently become an opposite-eye veto in the default.
+
+Recommended order: observe/labeled trials → temporal intent prototype → capability
+profiles → gaze feasibility → explicit pointer/Drivers handoff. Keep all work in
+owning lanes and coordinate feature/profile/event contracts before integration.
