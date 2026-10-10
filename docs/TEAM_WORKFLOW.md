@@ -5,18 +5,24 @@
 Use Vision, Processing, and Drivers as the three parallel work streams, with
 roughly one person responsible for each section and their agents working within it.
 Select one person to coordinate shared interfaces and merges. That responsibility can rotate.
-People and GitHub handles are intentionally not assigned to lanes yet.
+Reuvi has identified Processing as his section and the main integration
+conversation as the coordination hub. Confirm the current Vision and Drivers
+owners there; do not infer their assignments from names or GitHub handles.
+Use [COORDINATION.md](COORDINATION.md) for the baseline, current decisions, task
+claims, and handoffs. It is a guide, not a synchronized task registry.
 
 | Lane | Owns | Develop independently using |
 | --- | --- | --- |
 | vision | `Vision/`, `tests/vision/` | Recorded/synthetic frames and emitted SignalFrame fixtures |
-| processing | `Processing/`, `tests/processing/` | SignalFrame fixtures and a logging ControlFrame sink |
-| drivers | `Drivers/`, `tests/drivers/` | ControlFrame fixtures/manual sliders, no camera dependency |
+| processing | `Processing/`, `tests/processing/` | SignalFrame fixtures and the native mouse preview |
+| drivers | `Drivers/`, `tests/drivers/` | Agreed control fixtures/manual sliders, no camera dependency |
 | integration | Shared paths and app composition | All three public interfaces |
 
 Keep lane-specific requirements, lockfiles, tooling, and README instructions inside
 that lane until the integrator deliberately consolidates a shared environment.
 The integrator owns root dependency files, CI, `Contracts/`, and application wiring.
+The current mouse lab emits `mouse_preview_v0`; ControlFrame v1 remains a driver
+draft. Read [the adopted handoff](../Contracts/MOUSE_MVP.md) before wiring output.
 Put cross-lane questions in `<Component>/interface-requests/<task>.md` and reference
 them in the handoff. Changing a shared contract is a separate coordinated task.
 
@@ -73,7 +79,7 @@ file ownership in advance; merely using two branches does not solve that collisi
 Do not change another lane's implementation to make your own test pass. Mock the
 agreed interface and report the mismatch with a fixture or a minimal reproducer.
 
-At handoff, include:
+Return the handoff to the main coordination chat. At handoff, include:
 
 ```text
 Lane / task / branch:

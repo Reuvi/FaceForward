@@ -5,6 +5,11 @@ Python application. This is a **mouse-only signal lab**: left button, right butt
 vertical scrolling, and relative pointer movement. Output moves the simulated
 desktop inside the lab. The hardware emulator is still a separate integration.
 
+Keep the [testing companion](../docs/TESTING_GUIDE.md) open while experimenting.
+The [engineering guide](../docs/ENGINEERING_GUIDE.md) explains the complete pipeline,
+formulas, defaults, and diagnostic fields. Other agents should follow the
+[main chat coordination guide](../docs/COORDINATION.md) for task claims and handoffs.
+
 ## Start here
 
 From the repository root on `main`, with Python **3.10+** including Tk:

@@ -28,9 +28,19 @@ Read [the complete MVP runbook](App/README.md),
 [Vision camera setup](Vision/README.md), and
 [the adopted native handoff](Contracts/MOUSE_MVP.md).
 
+## Read while testing and developing
+
+- [Testing companion](docs/TESTING_GUIDE.md): step-by-step exercises, expected
+  readings, demo timeline, tuning experiments, CSV fields, and troubleshooting.
+- [Engineering guide](docs/ENGINEERING_GUIDE.md): architecture, signal formats,
+  eye state machines, transfer-function math, every setting, clocks, and limits.
+- [Main chat coordination](docs/COORDINATION.md): settled decisions, ownership,
+  agent task claims/handoffs, merge procedure, and the next incremental work.
+
 ## Start here
 
 1. Read [the original project notes](docs/ORIGINAL_PROJECT_NOTES.md),
+   [the coordination hub](docs/COORDINATION.md),
    [the team workflow](docs/TEAM_WORKFLOW.md), and [agent instructions](AGENTS.md).
 2. Pick a lane and create a separate worktree for every active agent:
 

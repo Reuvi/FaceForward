@@ -14,6 +14,13 @@ and adopted local interfaces. Keep all four mouse mappings independent, preserve
 invalid detector values, and keep simulated sources explicitly labeled. Camera
 calibration/head/tongue detection and hardware-emulator integration remain pending.
 
+Reuvi's main integration conversation is the coordination hub for other agents.
+Read `docs/COORDINATION.md` before claiming work and return its handoff template
+to that conversation. Read `docs/ENGINEERING_GUIDE.md` for implementation details
+and `docs/TESTING_GUIDE.md` for expected test behavior. These documents describe a
+dated baseline; check current code and commits before assuming an item is unchanged.
+Update relevant documentation when behavior, settings, or interfaces change.
+
 ## Start every task
 
 1. Run `git status --short --branch` and `git worktree list`. Preserve existing work.
