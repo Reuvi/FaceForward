@@ -6,6 +6,9 @@ does today. Future features are identified explicitly. Use the
 [testing guide](TESTING_GUIDE.md) alongside the app and the
 [coordination hub](COORDINATION.md) when assigning or handing off work.
 
+For the current detector-by-detector ML status and how to inspect raw camera
+signals before mouse mapping, see [RAW_DETECTION_GUIDE.md](RAW_DETECTION_GUIDE.md).
+
 ## 1. Scope and current capabilities
 
 The application runs locally in Python with a native Tk window. The four controls

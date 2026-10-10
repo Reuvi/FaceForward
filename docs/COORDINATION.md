@@ -16,7 +16,8 @@ without user authorization.
 1. [Root AGENTS.md](../AGENTS.md), then each component's `AGENTS.md` you will touch.
 2. [Testing companion](TESTING_GUIDE.md) for expected current behavior and checks.
 3. [Engineering guide](ENGINEERING_GUIDE.md) for formats, algorithms, configuration,
-   clocks, diagnostic meanings, and known limits.
+   clocks, diagnostic meanings, and known limits; [raw detection guide](RAW_DETECTION_GUIDE.md)
+   for detector implementation status, ML, and camera-only testing.
 4. [Adopted MVP interfaces](../Contracts/MOUSE_MVP.md) and
    [original v1 contracts](../Contracts/README.md). The driver output is still a draft.
 5. [Team workflow](TEAM_WORKFLOW.md), [agent starters](AGENT_STARTERS.md), and

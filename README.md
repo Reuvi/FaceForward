@@ -30,6 +30,8 @@ Read [the complete MVP runbook](App/README.md),
 
 ## Read while testing and developing
 
+- [Raw detection guide](docs/RAW_DETECTION_GUIDE.md): which facial detectors exist,
+  how the ML and calibration work, what is missing, and camera-only diagnostics.
 - [Testing companion](docs/TESTING_GUIDE.md): step-by-step exercises, expected
   readings, demo timeline, tuning experiments, CSV fields, and troubleshooting.
 - [Engineering guide](docs/ENGINEERING_GUIDE.md): architecture, signal formats,

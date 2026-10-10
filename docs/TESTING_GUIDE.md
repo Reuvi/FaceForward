@@ -181,6 +181,9 @@ the source instead; the mock Input Hz field does not control Vision.
 
 ## 6. Live camera diagnostics: what to test now
 
+For the per-detector implementation status, ML explanation, and detection-only
+experiment checklist, use [RAW_DETECTION_GUIDE.md](RAW_DETECTION_GUIDE.md).
+
 After optional [camera setup](../Vision/README.md#install-the-optional-camera-dependencies):
 
 ```bash
