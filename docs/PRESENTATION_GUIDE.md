@@ -20,6 +20,13 @@ reopen both eyes to resume. Stop, tracking loss and stale input release everythi
 and require Start again. Missing mouth evidence stops pointer movement in this
 mapping; it does not invent a closed-mouth value.
 
+With **Require calibrated wink for eye actions** enabled, a recognized wink clicks
+on reopening without an extra minimum hold. The first closed frame can precede
+wink recognition; it no longer rejects the entire gesture. Hold a recognized
+left wink for dragging. Known closed non-wink readings release pending recognition;
+unknown readings cancel the gesture until you reopen both eyes. Both-eye dictation
+continues to use anatomical closure, independent of wink recognition.
+
 ## Build and run
 
 From the repository root:
@@ -77,8 +84,9 @@ removes existing momentum and reduces requested velocity. It never reverses the
 pointer. Closing releases the brake and restores speed through the existing head
 acceleration/filter. Head response settings remain separate.
 
-**Live curves → Eye gesture timing** adjusts the solo closure minimum, both-eye
-hold and drag hold. **Require calibrated wink for eye actions** selects wink vs
+**Live curves → Eye gesture timing** adjusts the plain-mode solo closure minimum,
+both-eye hold and drag hold. The solo minimum is hidden in wink mode because wink
+recognition already qualifies the action. **Require calibrated wink for eye actions** selects wink vs
 plain anatomical input for solo actions; both-eye dictation always uses anatomical
 closure. Save/load a named tuning profile to keep these choices. Loading profiles
 or changing eye mode stops output; live response sliders do not arm it.
@@ -86,6 +94,15 @@ or changing eye mode stops output; live response sliders do not arm it.
 For scrollbars: position over the scrollbar thumb, hold the left eye until the
 Signals row says Dragging, move your head, then reopen. Mouth resistance also
 works while dragging.
+
+If a wink does not click, the left-eye Signals row distinguishes **waiting for
+calibrated wink**, **wink unknown**, **wink recognized — reopen for click**, and
+**Eye open/closed unknown**. Wink mode needs a camera profile with completed Wink
+action calibration, not just a saved response/curve profile. Retry only the Wink
+action guide if recognition remains unavailable; existing head and eye geometry
+are retained. The local diagnostic log includes scalar recognition state and
+capture-level action/unknown counts, so brief winks are visible between 5 Hz log
+observations. Counts are gesture requests; `driver_events` confirms delivery.
 
 ## Software checks
 

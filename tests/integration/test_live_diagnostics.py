@@ -149,6 +149,21 @@ class LiveDiagnosticsTests(unittest.TestCase):
             log.record_error("logging disabled")
             log.close()
 
+    def test_gesture_counts_and_wink_status_logged_without_face_features(self):
+        source,lab=self.feed()
+        lab['snapshot']['diagnostics']['eye_gesture']={
+            'status':'Left eye closed — waiting for calibrated wink',
+            'counts':{'left_action_frames':1,'clicks':1}}
+        source['detector']={'wink_readings':{'left':dict(calibrated=True,known=True,
+            state='wink',score=.9,features=['private-face-features'])}}
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'wink.jsonl'
+            log=DiagnosticLog(path);log.record(source,lab);log.close()
+            row=json.loads(path.read_text().splitlines()[1])
+            self.assertEqual(row['eye_gesture']['counts']['left_action_frames'],1)
+            self.assertEqual(row['wink_detection']['left'],dict(calibrated=True,known=True,state='wink',score=.9))
+            self.assertNotIn('private-face-features',path.read_text())
+
 
 if __name__ == "__main__":
     unittest.main()

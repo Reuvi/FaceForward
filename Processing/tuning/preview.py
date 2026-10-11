@@ -55,11 +55,12 @@ def response_preview(state,channel):
     """Synthetic outward turn, hold and return. Never feeds the live controller."""
     if channel in ('left','right') and (state.get('mapping') or {}).get('presentation',{}).get('enabled'):
         from Processing.mappings.presentation import EyeGestures
-        gestures=EyeGestures();config=Mapping.from_dict(state['mapping']).presentation
+        gestures=EyeGestures();mapping=Mapping.from_dict(state['mapping']);config=mapping.presentation
         raw=[];out=[]
         for t in range(0,2501,10):
             closed=200<=t<800
-            gestures.sample(closed if channel=='left' else False, closed if channel=='right' else False,t,config)
+            gestures.sample(closed if channel=='left' else False, closed if channel=='right' else False,t,config,
+                            require_wink=mapping.require_wink)
             raw.append((t/1000,int(closed)))
             out.append((t/1000,int((gestures.click or gestures.drag) if channel=='left' else gestures.enter)))
         return {'Eye closure':raw,'Command':out}

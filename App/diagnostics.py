@@ -180,6 +180,9 @@ class DiagnosticLog:
                      "head_wink_clicks":(lab.get("mapping") or {}).get("head_wink_clicks", False),
                      "require_wink":(lab.get("mapping") or {}).get("require_wink", True),
                      "eyes":diag.get("eyes"), "head_center_pending":diag.get("head_center_pending", False),
+                     "eye_gesture":diag.get("eye_gesture"),
+                     "wink_detection":{side:{key:reading.get(key) for key in ("calibrated", "known", "state", "score")}
+                                       for side,reading in detector.get("wink_readings", {}).items()},
                      "mouth_open":signals.get("mouth_open"), "button_actions":diag.get("button_actions"),
                      "keys":snap.get("keys"), "mouth_brake":diag.get("mouth_brake"),
                      "presentation":snap.get("presentation"),

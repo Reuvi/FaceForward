@@ -78,6 +78,41 @@ class PresentationConnectionTests(unittest.TestCase):
         self.assertEqual(state['output']['event_counts'].get(3),1)
         self.assertEqual(state['output']['held_keys'],0)
 
+    def test_wink_after_initial_nonmatch_and_brief_wink_reach_compiled_driver_once(self):
+        mapping=self.lab.state()['mapping'];mapping['require_wink']=True
+        self.lab.update_mapping(mapping)
+        self.lab.action({'action':'arm'});self.feed()
+        self.hold(3,left='closed')
+        self.feed(left='wink')
+        state=self.feed()
+        self.assertEqual(state['output']['event_counts'].get(3),1)
+        for _ in range(8):self.lab.step(self.now)
+        self.assertEqual(self.lab.state()['output']['event_counts'].get(3),1)
+        self.hold(3,right='closed');self.feed(right='wink')
+        self.assertEqual(self.feed()['output']['event_counts'].get(9),1)
+        self.feed(left='wink')
+        self.hold(30,left='closed',right='closed')
+        state=self.feed()
+        self.assertEqual(state['output']['event_counts'].get(3),1)
+        self.assertEqual(state['output']['event_counts'].get(9),1)
+        self.assertEqual(self.speech.starts,1)
+
+    def test_unknown_wink_releases_compiled_drag_without_click(self):
+        mapping=self.lab.state()['mapping'];mapping['require_wink']=True
+        self.lab.update_mapping(mapping)
+        self.lab.action({'action':'arm'});self.feed()
+        self.hold(35,left='wink')
+        self.now+=20;self.seq+=1
+        sample=frame(self.seq,self.now,left='closed')
+        sample['eye_intent']['left']=dict(value=None,known=False,state='unknown')
+        self.session.deliver(sample)
+        state=self.lab.state()
+        self.assertEqual(state['output']['event_counts'].get(10),1)
+        self.assertEqual(state['output']['event_counts'].get(11),1)
+        self.hold(35,left='wink');state=self.feed()
+        self.assertEqual(state['output']['event_counts'].get(10),1)
+        self.assertEqual(state['output']['event_counts'].get(3,0),0)
+
     def test_dictation_types_one_character_at_a_time_and_enter_is_separate(self):
         from unittest.mock import Mock
         typed=Mock(wraps=self.lab.output.type_character)

@@ -1,5 +1,41 @@
 # Main chat and agent coordination hub
 
+## Presentation wink-click recovery handoff
+
+- Lane/task: Reuvi integration, `codex/integration/presentation-wink-fix`, isolated
+  `.worktrees/reuvi-integration-presentation-wink-fix`, base `9f07365`. This main
+  conversation coordinates the App/Processing integration fix. Contract clarification
+  `0a18584` precedes implementation; merge/push to main authorized by the user.
+- Paths: Processing presentation gestures and curve model/preview, App scalar
+  diagnostics, corresponding Processing/integration tests, presentation contract
+  and runbook. Vision classifier, Drivers ABI, personal profiles and movement
+  response settings are unchanged.
+- Cause/fix: a first anatomical closed frame without a wink match permanently
+  blocked the whole gesture. Known non-matches now wait for a later valid wink.
+  A recognized wink requires no extra 120 ms solo dwell; click/Enter still occur
+  on reopening. Plain closure keeps its minimum. Unknown input cancels; interrupted
+  dragging releases and requires reopening. Both-eye dictation suppresses solo
+  output, including closures whose first solo frame was a non-match.
+- Diagnostics: Signals shows waiting/recognized/unknown/reopen status. Bounded
+  logs add capture-level action and unknown counts plus scalar classifier state,
+  score and calibration availability; no face features/models/transcripts. Existing
+  logs showed active movement without driver errors, but 5 Hz observations cannot
+  establish every attempted wink or prove detector accuracy.
+- Verification: Processing suite **222 passed**, with the final presentation
+  regression subset **18 passed**. Compiled-driver presentation integration
+  **15 passed**, diagnostics **9 passed**, native Tk Signals/curves **19 passed**.
+  Gaming pipeline **4 passed / 1 optional skip**. Native driver build succeeded;
+  **5/5 CTest groups passed**. Changed-file Ruff F, diff and integration scope checks
+  passed. Regression cases failed on the original gesture implementation.
+- Whole mock pipeline: 490/490 captures accepted, 672 relative movement events,
+  one drag down/up and one Enter, no driver error, ending disabled with no held
+  keys. Dedicated compiled-driver tests confirm exactly one click from a brief
+  recognized wink preceded by closed non-match frames.
+- Run/handoff: restart App from main, load the existing camera and tuning profiles,
+  enable calibrated wink mode and Center head & start. [Presentation runbook](PRESENTATION_GUIDE.md).
+  Real-person recognition still needs the user's next trial; no live camera,
+  microphone or OS injection was used for these checks.
+
 ## Presentation mode handoff
 
 - Task / lane / branch / worktree: Reuvi integration; user-requested presentation

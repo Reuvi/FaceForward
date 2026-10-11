@@ -67,6 +67,8 @@ def sliders(state, channel):
         for key,label,lo,hi in (('solo_ms','Click / Enter minimum closure',0,400),
                               ('chord_ms','Both eyes: dictation hold',250,1500),
                               ('drag_ms','Left eye: start dragging',450,2000)):
+            if key == 'solo_ms' and mapping['require_wink']:
+                continue  # A recognized wink has no additional solo dwell.
             add(key,label,lo,hi,10,'mapping.presentation.'+key,'ms')
         return result
     if channel in ('left','right','mouth'):
