@@ -2,6 +2,20 @@
 
 Last updated: 2026-10-10. Owner of this update: repository implementation agent.
 
+## Latest change — macOS relative mouse deltas
+
+- Goal: make velocity-mode mouse input available as relative deltas for apps
+  that lock the cursor, including first-person camera controls. The C ABI v3
+  and Linux backend are unchanged.
+- macOS velocity events advance the visible cursor by the computed movement
+  and also set `kCGMouseEventDeltaX/Y` to that relative movement. Absolute
+  `FID_POINTER_TARGET` handling remains on the existing `move_toward()` path.
+- Validation on this host can cover dry-run/control behavior only. Build the
+  native library on macOS, then test the hard input simulation in Roblox first
+  person and a browser Pointer Lock page. Event-journal records prove posting,
+  not that those clients consumed the deltas. Quartz behavior and Roblox camera
+  rotation have not been verified on a Mac yet.
+
 ## Latest change — ABI v3 held-key state
 
 - Goal: add continuous W/A/S/D, Space, and left Shift state to the Driver so

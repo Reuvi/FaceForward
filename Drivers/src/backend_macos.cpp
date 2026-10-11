@@ -117,11 +117,15 @@ public:
         if (!current) return FID_INTERNAL_ERROR;
         CGPoint point = CGEventGetLocation(current.get());
         if (event.type == FID_EVENT_MOVE) {
+            // Advance the visible cursor for ordinary desktop use, while also
+            // supplying explicit deltas for applications that lock the cursor.
             const CGRect screen = CGDisplayBounds(CGMainDisplayID());
             point.x = std::clamp(point.x + event.x, CGRectGetMinX(screen), CGRectGetMaxX(screen) - 1);
             point.y = std::clamp(point.y + event.y, CGRectGetMinY(screen), CGRectGetMaxY(screen) - 1);
             Event move(CGEventCreateMouseEvent(nullptr, kCGEventMouseMoved, point, kCGMouseButtonLeft));
             if (!move) return FID_INTERNAL_ERROR;
+            CGEventSetIntegerValueField(move.get(), kCGMouseEventDeltaX, event.x);
+            CGEventSetIntegerValueField(move.get(), kCGMouseEventDeltaY, event.y);
             CGEventPost(kCGHIDEventTap, move.get());
             return FID_OK;
         }

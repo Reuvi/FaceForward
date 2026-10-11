@@ -151,10 +151,29 @@ Then run:
 python3 examples/python_ctypes.py --interactive --native
 ```
 
-Pointer movement is restricted to the primary display. Insert is the macOS
-Help/Insert-position key and may have no overwrite behavior in your application.
-The status command labels that limitation. Mac compilation/live results must
-be recorded on a Mac; a passing Linux build does not verify them.
+Velocity mode posts relative Quartz delta fields for locked-cursor camera input;
+target mode moves the visible cursor to an absolute position on the primary
+display. Try velocity in a browser Pointer Lock page and a Roblox first-person
+experience. The event journal confirms that Quartz events were posted, not that
+the application consumed their deltas. Insert is the macOS Help/Insert-position
+key and may have no overwrite behavior in your application. Mac compilation and
+live results must be recorded on a Mac; a passing Linux build does not verify
+them.
+
+For a visible browser check, serve `examples/` locally:
+
+```sh
+cd Drivers/examples
+python3 -m http.server 8000
+```
+
+Open `http://localhost:8000/pointer_delta_probe.html`. In a second terminal,
+run `python3 examples/hard_input_simulation.py --native` from `Drivers/`, then
+return focus to the probe page during the five-second countdown. Leave its
+pointer unlocked to check visible cursor movement; to check relative input,
+click **Lock pointer** during the countdown. Increase `--delay` if you need more
+time. The probe displays free-cursor positions or locked `movementX/Y` deltas.
+Press Escape to unlock before leaving the browser.
 
 ## 2. Try named commands
 
@@ -240,7 +259,8 @@ Finished: Left click — left click: 1. Output paused.
 
 Movement summaries show direction and total units; scroll shows direction and
 detents. Timing can change the exact totals. Linux pointer units are relative
-mouse counts subject to desktop acceleration; macOS uses Quartz coordinates.
+mouse counts subject to desktop acceleration; macOS velocity uses Quartz mouse
+delta fields while target mode uses display coordinates.
 
 `Accepted frames` counts valid input samples, not tests passed. `Emitted actions`
 counts generated movement/scroll/click/key actions. A trial can accept many frames

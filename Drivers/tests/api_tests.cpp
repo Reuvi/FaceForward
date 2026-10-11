@@ -92,6 +92,30 @@ int main() {
     }
     require(saw_w_down && saw_w_up && saw_shift_up, "journal includes key down, clear, and pause release");
 
+    require(fid_enable(raw) == FID_OK, "enable for relative velocity test");
+    fid_neutral_frame(&frame);
+    require(fid_submit(raw, &frame) == FID_OK, "relative velocity test submits neutral");
+    require(wait_for(raw, [](const fid_status &s) { return !s.awaiting_neutral; }),
+            "relative velocity test arms");
+    const auto movement_before = status_of(raw).emitted_events;
+    frame.pointer_x = 0.65;
+    require(fid_submit(raw, &frame) == FID_OK, "submit positive relative velocity");
+    const auto movement_deadline = std::chrono::steady_clock::now() + std::chrono::seconds(1);
+    while (status_of(raw).emitted_events <= movement_before &&
+           std::chrono::steady_clock::now() < movement_deadline)
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    require(status_of(raw).emitted_events > movement_before,
+            "velocity produces movement event");
+    require(fid_pause(raw) == FID_OK, "pause after relative velocity test");
+    require(fid_drain_events(raw, events, 8, &count) == FID_OK,
+            "drain relative velocity event");
+    bool saw_positive_relative_move = false;
+    for (size_t i = 0; i < count; ++i)
+        saw_positive_relative_move |= events[i].type == FID_EVENT_MOVE &&
+                                      events[i].x > 0 && events[i].y == 0;
+    require(saw_positive_relative_move,
+            "velocity mode reports positive incremental X movement, not a target position");
+
     fid_neutral_frame(&frame);
     frame.pointer_mode = FID_POINTER_TARGET;
     frame.target_x = 0.52; frame.target_y = 0.5; frame.target_speed = 0.1;

@@ -48,6 +48,8 @@ Linux target mode requires an X11 session and XRandR primary-display geometry;
 Wayland sessions and builds without those development files return
 `FID_UNSUPPORTED` for target frames. Linux relative velocity mode continues to
 use uinput and remains available on Wayland.
+On macOS, velocity events carry Quartz relative mouse deltas while target mode
+continues to move to an absolute Quartz display position.
 
 ## Processing integration request
 

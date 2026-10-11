@@ -113,8 +113,9 @@ Dry-run target movement starts at the simulated center of a 1920×1080 display.
 Native macOS uses the main display. Native Linux target movement is supported
 only when built with X11/XRandR and run in an X11 session; on Wayland, target
 commands report unsupported while `velocity` continues to use uinput. Linux
-velocity values are relative mouse counts; macOS values use Quartz coordinate
-units. Neither scale is guaranteed to equal visible physical pixels. See
+velocity values are relative mouse counts; macOS velocity events carry Quartz
+relative delta fields. Target movement uses display coordinates. Neither speed
+scale is guaranteed to equal visible physical pixels. See
 [`architecture.md`](architecture.md) for mode rationale and Processing handoff.
 
 For other actions, `scroll 0.8` scrolls down and `scroll 0.2` up; `0.5` is
@@ -245,7 +246,11 @@ Python executable for ctypes, or the application's executable when integrated.
 CLI permissions may also depend on the terminal/launcher; check the actual host.
 Keep the binary in a stable location while testing permissions.
 
-Pointer velocity uses Quartz coordinates. Target mode reads the cursor and moves
+Pointer velocity posts Quartz mouse-moved events that advance the visible cursor
+by the computed delta and set `kCGMouseEventDeltaX/Y` to that same relative
+movement. This is intended to support both ordinary cursor use and locked-cursor
+camera control; whether a target application consumes the deltas must be
+verified on macOS. Target mode remains absolute: it reads the cursor and moves
 to normalized coordinates on the main display, at a constant fraction of the
 configured maximum speed. Speed is in coordinate units/sec rather than physical
 display pixels.
