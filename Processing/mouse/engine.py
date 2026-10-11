@@ -167,16 +167,21 @@ class AxisFilter:
             strength = ((min(1.0, magnitude) - config.deadzone) / (1 - config.deadzone)) ** config.exponent
             strength = min(1.0, strength * self.gain * (1 + self.boost))
         self.target = tuple(v / magnitude * strength if magnitude else 0.0 for v in signed)
+        self.target, acceleration, deceleration = self.motion_response(self.target, now)
         alpha = 1.0 if config.smoothing_ms == 0 else -math.expm1(-dt * 1000.0 / config.smoothing_ms)
         desired = (self.adaptive.step(self.target, dt) if self.adaptive else
                    tuple(v + alpha * (t - v) for v, t in zip(self.velocity, self.target)))
         delta = tuple(d - v for d, v in zip(desired, self.velocity))
-        rate = config.deceleration if length(desired) < length(self.velocity) else config.acceleration
+        rate = deceleration if length(desired) < length(self.velocity) else acceleration
         scale = min(1.0, rate * dt / length(delta)) if length(delta) else 1.0
         self.velocity = tuple(max(-1.0, min(1.0, v + d * scale)) for v, d in zip(self.velocity, delta))
         if not self.active and length(self.velocity) < 0.0001:
             self.velocity = (0.0,) * self.dimensions
         return self.velocity
+
+    def motion_response(self, target, now):
+        """Optional source-specific response before the existing smoothing/ramp."""
+        return target, self.config.acceleration, self.config.deceleration
 
 
 class MouseProcessor:

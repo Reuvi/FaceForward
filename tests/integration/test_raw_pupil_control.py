@@ -191,12 +191,14 @@ class RawPupilControlTests(unittest.TestCase):
                 selected['pointer_down_gain']=5
                 selected['target_smoothing_ms']=12
                 selected['response']['pointer']['smoothing_ms']=17
+                if identity=='mouse-test':selected['head_motion']['speed_gain']=.5
                 self.session.lab.update_mapping(selected)
                 self.session.lab.action({'action':'arm'});self.feed()
                 self.session.load_profile(path)
                 pointer=self.session.lab.processor.pointer
                 self.assertEqual(pointer.config.smoothing_ms,12 if identity.startswith('gaming') else 17)
                 self.assertEqual(pointer.down_gain,5)
+                self.assertEqual(self.session.lab.state()['mapping']['head_motion'],selected['head_motion'])
                 state=self.session.lab.state()
                 self.assertEqual(state['snapshot']['diagnostics']['pointer_interpolation_ms'],0)
                 self.assertFalse(state['snapshot']['armed'])

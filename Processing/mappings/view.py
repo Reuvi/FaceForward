@@ -111,6 +111,17 @@ class MappingPanel(ttk.Frame):
         self.adaptive = tk.BooleanVar(value=True)
         self.adaptive_widget = ttk.Checkbutton(settings_parent, text="Adaptive pointer smoothing (1€)", variable=self.adaptive)
         self.adaptive_widget.pack(anchor="w", pady=5)
+        self.motion_group = ttk.LabelFrame(settings_parent, text="Head movement response", padding=8)
+        self.motion_enabled = tk.BooleanVar()
+        ttk.Checkbutton(self.motion_group, text="Speed-aware acceleration and return braking",
+                        variable=self.motion_enabled).grid(row=0, column=0, columnspan=4, sticky="w")
+        self.motion_fields = {}
+        for col, (key, title) in enumerate((("speed_gain", "Movement boost (0–2)"),
+                                           ("return_brake", "Return braking (0–1)"))):
+            label(self.motion_group, title).grid(row=1, column=col*2, sticky="w", padx=5, pady=5)
+            var = tk.StringVar()
+            self.motion_fields[key] = var
+            ttk.Entry(self.motion_group, textvariable=var, width=8).grid(row=1, column=col*2+1, padx=5)
         self.pointer_group = None
         if compact:
             pointer = ttk.LabelFrame(settings_parent, text="Pointer response", padding=8)
@@ -220,6 +231,8 @@ class MappingPanel(ttk.Frame):
         data["pointer_mode"] = "target" if self.pointer_mode.get() == "Screen destination" else "velocity"
         data["target_jitter"] = float(self.target_jitter.get())
         data["pointer_down_gain"] = float(self.down_gain.get())
+        data["head_motion"] = dict(enabled=self.motion_enabled.get(),
+                                   **{key:float(var.get()) for key,var in self.motion_fields.items()})
         data.update({key:float(var.get()) for key,var in self.target_fields.items()})
         data["revision"] += 1
         for (axis, key), var in self.fields.items():
@@ -273,6 +286,14 @@ class MappingPanel(ttk.Frame):
             self.selector.current(next(i for i, m in enumerate(self.mapping_choices) if m["id"] == state["mapping_id"]))
             mapping = state["mapping"]
             head_only = bool(mapping and mapping.get("input_mode") == "head-mouse")
+            if head_only:
+                self.motion_group.pack(fill="x", pady=(6,0), after=self.adaptive_widget)
+            else:
+                self.motion_group.pack_forget()
+            motion = mapping["head_motion"] if mapping else dict(enabled=False,speed_gain=.75,return_brake=.65)
+            self.motion_enabled.set(motion["enabled"])
+            for key, var in self.motion_fields.items():
+                var.set(motion[key])
             for group in (*self.head_groups, self.binding_group):
                 group.grid_remove() if head_only else group.grid()
             self.adaptive_widget.configure(state="normal" if mapping else "disabled")
@@ -289,6 +310,7 @@ class MappingPanel(ttk.Frame):
                                + (" Screen destination moves to a point and stops; without screen calibration its alignment is approximate. Fixation dead band 0.002 means 0.2% of the screen. Position smoothing/delay belong to this mapping. Velocity keeps moving while off-center."
                                   if not head_only else "")
                                + " Downward boost multiplies movement below center before inversion; pointer gain scales overall response."
+                               + (" Faster turns away from neutral get a speed boost; returning toward neutral brakes the cursor. Holding your head still returns to normal speed. Uncheck speed-aware response to compare the original feel." if head_only else "")
                                + ("" if self.compact else " Velocity smoothing and response are in Transfer settings."))
             for widget in self.edit_widgets:
                 widget.configure(state="disabled" if mapping is None else "readonly" if isinstance(widget, ttk.Combobox) else "normal")

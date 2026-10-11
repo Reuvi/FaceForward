@@ -1267,3 +1267,54 @@ Old imported mappings intentionally keep their tuning. No human-camera accuracy
 or native OS cursor injection was measured in this follow-up. Stronger gain also
 amplifies noise; these are adjustable starting values based on the user's report
 and the compressed downward range in existing scalar logs, not a gaze calibration.
+
+## Head-speed acceleration and return braking — user-requested integration
+
+Lane / task / branch: Reuvi integration / head-motion-response /
+`codex/integration/head-motion-response`, based on `65013f0`.
+Changed paths: Processing head pointer filter, mapping persistence/settings,
+App scalar diagnostics, component/integration tests, current agent notes,
+contracts and runbooks. Contract-first commit: `a51fb1c`.
+
+The user reports that head X/Y control feels smooth and substantially better than
+pupils, and asked for speed-aware acceleration/deceleration. Mouse test now enables
+an optional head movement response: fast outward motion adds up to 75% speed/ramp
+boost, and fast returns reduce requested speed by up to 65% while increasing the
+deceleration limit. Existing adaptive smoothing, steady deflection response,
+dead zone, 3× downward gain and detector calibration remain intact. The off switch
+uses exactly the previous AxisFilter. Other mapping families are unaffected.
+
+The estimator uses original capture times, an 80 ms window and latest-capture
+direction/speed evidence in unamplified personal head coordinates. Tiny jitter,
+stationary evidence, return and reversal cannot sustain an outward boost. A stalled
+capture stream fades the transient response after 80 ms and clears it at 150 ms;
+normal freshness/unknown/Stop handling still releases immediately as appropriate.
+Mapping files v5 add validated head_motion settings; v1–v4 migrate with the feature
+off. Copies, exports and face-profile loading retain the toggle/strengths. No Vision
+or Drivers code, ABI, SignalFrame, detector-preset or face-profile version changes.
+
+Checks:
+- `python3 -m unittest discover -s tests/processing -q`: **129 passed**, including
+  nine head-response cases covering slow/fast turns, steady hold, return/reversal,
+  X/Y/diagonals/inversion/downward gain, jitter, different camera/output rates,
+  duplicate timestamps, stalled captures, loss/rearm and exact disabled parity.
+- `RUN_TK_TESTS=1 FID_LIBRARY=<main compiled library>` with Vision's venv, each
+  `tests/integration/test_*.py` module in a separate process: **148 passed**, no
+  skips. Includes settings visibility/toggle, mapping persistence, profile loading,
+  diagnostics and actual compiled-driver delta output during outward/return motion.
+  The driver emits no extra moves after settling, and no reverse drift/clicks/keys.
+- Full App demo, Mouse test, 490 frames with the compiled dry-run library:
+  **490 accepted**, no errors, **662 movement events**, no clicks/keys/scroll;
+  final disabled, neutral velocity and held keys 0.
+  Command: `Vision/.venv/bin/python -m App --source demo --mapping mouse-test
+  --headless --frames 490 --output dry-run --driver-library <main library>`.
+- 10,000-tick synthetic HeadMouseProcessor benchmark (33.3 Hz input / 100 Hz output):
+  response off mean **58.32 µs**, p95 **79.67 µs**; on mean **81.64 µs**, p95
+  **107.29 µs**. Excludes detector/GUI/driver latency and is not a timing guarantee.
+- Ruff F, whitespace and integration scope checks against `65013f0` passed.
+
+Handoff: restart App, select Mouse test, load the usual face profile, center and
+Start live control. Mapping settings → Head movement response exposes the toggle,
+Movement boost and Return braking. Export custom mapping settings for persistence.
+See [head pointer tuning](HEAD_POINTER_GUIDE.md). Synthetic checks establish the
+software path; no real-camera comfort study or native OS injection was performed.

@@ -159,14 +159,24 @@ class SimpleSignalsWindowTests(unittest.TestCase):
         self.assertFalse(panel.binding_group.winfo_ismapped())
         self.assertEqual(panel.down_gain.get(),'3')
         self.assertEqual(panel.pointer_fields['smoothing_ms'].get(),'20')
+        self.assertTrue(panel.motion_group.winfo_ismapped())
+        self.assertTrue(panel.motion_enabled.get())
+        panel.motion_enabled.set(False)
+        panel.motion_fields['speed_gain'].set('0.5')
+        panel.motion_fields['return_brake'].set('0.4')
         panel.adaptive.set(False);panel._apply()
         self.assertFalse(self.session.lab.state()['mapping']['adaptive_pointer'])
         self.assertEqual(self.session.lab.state()['mapping']['input_mode'],'head-mouse')
         self.assertFalse(self.session.lab.processor.armed)
+        self.assertEqual(self.session.lab.state()['mapping']['head_motion'],
+                         dict(enabled=False,speed_gain=.5,return_brake=.4))
+        from Processing.mouse.engine import AxisFilter
+        self.assertIs(type(self.session.lab.processor.pointer),AxisFilter)
         self.session.lab.select_mapping('gaming-keyboard-mouse-1')
         self.ui.refresh();self.root.update()
         self.assertTrue(all(group.winfo_ismapped() for group in panel.head_groups))
         self.assertTrue(panel.binding_group.winfo_ismapped())
+        self.assertFalse(panel.motion_group.winfo_ismapped())
 
     def test_screen_destination_settings_show_only_relevant_response_controls(self):
         self.ui.refresh();self.root.update()

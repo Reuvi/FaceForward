@@ -8,6 +8,7 @@ from Processing.mouse.engine import AxisFilter, MouseProcessor
 from Processing.mouse.signals import decode
 from .config import DIRECTIONS, KEYS, Mapping, mouse_test_mapping
 from .target import TargetFilter
+from .head_pointer import HeadPointerFilter
 
 
 class HeadGate:
@@ -142,6 +143,7 @@ class GamingProcessor(MouseProcessor):
                                               if self.mapping.pointer_mode == "target" else self.config.interpolation_ms),
                     pointer_down_gain=self.mapping.pointer_down_gain,
                     target_jitter=self.mapping.target_jitter if self.mapping.pointer_mode == "target" else None,
+                    head_motion=dict(self.pointer.motion_state) if isinstance(self.pointer, HeadPointerFilter) else None,
                     head_x=self.head_diagnostic(self.head_x), head_y=self.head_diagnostic(self.head_y))
         snap["known"] = {"left_click": diag["left_closed"] is not None,
                          "right_click": diag["right_closed"] is not None,
@@ -213,6 +215,10 @@ class HeadMouseProcessor(GamingProcessor):
         if mapping.input_mode != "head-mouse":
             raise ValueError("Head mouse processor requires a head-mouse mapping")
         super().__init__(mapping, subject_id)
+        if mapping.head_motion.enabled:
+            self.pointer = HeadPointerFilter(self.config.pointer, mapping.head_motion,
+                                             gain=mapping.pointer_gain, down_gain=mapping.pointer_down_gain,
+                                             adaptive=mapping.adaptive_pointer)
 
     def decode_sample(self, frame):
         sample = decode(frame, self.config, self.subject_id, ignore_eyes=True)
@@ -228,8 +234,11 @@ class HeadMouseProcessor(GamingProcessor):
 
     def instructions(self, snap):
         rows = super().instructions(snap)[-2:]
+        motion = snap["diagnostics"]["head_motion"]
         for row, axis in zip(rows, ("X", "Y")):
             row.update(id="head_pointer_"+axis.lower(), input="Head "+axis)
+            if motion and snap["enabled"] and snap["known"]["pointer"]:
+                row["instruction"] += " · "+motion["phase"]
         rows.append(dict(id="ignored", input="Other inputs", raw=None, filtered=None,
                          threshold="Ignored", instruction="No clicks, keys or scroll"))
         return rows

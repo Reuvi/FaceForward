@@ -1,5 +1,9 @@
 # Shared contracts — initial v1
 
+[HEAD_POINTER_RESPONSE.md](HEAD_POINTER_RESPONSE.md) adds optional head-speed
+acceleration/return braking to Mouse test and mapping v5 persistence. Existing
+v1–v4 mappings retain the prior response until explicitly enabled.
+
 [SCREEN_POINTER.md](SCREEN_POINTER.md) adds an explicit target variant to
 device_control_v1 using the driver's existing ABI v3. Gaming defaults to approximate
 screen destinations from raw pupils; Mouse test remains head-only velocity.

@@ -1,5 +1,11 @@
 # Agent working agreement
 
+**Current head pointer response:** read `Contracts/HEAD_POINTER_RESPONSE.md`.
+Mouse test now has optional capture-speed acceleration and return braking. Keep
+its base response/calibration and the off-switch equivalent to the earlier filter.
+Mapping v5 migrates older mappings with this feature disabled; face profiles retain
+these mapping settings. Pupils and gaming eye/head actions are independent.
+
 **Current screen pointer decision:** read `Contracts/SCREEN_POINTER.md`.
 Gaming defaults to an approximate primary-display destination from raw pupils;
 it arrives and stops. No pupil calibration is added. Mapping v4 supports target

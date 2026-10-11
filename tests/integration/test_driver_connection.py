@@ -117,6 +117,35 @@ class DriverConnectionTests(unittest.TestCase):
                 self.assertGreater(self.lab.state()["snapshot"]["pointer_x"], .5)
                 self.assertIsNone(self.lab.state()["output"]["error"])
 
+    def test_head_speed_response_reaches_driver_and_return_settles_without_reverse(self):
+        self.lab.select_mapping('mouse-test')
+        self.lab.action({'action':'arm'});self.deliver()
+        phases=[]
+        for i in range(1,9):
+            time.sleep(.01);self.deliver(head_x=.5+i*.025,left_eye_open=0,gaze_x=None,gaze_y=None)
+            snap=self.lab.state()['snapshot']
+            phases.append(snap['diagnostics']['head_motion']['phase'])
+            self.assertTrue(.5 <= snap['pointer_x'] <= 1)
+        self.assertIn('accelerating',phases)
+        for _ in range(12):self.deliver(head_x=.7)
+        self.assertEqual(self.lab.state()['snapshot']['diagnostics']['head_motion']['multiplier'],1)
+        returning=[]
+        for i in range(1,9):
+            time.sleep(.01);self.deliver(head_x=.7-i*.025)
+            snap=self.lab.state()['snapshot']
+            returning.append(snap['diagnostics']['head_motion']['phase'])
+            self.assertGreaterEqual(snap['pointer_x'],.5)
+            self.assertEqual(snap['diagnostics']['head_motion']['multiplier'],1)
+        self.assertIn('return braking',returning)
+        for _ in range(20):self.deliver()
+        self.assertEqual(self.lab.state()['message']['pointer'],dict(mode='velocity',x=.5,y=.5))
+        self.lab.output.collect();count=self.lab.output.counts[1]
+        for _ in range(6):time.sleep(.01);self.deliver()
+        self.assertEqual(self.lab.output.counts[1],count)
+        self.assertGreater(count,0)
+        self.assertTrue(all(event['type']==1 and event['x']>0 and event['y']==0 for event in self.lab.output.events))
+        self.assertIsNone(self.lab.state()['output']['error'])
+
     def test_wink_during_startup_waits_for_release_before_first_command(self):
         settings=self.lab.state()['mapping'];settings['pointer_mode']='velocity'
         self.lab.update_mapping(settings)

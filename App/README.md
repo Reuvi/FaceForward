@@ -80,7 +80,10 @@ default is a labeled synthetic demo; choose **Camera** to open your camera.
    boost (4×), pointer gain (2×) and a fixation dead band (.002). Velocity exposes the original central dead zone,
    activation margin, response curve, acceleration and deceleration. Applying changes
    stops output. The pointer uses pupils in gaming or head X/Y in Mouse test. **Adaptive pointer smoothing (1€)** reduces stationary jitter and responds faster to deliberate motion; uncheck it to compare the fixed filter. In Mouse test, unused eye/key settings are hidden. Detector setup remains
-   independent in Calibration.
+   independent in Calibration. Mouse test also offers **Speed-aware acceleration
+   and return braking**: fast outward turns accelerate, returning toward neutral
+   brakes, and holding a position keeps its usual speed. Uncheck it to compare
+   the previous feel. [Head pointer tuning](../docs/HEAD_POINTER_GUIDE.md).
 8. To control the OS, build Drivers and choose **Output → Live mouse + keyboard →
    Connect output** on Signals, then **Start live control**. Native eyes
    produce one complete click per activation (no dragging); head keys stay held
@@ -131,12 +134,13 @@ Save the migrated profile to preserve the new format. Existing files are not
 rewritten automatically.
 
 Gaming names, head thresholds, key bindings and pointer gain use separate
-`input_mapping_v4` files (v1/v2 import as velocity; v3 retains its response) exported from **Signals → Mapping settings…**. Mode, gains and target filtering belong to the mapping. Face profiles continue
+`input_mapping_v5` files (v1/v2 import as velocity; v3/v4 retain their response) exported from **Signals → Mapping settings…**. Mode, gains and target filtering belong to the mapping. Face profiles continue
 to contain detector fits and the existing mouse response settings. Loading a face
 profile applies its response to the selected mapping and stops output; it keeps
 that mapping's name, head settings, bindings, gains and target filtering. Mouse test
 also retains its pointer response and delay, including the new 3× downward boost
-and 20 ms smoothing. Export mapping settings separately
+and 20 ms smoothing. The head motion response toggle/strengths also belong to
+the mapping. Export mapping settings separately
 after tuning them; named copies are otherwise held only for the current app session.
 
 Brief face loss and same-source restarts keep completed fits. Switching source

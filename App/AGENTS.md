@@ -1,5 +1,10 @@
 # Application integration
 
+**Current head pointer response:** follow `Contracts/HEAD_POINTER_RESPONSE.md`.
+Mouse test has a speed-aware response toggle and strengths in Mapping settings;
+face-profile loads keep this mapping configuration. Mapping files are now v5, with
+v1–v4 importing the feature disabled. Keep diagnostic movement phase visible.
+
 **Current screen pointer:** follow `Contracts/SCREEN_POINTER.md` (repository root).
 Default gaming sends approximate primary-display targets from raw pupils, not
 velocity. Label destination and arrival clearly, retain no pupil calibration,

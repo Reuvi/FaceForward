@@ -1,5 +1,10 @@
 # Processing lane
 
+**Current head pointer response:** read `../Contracts/HEAD_POINTER_RESPONSE.md`.
+Mouse test adds capture-timed outward acceleration and return braking in Processing.
+Keep motion estimation separate from downward gain/inversion. Mapping v5 preserves
+v1–v4 behavior with the feature off; no driver or detector changes.
+
 **Current screen pointer:** read `../Contracts/SCREEN_POINTER.md`.
 Gaming defaults to target position filtering and a fixation dead band, without
 the velocity center gate/curve/acceleration. Target and velocity commands must

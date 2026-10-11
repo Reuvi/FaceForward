@@ -1,5 +1,9 @@
 # Screen destination pointer
 
+Mapping v5 and the latest Mouse test response are specified in
+[HEAD_POINTER_RESPONSE.md](HEAD_POINTER_RESPONSE.md). Pupil behavior below remains
+unchanged; the v3/v4 paragraphs describe those earlier format additions.
+
 The user requested that the cursor follow eye position and stop at a fixed gaze,
 instead of continuing to move while the eyes are off center. This supersedes the
 gaming pointer velocity behavior in RAW_PUPIL_CONTROL.md and DRIVER_CONNECTION.md.

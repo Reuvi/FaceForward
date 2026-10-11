@@ -89,13 +89,14 @@ class MouseTestMappingTests(unittest.TestCase):
             self.lab.import_mapping(path)
         self.assertEqual(self.lab.processor.config.interpolation_ms,15)
         self.assertFalse(self.lab.processor.armed)
+        self.assertTrue(self.lab.state()['mapping']['head_motion']['enabled'])
         self.lab.action({'action':'arm'})
         self.assertTrue(self.feed(x=None,y=None,left='unknown',right='unknown')['enabled'])
 
     def test_mapping_versions_and_invalid_head_keyboard_bindings(self):
-        current=Mapping().to_dict();self.assertEqual(current['format'],'input_mapping_v4')
+        current=Mapping().to_dict();self.assertEqual(current['format'],'input_mapping_v5')
         legacy=deepcopy(current);legacy['format']='input_mapping_v1'
-        for key in ('pointer_down_gain','target_smoothing_ms','target_interpolation_ms'):del legacy[key]
+        for key in ('pointer_down_gain','target_smoothing_ms','target_interpolation_ms','head_motion'):del legacy[key]
         del legacy['input_mode'];del legacy['adaptive_pointer']
         del legacy['pointer_mode'];del legacy['target_jitter']
         self.assertEqual(Mapping.from_dict(legacy),Mapping(pointer_mode='velocity',pointer_down_gain=1,

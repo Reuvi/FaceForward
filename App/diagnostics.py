@@ -67,7 +67,9 @@ def pointer_status(source, lab):
             return f"Pointer filtering: radius {radius:.3f} exceeds {threshold:.3f}; waiting for filtered movement."
         return f"Pointer inside dead zone: radius {radius:.3f}; movement starts above {threshold:.3f}."
     x, y = 2*snap["pointer_x"]-1, 2*snap["pointer_y"]-1
-    return f"Pointer request: X {x:+.1%}, Y {y:+.1%}."
+    motion = diag.get("head_motion")
+    detail = " · "+motion["phase"] if head_only and motion else ""
+    return f"Pointer request: X {x:+.1%}, Y {y:+.1%}{detail}."
 
 
 class DiagnosticLog:
@@ -152,6 +154,7 @@ class DiagnosticLog:
                                            smoothing_ms=diag.get("pointer_smoothing_ms", lab["config"]["pointer"]["smoothing_ms"])),
                      "pointer_interpolation_ms":diag.get("pointer_interpolation_ms", lab["config"]["interpolation_ms"]),
                      "pointer_down_gain":diag.get("pointer_down_gain", 1),
+                     "head_motion":diag.get("head_motion"),
                      "target_jitter":diag.get("target_jitter"), "min_confidence":lab["config"]["min_confidence"],
                      "pointer_gain":(lab.get("mapping") or {}).get("pointer_gain",1),
                      "adaptive_pointer":(lab.get("mapping") or {}).get("adaptive_pointer", False),
