@@ -43,3 +43,18 @@ The native pupil view draws an actual square 11×11 grid, highlighted active cel
 continuous position and raw data. Unknown intervals can dark-hold the last plotted
 cell with an explicit unknown label; displayed holds never become samples. No
 sensitivity, setup wizard or pupil calibration controls remain.
+
+## Downward implementation
+
+New fixed measurement identity: `mediapipe_iris_direction_v3`.
+X uses ±.2 eye widths; up uses −.1; down uses +.065. Thus x=clip(.5+raw_x/.4),
+y=clip(.5+raw_y/.2) for raw_y<=0, otherwise clip(.5+raw_y/.13).
+This changes only the positive-Y half and is an experimental fixed scale, not a
+personal anatomical range or screen-gaze estimate. No user setting is exposed.
+
+Keep the existing ≥.16 lid-gap/eye-width gate by default. A narrower eye may pass
+at ≥.10 only when iris Y>.015 eye widths, eyeLookDown≥.2 and eyeLookDown exceeds
+eyeLookUp by ≥.1. The existing eyeBlink<.4 gate, image/iris quality and two-eye
+agreement still apply. Missing or malformed expression support cannot enable this
+exception. These thresholds require live validation, not a claim of measured
+human accuracy. Expose lid gap, blink and down-look support in pupil diagnostics.
