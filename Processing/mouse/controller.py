@@ -71,7 +71,7 @@ class Lab:
                         rows=self.runtime["rows"], columns=self.runtime["columns"],
                         vector_size=self.runtime["vector_size"], subject_id=self.runtime["subject_id"],
                     )
-                    self.processor.accept(self.last_raw, timestamp)
+                    self._accept(self.last_raw, timestamp)
                     self.sample_sequence += 1
             self.take_snapshot(timestamp)
             self.trace_id += 1
@@ -272,6 +272,24 @@ class Lab:
             self.mappings[mapping.id] = mapping
             self.select_mapping(mapping.id)
 
+    def set_eye_mode(self, require_wink, *, mapping_id, generation):
+        with self.lock:
+            if mapping_id != self.mapping_id or generation != self.generation:
+                raise ValueError("Mapping/settings changed; refresh the curve editor")
+            if self.mapping_id == "mouse":
+                raise ValueError("Select a named mapping to choose the eye input")
+            mapping = self.mappings[self.mapping_id]
+            updated = replace(mapping, require_wink=require_wink, revision=mapping.revision+1)
+            self.update_mapping(updated.to_dict())
+
+    def _accept(self, frame, timestamp):
+        """Accept under the lab lock and retain an explicitly recentered mapping."""
+        result = self.processor.accept(frame, timestamp)
+        if isinstance(self.processor, HeadMouseProcessor) and self.processor.mapping is not self.mappings[self.mapping_id]:
+            self.mappings[self.mapping_id] = self.processor.mapping
+            self.generation += 1
+        return result
+
     def tune_response(self, channel, changes, *, mapping_id, generation):
         """Hot-update only transfer parameters; never restart or arm the source."""
         with self.lock:
@@ -363,6 +381,13 @@ class Lab:
             if action == "arm":
                 self.output_error = None
                 self.processor.arm()
+            elif action == "center_head_start":
+                if not isinstance(self.processor, HeadMouseProcessor):
+                    raise ValueError("Center head & start needs a head mouse mapping")
+                self.processor.disarm("Recentering head; output released")
+                self.take_snapshot(timestamp)
+                self.output_error = None
+                self.processor.arm(center=True)
             elif action == "stop":
                 self.processor.disarm()
             elif action == "center":
@@ -412,7 +437,7 @@ class Lab:
             if self.runtime["source"] != "external":
                 raise ValueError("Select external source before submitting detector frames")
             timestamp = self.clock()
-            result = self.processor.accept(frame, timestamp)
+            result = self._accept(frame, timestamp)
             # Show the actual latest input, including subject loss/rejected frames.
             self.last_raw = frame
             self.last_ingest = result

@@ -152,7 +152,7 @@ class SimpleSignalsWindowTests(unittest.TestCase):
         panel=self.ui.mapping_page
         self.assertEqual(panel.selector.get(),'Mouse test')
         self.assertEqual(len(panel.table.get_children()),5)
-        self.assertIn('calibrated Wink actions',panel.help_text.get())
+        self.assertIn('calibrated wink or plain open/closed',panel.help_text.get())
         self.assertTrue(panel.wink_clicks.get())
         self.assertIn('Downward boost',panel.help_text.get())
         panel.show_settings();self.root.update()
@@ -231,6 +231,45 @@ class SimpleSignalsWindowTests(unittest.TestCase):
         editor.show();self.root.update()
         editor.stop()
         self.assertFalse(self.session.lab.processor.armed)
+
+    def test_eye_source_checkbox_and_head_recovery_buttons_are_connected(self):
+        from Vision.mouse_demo import mouse_demo_records
+        from Processing.mappings.demo import gaming_demo_frame
+        self.session.lab.select_mapping('mouse-test')
+        self.ui.refresh();self.root.update()
+        panel=self.ui.mapping_page
+        self.assertTrue(panel.center_button.winfo_ismapped())
+        panel.show_curves();self.root.update()
+        editor=panel.curve_editor
+        self.assertTrue(editor.require_wink.get())
+        self.session.lab.action({'action':'arm'})
+        editor.eye_mode_button.invoke();self.root.update()
+        self.assertFalse(self.session.lab.state()['mapping']['require_wink'])
+        self.assertFalse(self.session.lab.processor.armed)
+        self.assertIn('ordinary blinks',editor.notice.get())
+        editor.selector.current(1);editor.select_channel();self.root.update()
+        self.assertIn('Plain open/closed',editor.explanation.get())
+        self.assertEqual(editor.widgets,{})
+        editor.center_button.invoke();self.root.update()
+        self.assertTrue(self.session.lab.processor.center_requested)
+        self.assertIn('WAITING TO START',editor.connection.get())
+        base=next(mouse_demo_records(count=1));base['timestamp_ms']=self.session.clock()
+        frame=gaming_demo_frame(base,30)
+        for key,value in (('head_x',.3),('head_y',.7)):
+            frame['faces'][0]['signals'][key].update(value=value,valid=True,confidence=1)
+        self.session.deliver(frame)
+        self.ui.refresh();self.root.update()
+        self.assertTrue(self.session.lab.processor.enabled)
+        self.assertIn('0.300',panel.center_text.get())
+        self.assertIn('RUNNING',editor.connection.get())
+        panel.center_button.invoke()
+        self.assertTrue(self.session.lab.processor.center_requested)
+        self.session.lab.action({'action':'stop'})
+        self.session.lab.select_mapping('gaming-keyboard-mouse-1')
+        self.ui.refresh();self.root.update()
+        self.assertFalse(panel.center_button.winfo_ismapped())
+        self.assertFalse(editor.center_button.winfo_ismapped())
+        self.assertTrue(editor.require_wink.get())
 
     def test_screen_destination_settings_show_only_relevant_response_controls(self):
         self.ui.refresh();self.root.update()

@@ -1,5 +1,7 @@
 # Live signal response editor
 
+Follow-up: [EYE_MODE_CONTROL_RECOVERY.md](EYE_MODE_CONTROL_RECOVERY.md) adds the explicit plain-closure option, mapping v7 and fresh head-center startup.
+
 The user requested connected curve editing with live sliders, useful defaults,
 saved profiles and control over response timing across mapped inputs. This adds
 one native editor window from Signals, without another main tab or detector UI.

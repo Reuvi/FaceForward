@@ -5,7 +5,7 @@ import math
 import uuid
 
 from Processing.mouse.engine import AxisFilter, MouseProcessor
-from Processing.mouse.signals import decode
+from Processing.mouse.signals import decode, finite
 from .config import DIRECTIONS, KEYS, Mapping, mouse_test_mapping
 from .target import TargetFilter
 from .head_pointer import HeadPointerFilter
@@ -90,8 +90,8 @@ class GamingProcessor(MouseProcessor):
                                    adaptive=self.mapping.adaptive_pointer, down_gain=self.mapping.pointer_down_gain))
 
     def decode_sample(self, frame):
-        sample = super().decode_sample(frame)
-        if frame.get("format") != "raw_mouse_v1" and not sample.appearance_intent:
+        sample = decode(frame, self.config, self.subject_id, raw_eyes=not self.mapping.require_wink)
+        if self.mapping.require_wink and frame.get("format") != "raw_mouse_v1" and not sample.appearance_intent:
             sample = replace(sample, left_closed=False, right_closed=False,
                              left_known=False, right_known=False)
         return sample
@@ -144,7 +144,12 @@ class GamingProcessor(MouseProcessor):
                     pointer_down_gain=self.mapping.pointer_down_gain,
                     target_jitter=self.mapping.target_jitter if self.mapping.pointer_mode == "target" else None,
                     head_motion=dict(self.pointer.motion_state) if isinstance(self.pointer, HeadPointerFilter) else None,
-                    head_x=self.head_diagnostic(self.head_x), head_y=self.head_diagnostic(self.head_y))
+                    head_x=self.head_diagnostic(self.head_x), head_y=self.head_diagnostic(self.head_y),
+                    require_wink=self.mapping.require_wink,
+                    head_center_pending=getattr(self, "center_requested", False),
+                    eyes={side:dict(known=getattr(self.sample, side+"_known", False) and diag[side+"_closed"] is not None,
+                                   ready=getattr(self, side).ready, down=getattr(self, side).down)
+                          for side in ("left", "right")})
         snap["known"] = {"left_click": diag["left_closed"] is not None,
                          "right_click": diag["right_closed"] is not None,
                          "head_x": self.head_x.raw is not None,
@@ -166,7 +171,7 @@ class GamingProcessor(MouseProcessor):
             raw = diag[side+"_closed"]
             status = "unknown; released" if raw is None else "waiting for reopen" if not gate.ready else "active" if snap[side+"_click"] else "released"
             rows.append({"id": "eye_"+side, "input": side.title()+" eye action", "raw": None if raw is None else int(raw),
-                         "filtered": None if raw is None else int(raw), "threshold": "Calibrated action",
+                         "filtered": None if raw is None else int(raw), "threshold": "Calibrated wink" if self.mapping.require_wink else "Open / closed",
                          "instruction": side.title()+" mouse: "+status})
         for name, gate, direction, key in zip(DIRECTIONS, (self.head_y,self.head_y,self.head_x,self.head_x),
                                               (1,-1,-1,1), self.mapping.bindings):
@@ -208,22 +213,67 @@ class GamingProcessor(MouseProcessor):
 
 
 class HeadMouseProcessor(GamingProcessor):
-    """Head X/Y pointer with optional calibrated wink clicks; no keys/scroll."""
+    """Head X/Y pointer with optional wink or plain closure clicks; no keys/scroll."""
 
     def __init__(self, mapping=None, subject_id="mock-person"):
         mapping = mapping or mouse_test_mapping()
         if mapping.input_mode != "head-mouse":
             raise ValueError("Head mouse processor requires a head-mouse mapping")
+        self.center_requested = False
+        self.center_capture_at = None
         super().__init__(mapping, subject_id)
         if mapping.head_motion.enabled:
             self.pointer = HeadPointerFilter(self.config.pointer, mapping.head_motion,
                                              gain=mapping.pointer_gain, down_gain=mapping.pointer_down_gain,
                                              adaptive=mapping.adaptive_pointer)
 
+    def arm(self, *, center=False):
+        super().arm()
+        self.center_requested = center
+        self.center_capture_at = self.last_tick if center else None
+        if center:self.reason = "Center head: hold a comfortable pose and open your eyes"
+
+    def disarm(self, reason="Preview stopped"):
+        self.center_requested = False
+        self.center_capture_at = None
+        super().disarm(reason)
+
+    def expire_center(self, now_ms):
+        if (finite(now_ms) and self.center_requested and self.center_capture_at is not None
+                and now_ms-self.center_capture_at > self.config.stale_ms):
+            self.disarm("Head input stale; press Center head & start again")
+
+    def tick(self, now_ms):
+        self.expire_center(now_ms)
+        return super().tick(now_ms)
+
+    def accept(self, frame, received_ms):
+        self.expire_center(received_ms)
+        result = super().accept(frame, received_ms)
+        if result["accepted"] and self.armed and self.center_requested:
+            self.center_capture_at = received_ms
+            sample = self.sample
+            if sample.pointer is None:
+                self.reason = "Center head: waiting for valid Head X and Head Y"
+            elif any(getattr(sample, side+"_known") and getattr(sample, side+"_closed") for side in ("left", "right")):
+                self.reason = "Center head: open your eyes before starting"
+            elif not all(.05 <= value <= .95 for value in sample.pointer):
+                self.reason = "Center head: move away from the calibrated range limits"
+            else:
+                pointer = replace(self.config.pointer, center_x=sample.pointer[0], center_y=sample.pointer[1])
+                self.config = replace(self.config, pointer=pointer)
+                self.mapping = replace(self.mapping, response=self.config)
+                self.pointer.retune(pointer)
+                self.pointer.start_from_latest()
+                self.center_requested = False
+                self.center_capture_at = None
+        return result
+
     def decode_sample(self, frame):
-        sample = decode(frame, self.config, self.subject_id, ignore_eyes=not self.mapping.head_wink_clicks)
-        if not self.mapping.head_wink_clicks or not sample.appearance_intent:
-            # Even legacy raw closures cannot substitute for trained winks.
+        sample = decode(frame, self.config, self.subject_id, ignore_eyes=not self.mapping.head_wink_clicks,
+                        raw_eyes=not self.mapping.require_wink)
+        if not self.mapping.head_wink_clicks or (self.mapping.require_wink and not sample.appearance_intent):
+            # Plain closures are used only when explicitly selected.
             sample = replace(sample, left_closed=False, right_closed=False,
                              left_known=False, right_known=False)
         point = ((sample.head_x, sample.scroll)
@@ -235,7 +285,7 @@ class HeadMouseProcessor(GamingProcessor):
         eyes_released = (self.sample is not None and
                          not (self.sample.left_known and self.sample.left_closed) and
                          not (self.sample.right_known and self.sample.right_closed))
-        return (self.pointer.valid and self.pointer.neutral() and eyes_released
+        return (not self.center_requested and self.pointer.valid and self.pointer.neutral() and eyes_released
                 and not self.left.down and not self.right.down)
 
     def instructions(self, snap):

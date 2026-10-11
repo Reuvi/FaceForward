@@ -32,14 +32,22 @@ small movements very slow precision speed while larger turns reach full speed.
 The 20 ms adaptive smoothing, 3× downward gain and calibration remain. The speed
 response off switch disables the transient boost/braking; the precision curve remains. See [head pointer tuning](../../docs/HEAD_POINTER_GUIDE.md).
 
-The **Calibrated winks** checkbox in Head movement response enables the clicks.
-Use a wink-trained face profile or complete Eye open/closed and Wink action
-calibration. Untrained/unknown eyes still allow head movement. Each unknown eye
+The **Eye clicks** checkbox in Head movement response enables the clicks.
+**Live curves → Require calibrated wink for clicks** selects trained winks when
+checked, or immediate plain open/closed when unchecked. Plain mode needs only eye
+geometry; ordinary blinks also click. Changing this flag stops output.
+For wink mode, use a wink-trained face profile or complete Eye open/closed and
+Wink action calibration. Untrained/unknown eyes still allow head movement. Each unknown eye
 releases its click and needs actual reopening before another activation; head loss
 stops only the pointer while valid wink channels remain usable after startup.
 Uncheck the option for the previous pointer-only behavior.
 
-Copies retain this head movement mode and the wink setting. Pointer settings and gain apply; keyboard bindings and key thresholds are hidden. The driver connection and permissions are identical to gaming mode.
+**Center head & start** captures a fresh resting head position and enables output
+with a neutral first command. Use it if Start waits for the old center. It preserves
+the precision curve/dead zone and detector ranges. Missing/stale input cancels the
+request. The new center is saved with tuning profiles and mapping exports.
+
+Copies retain this head movement mode and the wink/closure setting. Pointer settings and gain apply; keyboard bindings and key thresholds are hidden. The driver connection and permissions are identical to gaming mode.
 
 ## Live response curves
 
@@ -140,7 +148,7 @@ combined as a held state. Pointer and independent mouse-button bindings remain
 fixed within each mapping family. Mouse test always has all key bindings set to none. Apply increments the mapping revision and
 requires a new Start preview.
 
-**Export mapping / Import mapping** writes strict `input_mapping_v6` JSON (v1/v2 read as velocity; v3–v5 retain their saved response; all older files import with head wink clicks off), including pointer mode, downward boost, position smoothing/delay, fixation dead band, input mode and adaptive-filter selection alongside
+**Export mapping / Import mapping** writes strict `input_mapping_v7` JSON (v1/v2 read as velocity; v3–v6 retain saved response; v1–v5 import with head clicks off; all older files default to require_wink=true), including pointer mode, downward boost, position smoothing/delay, fixation dead band, input mode and adaptive-filter selection alongside
 name, stable ID, revision, response settings, pointer gain, head thresholds,
 bindings and head movement response. v1–v4 import with the new head response
 disabled; opt in with its checkbox and re-export to save. Import validates the whole file before replacing/selecting it. Files

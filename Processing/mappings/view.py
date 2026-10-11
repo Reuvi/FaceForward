@@ -26,6 +26,12 @@ class MappingPanel(ttk.Frame):
         if compact:
             desktop.button(toolbar, "Mapping settings…", self.show_settings).pack(side="left", padx=(8,0))
         desktop.button(toolbar, "Live curves…", self.show_curves).pack(side="left", padx=(8,0))
+        self.center_row = ttk.Frame(self)
+        self.center_button = desktop.button(self.center_row, "Center head & start",
+                                            lambda: self.lab.action({"action":"center_head_start"}))
+        self.center_button.pack(side="left", padx=(0,8))
+        self.center_text = tk.StringVar()
+        label(self.center_row, textvariable=self.center_text, foreground=MUTED).pack(side="left")
         self.notice = tk.StringVar()
         if not compact:
             label(self, textvariable=self.notice, foreground=GREEN, wraplength=1250).pack(anchor="w", pady=7)
@@ -125,7 +131,7 @@ class MappingPanel(ttk.Frame):
             self.motion_fields[key] = var
             ttk.Entry(self.motion_group, textvariable=var, width=8).grid(row=1, column=col*2+1, padx=5)
         self.wink_clicks = tk.BooleanVar()
-        ttk.Checkbutton(self.motion_group, text="Calibrated winks: left eye → left click, right eye → right click",
+        ttk.Checkbutton(self.motion_group, text="Eye clicks: left eye → left click, right eye → right click (source in Live curves)",
                         variable=self.wink_clicks).grid(row=2, column=0, columnspan=4, sticky="w", pady=4)
         self.pointer_group = None
         if compact:
@@ -300,8 +306,12 @@ class MappingPanel(ttk.Frame):
             mapping = state["mapping"]
             head_only = bool(mapping and mapping.get("input_mode") == "head-mouse")
             if head_only:
+                self.center_row.pack(fill="x", pady=5, after=self.selector.master)
+                center=state["config"]["pointer"]
+                self.center_text.set(f"Resting center: X {center['center_x']:.3f}, Y {center['center_y']:.3f} · hold a comfortable pose to recenter")
                 self.motion_group.pack(fill="x", pady=(6,0), after=self.adaptive_widget)
             else:
+                self.center_row.pack_forget()
                 self.motion_group.pack_forget()
             motion = mapping["head_motion"] if mapping else dict(enabled=False,speed_gain=.75,return_brake=.65)
             self.motion_enabled.set(motion["enabled"])
@@ -320,10 +330,10 @@ class MappingPanel(ttk.Frame):
             self.mode_widget.configure(state="disabled" if head_only or not mapping else "readonly")
             self.pointer_controls()
             head_help = ("Head X + Head Y move the pointer together; both axes need calibration. Small movements give precise slow speed; larger, faster turns travel quickly. "
-                         + ("Left/right calibrated Wink actions click the matching mouse button. Load a wink-trained profile or finish Eye open/closed and Wink action calibration. Pupils, keys and scroll are ignored."
+                         + ("Each eye clicks its matching mouse button. Choose calibrated wink or plain open/closed in Live curves. Pupils, keys and scroll are ignored."
                             if mapping and mapping["head_wink_clicks"] else "Eyes and pupils are ignored; no clicks, keys or scroll."))
             self.help_text.set((head_help
-                               if head_only else "Head thresholds use the fraction of your calibrated range from neutral. Eyes use calibrated actions without a dwell timer.")
+                               if head_only else "Head thresholds use the fraction of your calibrated range from neutral. Choose wink or plain eye open/closed clicks in Live curves; both are immediate.")
                                + (" Screen destination moves to a point and stops; without screen calibration its alignment is approximate. Fixation dead band 0.002 means 0.2% of the screen. Position smoothing/delay belong to this mapping. Velocity keeps moving while off-center."
                                   if not head_only else "")
                                + " Downward boost multiplies movement below center before inversion; pointer gain scales overall response."

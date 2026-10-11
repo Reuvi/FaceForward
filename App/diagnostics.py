@@ -17,18 +17,22 @@ def pointer_status(source, lab):
         return "Pointer stopped: " + lab["output"]["error"]
     if source.get("error"):
         return "Pointer stopped: " + source["error"]
+    if diag.get("head_center_pending"):
+        return snap["status"] + ". Output waits for a fresh center capture."
     if diag["raw_pointer"] is None:
         age = source.get("age_ms")
         if age is None or age > config["stale_ms"]:
             return "Pointer unavailable: waiting for a fresh camera/input sample."
         signals = next((f["signals"] for f in (source.get("frame") or {}).get("faces", [])
                         if f["subject_id"] == lab["runtime"]["subject_id"]), {})
+        if not signals:
+            return "Pointer unavailable: waiting for the face to return. Then press Start again."
         if head_only:
             details = []
             for key, name, reason_key in (("head_x", "Head X", "head_x"), ("head_y", "Head Y", "head")):
                 signal = signals.get(key, {})
                 if not signal.get("valid"):
-                    details.append(name+": "+detector.get("reasons", {}).get(reason_key, "calibrate this head axis"))
+                    details.append(name+": "+detector.get("reasons", {}).get(reason_key, "no valid measurement; check head calibration"))
                 elif signal.get("confidence", 0) < config["min_confidence"]:
                     details.append(name+": confidence below threshold")
             return "Pointer unavailable: " + ("; ".join(details) or "waiting for fresh calibrated Head X and Head Y.")
@@ -43,12 +47,16 @@ def pointer_status(source, lab):
                    if not eye.get("valid") and eye.get("reason")]
         return "Pointer unavailable: " + reason + (" · " + "; ".join(details) if details else "")
     if not snap["armed"]:
-        return input_name + " input available. Output is stopped; press Start when ready."
+        return input_name + " input available. Output stopped: " + snap["status"] + (
+            ". Use Center head & start to set your resting position." if head_only else ". Press Start when ready.")
     if not snap["enabled"]:
         pending = []
         radius = diag.get("pointer_radius")
         if not target and radius is not None and radius > config["pointer"]["deadzone"]:
-            pending.append("Head X/Y" if head_only else "pupils")
+            if head_only:
+                return (f"Waiting to start: head offset {radius:.3f} exceeds saved-center tolerance "
+                        f"{config['pointer']['deadzone']:.3f}. Hold a comfortable pose and use Center head & start.")
+            pending.append("pupils")
         for key, name in (() if head_only else (("head_x", "Head X"), ("head_y", "Head Y"))):
             if not diag.get(key, {}).get("neutral", True):
                 pending.append(name)
@@ -157,6 +165,8 @@ class DiagnosticLog:
                      "pointer_down_gain":diag.get("pointer_down_gain", 1),
                      "head_motion":diag.get("head_motion"),
                      "head_wink_clicks":(lab.get("mapping") or {}).get("head_wink_clicks", False),
+                     "require_wink":(lab.get("mapping") or {}).get("require_wink", True),
+                     "eyes":diag.get("eyes"), "head_center_pending":diag.get("head_center_pending", False),
                      "tuning_revision":lab.get("tuning_revision", 0),
                      "target_jitter":diag.get("target_jitter"), "min_confidence":lab["config"]["min_confidence"],
                      "pointer_gain":(lab.get("mapping") or {}).get("pointer_gain",1),

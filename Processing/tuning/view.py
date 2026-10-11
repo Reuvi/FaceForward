@@ -44,7 +44,14 @@ class CurveEditor:
         ttk.Entry(bar,textvariable=self.name,width=27).pack(side='left',padx=8)
         for text,fn in (('Save as…',self.save),('Load…',self.load),('Default profile',self.defaults)):
             ttk.Button(bar,text=text,command=lambda f=fn:self.guarded(f)).pack(side='left',padx=3)
-        self.notice=tk.StringVar(value='Sliders change the running response. Loading a profile stops output.')
+        options=ttk.Frame(outer);options.pack(fill='x',pady=(8,0))
+        self.require_wink=tk.BooleanVar(value=True)
+        self.eye_mode_button=ttk.Checkbutton(options,text='Require calibrated wink for clicks',
+            variable=self.require_wink,command=lambda:self.guarded(self.change_eye_mode))
+        self.eye_mode_button.pack(side='left')
+        self.center_button=ttk.Button(options,text='Center head & start',command=lambda:self.guarded(self.center_head))
+        self.center_button.pack(side='right')
+        self.notice=tk.StringVar(value='Sliders change the running response. Uncheck Require calibrated wink for plain open/closed clicks; ordinary blinks also click. Changing eye mode or loading a profile stops output.')
         ttk.Label(outer,textvariable=self.notice,wraplength=1060).pack(anchor='w',pady=(8,8))
         body=ttk.Frame(outer);body.pack(fill='both',expand=True)
         left=ttk.Frame(body,width=410);left.pack(side='left',fill='y',padx=(0,18));left.pack_propagate(False)
@@ -113,6 +120,12 @@ class CurveEditor:
         self.syncing=True
         for child in self.controls.winfo_children():child.destroy()
         self.widgets={}
+        mapping=state['mapping']
+        self.require_wink.set(mapping['require_wink'] if mapping else True)
+        clicks=bool(mapping and (mapping['input_mode']!='head-mouse' or mapping['head_wink_clicks']))
+        self.eye_mode_button.configure(state='normal' if clicks else 'disabled')
+        if mapping and mapping['input_mode']=='head-mouse':self.center_button.pack(side='right')
+        else:self.center_button.pack_forget()
         self.channel_choices=channels(state)
         if self.channel not in dict(self.channel_choices):self.channel='pointer'
         self.selector.configure(values=[name for _,name in self.channel_choices])
@@ -127,9 +140,11 @@ class CurveEditor:
             detail='Pupil position becomes a screen destination. Gain and downward amplification change reach; smoothing, delay and fixation dead band control settling. X and Y curves show one axis at a time.'
         else:
             detail='X/Y share a smooth radial speed curve. X and Y lines show each axis with the other centered; diagonal motion is bounded. Gain shapes speed; acceleration and braking shape timing.'
+        if self.channel in ('left','right') and mapping and not mapping['require_wink']:
+            detail='Plain open/closed signals: closure clicks immediately, including ordinary blinks. Open releases and re-arms that eye. Unknown releases it. Only Eye open/closed geometry is needed; wink training is ignored.'
         if self.channel in ('left','right') and legacy_eye_timing(state):
             detail='Legacy raw closure input: confirmation and reopening timers are active here. Calibrated camera winks bypass these timers. Each eye remains independent.'
-        self.timing_title.set('Timing preview · synthetic wink' if self.channel in ('left','right') else 'Timing preview · synthetic turn, hold, return')
+        self.timing_title.set('Timing preview · synthetic eye activation' if self.channel in ('left','right') else 'Timing preview · synthetic turn, hold, return')
         self.explanation.set(detail)
         target=self.channel=='pointer' and state['mapping'] and state['mapping']['pointer_mode']=='target'
         self.output_legend.set('Output: OFF (0) / ON (1); the driver clicks once on activation.' if self.channel in ('left','right') else
@@ -138,7 +153,7 @@ class CurveEditor:
                                'Output speed: 0 = full left/up, 0.5 = stopped, 1 = full right/down.')
         specs=sliders(state,self.channel)
         if not specs:
-            ttk.Label(self.controls,text='Instant calibrated action\n\nOFF → no click\nON → one click\nHeld ON → no repeats',justify='left').pack(anchor='w',pady=20)
+            ttk.Label(self.controls,text='Instant eye action\n\nOFF → no click\nON → one click\nHeld ON → no repeats',justify='left').pack(anchor='w',pady=20)
         for spec in specs:
             row=ttk.Frame(self.controls);row.pack(fill='x',pady=(2,7))
             ttk.Label(row,text=spec.label).grid(row=0,column=0,sticky='w')
@@ -197,7 +212,9 @@ class CurveEditor:
             self.rebuild(state)
         self.state=state
         mode={'preview':'Preview','dry-run':'Driver dry run','native':'Live mouse + keyboard'}[state['output']['mode']]
-        running='RUNNING · sliders affect output immediately' if state['snapshot']['enabled'] else 'OUTPUT STOPPED · edits do not start it'
+        running=('RUNNING · sliders affect output immediately' if state['snapshot']['enabled'] else
+                 'WAITING TO START · '+state['snapshot']['status'] if state['snapshot']['armed'] else
+                 'OUTPUT STOPPED · '+state['snapshot']['status'])
         self.connection.set(mode+' · '+running)
         if force or time.monotonic()>=self.next_draw:
             self.next_draw=time.monotonic()+.1
@@ -229,10 +246,31 @@ class CurveEditor:
     def draw(self):
         if self.state is None:return
         values=live_values(self.state,self.channel)
-        self.chart(self.curve_canvas,self.curves,xlabel='Eye action: OFF (0) → ON (1)' if self.channel in ('left','right') else 'Input: 0 → neutral 0.5 → 1',markers=values)
+        xlabel='Input: 0 → neutral 0.5 → 1'
+        if self.channel=='pointer':
+            center=self.state['config']['pointer']
+            xlabel=f"Input: 0 → 1 · rest X {center['center_x']:.3f}, Y {center['center_y']:.3f}"
+        elif self.channel in ('left','right'):xlabel='Eye action: OFF (0) → ON (1)'
+        self.chart(self.curve_canvas,self.curves,xlabel=xlabel,markers=values)
         self.chart(self.time_canvas,self.timeline,duration=2.5,xlabel='Seconds · return starts at 0.8 s')
         self.readout.set('   |   '.join(name+': unknown · released' if raw is None else
                          f'{name}: input {raw:.3f} → output {out:.3f}' for name,raw,out in values))
+
+    def change_eye_mode(self):
+        desired=self.require_wink.get()
+        if not self.flush():return
+        try:
+            self.lab.set_eye_mode(desired,mapping_id=self.context[0],generation=self.context[1])
+        finally:
+            self.refresh(self.lab.state(),force=True)
+        self.notice.set('Eye input changed; output stopped. '+('Calibrated winks are required.' if desired else
+                        'Plain open/closed is active; ordinary blinks also click.')+' Press Start when ready.')
+
+    def center_head(self):
+        if not self.flush():return
+        self.lab.action({'action':'center_head_start'})
+        self.refresh(self.lab.state(),force=True)
+        self.notice.set('Hold a comfortable head pose with eyes open. The next valid capture sets the center and starts output.')
 
     def save(self):
         if not self.flush():return

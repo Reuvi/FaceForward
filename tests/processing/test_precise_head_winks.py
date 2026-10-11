@@ -120,7 +120,7 @@ class PreciseHeadWinkTests(unittest.TestCase):
 
     def test_v5_migration_preserves_tuning_but_leaves_new_clicks_off(self):
         current=mouse_test_mapping().to_dict()
-        old=deepcopy(current);old['format']='input_mapping_v5';del old['head_wink_clicks']
+        old=deepcopy(current);old['format']='input_mapping_v5';del old['head_wink_clicks'];del old['require_wink']
         old['pointer_gain']=.9;old['response']['pointer']['deadzone']=.12
         loaded=Mapping.from_dict(old)
         self.assertFalse(loaded.head_wink_clicks)

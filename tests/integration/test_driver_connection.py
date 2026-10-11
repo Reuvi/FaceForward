@@ -29,7 +29,7 @@ class DriverConnectionTests(unittest.TestCase):
         self.sequence = 0
         self.deliver()
 
-    def deliver(self, **values):
+    def deliver(self, *, eye_intent=True, **values):
         self.now += 20
         self.sequence += 1
         base = next(mouse_demo_records(count=1))
@@ -44,8 +44,55 @@ class DriverConnectionTests(unittest.TestCase):
                 closed=value == 0
                 frame['eye_intent'][side].update(value=None if value is None else int(closed),
                     known=value is not None,state='unknown' if value is None else 'wink' if closed else 'open')
+        if not eye_intent:frame.pop("eye_intent",None)
         self.session.deliver(frame)
         return self.lab.state()["output"]
+
+    def test_recenter_recovers_offset_head_and_compiled_driver_movement(self):
+        self.lab.select_mapping('mouse-test');self.lab.action({'action':'arm'})
+        self.assertFalse(self.deliver(head_x=.3,head_y=.7)['enabled'])
+        self.lab.action({'action':'center_head_start'})
+        output=self.deliver(head_x=.32,head_y=.68)
+        self.assertTrue(output['enabled']);self.assertIsNone(output['error'])
+        self.assertEqual(self.lab.state()['message']['pointer'],dict(mode='velocity',x=.5,y=.5))
+        start=len(self.lab.output.events)
+        for _ in range(25):
+            time.sleep(.01);output=self.deliver(head_x=.5,head_y=.75)
+        events=list(self.lab.output.events)[start:]
+        self.assertGreater(sum(e['x'] for e in events if e['type']==1),0)
+        self.assertGreater(sum(e['y'] for e in events if e['type']==1),0)
+        self.assertIsNone(output['error'])
+        self.assertEqual(output['held_keys'],0)
+        self.lab.action({'action':'center_head_start'})
+        self.assertFalse(self.lab.state()['output']['enabled'])
+        output=self.deliver(head_x=.5,head_y=.75)
+        self.assertTrue(output['enabled']);self.assertIsNone(output['error'])
+        self.assertEqual(self.lab.state()['message']['pointer'],dict(mode='velocity',x=.5,y=.5))
+
+    def test_plain_closure_source_reaches_driver_without_winks_and_does_not_repeat(self):
+        self.lab.select_mapping('mouse-test')
+        state=self.lab.state()
+        self.lab.set_eye_mode(False,mapping_id=state['mapping_id'],generation=state['generation'])
+        self.lab.action({'action':'arm'})
+        self.assertTrue(self.deliver(eye_intent=False)['enabled'])
+        for _ in range(15):
+            time.sleep(.01)
+            output=self.deliver(eye_intent=False,head_x=.7,left_eye_open=0,right_eye_open=0)
+        self.assertEqual(output['event_counts'].get(3),1)
+        self.assertEqual(output['event_counts'].get(4),1)
+        self.assertGreater(output['event_counts'].get(1,0),0)
+        self.deliver(eye_intent=False,left_eye_open=None,right_eye_open=0)
+        output=self.deliver(eye_intent=False,left_eye_open=0,right_eye_open=0)
+        self.assertEqual(output['event_counts'].get(3),1)
+        self.deliver(eye_intent=False,right_eye_open=0)
+        output=self.deliver(eye_intent=False,left_eye_open=0,right_eye_open=0)
+        self.assertEqual(output['event_counts'].get(3),2)
+        self.assertEqual(output['event_counts'].get(4),1)
+        self.assertIsNone(output['error'])
+        state=self.lab.state()
+        self.lab.set_eye_mode(True,mapping_id=state['mapping_id'],generation=state['generation'])
+        self.assertFalse(self.lab.state()['output']['enabled'])
+        self.assertIsNone(self.lab.state()['output']['error'])
 
     def test_real_driver_receives_eye_pulse_between_processing_ticks(self):
         self.deliver(left_eye_open=0)

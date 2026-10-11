@@ -1,5 +1,7 @@
 # Precise head movement and independent wink clicks
 
+Follow-up: [EYE_MODE_CONTROL_RECOVERY.md](EYE_MODE_CONTROL_RECOVERY.md) adds the explicit plain-closure option, mapping v7 and fresh head-center startup.
+
 Follow-up: [LIVE_CURVE_EDITOR.md](LIVE_CURVE_EDITOR.md) permits validated live
 response-only slider edits without disarming. Regular settings and full profile
 loads still stop; all wink validity and independence rules below remain.

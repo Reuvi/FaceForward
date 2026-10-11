@@ -68,6 +68,7 @@ class Sample:
     pointer_timestamp_ms: object = None
     pointer_sequence: object = None
     head_x: object = None
+    instant_eyes: bool = False
 
     def __post_init__(self):
         for side in ("left", "right"):
@@ -76,7 +77,7 @@ class Sample:
                 object.__setattr__(self, side + "_known", False)
 
 
-def decode(frame, config, subject_id, *, ignore_eyes=False):
+def decode(frame, config, subject_id, *, ignore_eyes=False, raw_eyes=False):
     if not isinstance(frame, dict):
         raise ValueError("Frame must be an object")
     session = frame.get("session_id")
@@ -98,7 +99,8 @@ def decode(frame, config, subject_id, *, ignore_eyes=False):
         return Sample(session, sequence, timestamp, subject_id, eye("left_eye"), eye("right_eye"),
                       one_hot_matrix(frame.get(config.pointer_source)),
                       one_hot_vector(frame.get("head_vertical")),
-                      head_x=one_hot_vector(frame.get("head_horizontal")))
+                      head_x=one_hot_vector(frame.get("head_horizontal")), instant_eyes=raw_eyes,
+                      left_reopened=eye("left_eye") is False, right_reopened=eye("right_eye") is False)
 
     if type(frame.get("schema_version")) is not int or frame["schema_version"] != 1:
         raise ValueError("Expected raw_mouse_v1 or SignalFrame schema_version 1")
@@ -145,7 +147,7 @@ def decode(frame, config, subject_id, *, ignore_eyes=False):
         return Sample(session, sequence, timestamp, subject_id, None, None,
                       (x, y) if x is not None and y is not None else None,
                       measurement("head_y"), head_x=measurement("head_x"), **pointer_source)
-    if "eye_intent" in frame:
+    if "eye_intent" in frame and not raw_eyes:
         intent=frame["eye_intent"]
         if (not isinstance(intent,dict) or set(intent)!={"format","session_id","sequence","timestamp_ms","subject_id","left","right"}
                 or intent.get("format")!="eye_intent_v1" or type(intent.get("sequence")) is not int
@@ -168,4 +170,7 @@ def decode(frame, config, subject_id, *, ignore_eyes=False):
                       appearance_intent=True,left_reopened=measurement("left_eye_open")==1,
                       right_reopened=measurement("right_eye_open")==1, head_x=measurement("head_x"), **pointer_source)
     return Sample(session, sequence, timestamp, subject_id, eye("left_eye_open"), eye("right_eye_open"),
-                  (x, y) if x is not None and y is not None else None, measurement("head_y"), head_x=measurement("head_x"), **pointer_source)
+                  (x, y) if x is not None and y is not None else None, measurement("head_y"),
+                  head_x=measurement("head_x"), instant_eyes=raw_eyes,
+                  left_reopened=measurement("left_eye_open")==1,
+                  right_reopened=measurement("right_eye_open")==1, **pointer_source)

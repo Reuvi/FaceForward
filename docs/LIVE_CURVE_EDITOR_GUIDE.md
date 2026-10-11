@@ -14,7 +14,24 @@ Choose an input from the menu. Only controls used by that mapping appear:
 | Gaming pupils, velocity | Velocity curve, gain, smoothing, acceleration/braking, delay and quick-move boost/fade |
 | Gaming head keys | Each axis's press threshold, release threshold, smoothing and press confirmation time |
 | Mouse and scroll: Head Y | Scroll curve, smoothing, ramp/braking, delay and quick-move boost/fade |
-| Calibrated left/right winks | Live independent ON/OFF and click-command state; one click per activation |
+| Left/right eye actions (wink or plain closure) | Live independent ON/OFF and click-command state; one click per activation |
+
+**Require calibrated wink for clicks** selects the eye source for this mapping.
+Leave it checked for trained wink actions. Uncheck it for plain **open/closed**:
+left closure → left click, right closure → right click, immediately. Ordinary
+blinks also click. Only the Eye open/closed geometry guide is needed in this mode;
+wink training and wink intent are ignored. Unknown releases that eye, and actual
+reopening re-arms it. Holding closed never repeats clicks. Changing the flag stops
+output; press Start again. Save as… and mapping export retain the choice.
+
+For Mouse test, **Center head & start** is available on Signals and in the editor.
+Hold a comfortable resting pose and open your eyes. The next fresh valid Head X/Y
+capture becomes your resting center, then output starts from a neutral command.
+This recovers a controller stuck waiting for the old center without weakening the
+precision dead zone. It uses the currently connected output mode. If the head is
+at a calibrated range limit, move closer to the middle first. Missing/stale input
+cancels the request; retry when tracking returns. Save the tuning profile to keep
+the new center. Normal Start continues to use the saved center.
 
 Winks are binary: there is no adjustable click strength or additional wink timer.
 Use Calibration for wink training. Legacy raw-eye developer inputs expose their
@@ -32,7 +49,7 @@ no dot and is labeled unknown. Graphs do not fabricate valid values.
 The lower graph is a **synthetic timing preview** using the same filters. It turns
 outward, holds, and starts returning at .8 seconds. It shows how motion ramps and
 settles as you adjust settings. This simulation never enters live control. A wink
-preview shows the activation level; the driver still clicks only on its rising edge.
+or closure preview shows the activation level; the driver still clicks only on its rising edge.
 
 ## Useful adjustments
 
@@ -63,7 +80,7 @@ separately for eye/head calibration. Mapping export also retains live-tuned valu
 **Load…** validates the entire file before applying it and selecting its mapping.
 It stops output; center/release your inputs and press Start on Signals afterward.
 **Default profile** restores the built-in family's response and default speed
-limits, preserving your mapping name, identity, bindings, pointer mode and wink
+limits, preserving your mapping name, identity, bindings, pointer mode, eye-click enable and wink/closure
 choice. It also stops output. Save custom tuning before resetting if you want it
 back. Each mapping can have multiple named local tuning files.
 

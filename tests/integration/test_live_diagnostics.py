@@ -55,6 +55,9 @@ class LiveDiagnosticsTests(unittest.TestCase):
             self.assertIsNone(row['processed_pupils'])
             self.assertIn('head_x',row['head_reasons'])
             self.assertTrue(row['head_wink_clicks'])
+            self.assertTrue(row['require_wink'])
+            self.assertFalse(row['head_center_pending'])
+            self.assertIn('ready',row['eyes']['left'])
             self.assertIn('phase',row['head_motion'])
             self.assertEqual(row['head_motion']['multiplier'],1)
 
@@ -68,7 +71,7 @@ class LiveDiagnosticsTests(unittest.TestCase):
     def test_stopped_center_wait_deadzone_and_filter_delay(self):
         mapping = self.lab.state()['mapping'];mapping['pointer_mode'] = 'velocity'
         self.lab.update_mapping(mapping)
-        self.assertIn("press Start",pointer_status(*self.feed()))
+        self.assertIn("Press Start",pointer_status(*self.feed()))
         self.lab.action({"action":"arm"})
         self.assertIn("center pupils",pointer_status(*self.feed(.8)))
         self.assertIn("dead zone",pointer_status(*self.feed()))
@@ -76,6 +79,23 @@ class LiveDiagnosticsTests(unittest.TestCase):
         for _ in range(6):
             state = self.feed(.8)
         self.assertIn("Pointer request",pointer_status(*state))
+
+    def test_head_start_blocker_points_to_recenter_and_distinguishes_missing_face(self):
+        self.lab.select_mapping('mouse-test')
+        source,lab=self.feed()
+        lab['snapshot'].update(armed=True,enabled=False)
+        lab['snapshot']['diagnostics']['pointer_radius']=.6
+        text=pointer_status(source,lab)
+        self.assertIn('0.600',text);self.assertIn('0.030',text)
+        self.assertIn('Center head & start',text)
+        self.lab.action({'action':'center_head_start'})
+        text=pointer_status(self.session.state(),self.lab.state())
+        self.assertIn('fresh center capture',text)
+        lab['snapshot']['diagnostics']['raw_pointer']=None
+        source['frame']['faces']=[]
+        text=pointer_status(source,lab)
+        self.assertIn('face to return',text)
+        self.assertNotIn('calibrat',text)
 
     def test_driver_error_is_retained_and_log_has_no_images_or_profiles(self):
         source,lab = self.feed()

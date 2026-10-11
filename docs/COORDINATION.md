@@ -1437,3 +1437,72 @@ as usual; sliders then apply without another Start. Save named tuning files for
 reuse. Full profile/default loads stop output and require Start again. See
 [editor and tuning guide](LIVE_CURVE_EDITOR_GUIDE.md). Real-camera comfort remains
 user testing; these are synthetic/software checks, not detector accuracy claims.
+
+
+## Eye input selection and stopped-head recovery — user-requested integration
+
+Lane / task / branch: Reuvi integration / eye-mode-control-recovery /
+`codex/integration/eye-mode-control-recovery`, based on `02cebf3`.
+Writable scope: Processing mappings, adapters, controller and native editor; App
+scalar diagnostics; relevant tests, contracts and shared runbooks. Contract-first
+commit: `d0cb7fd`, [EYE_MODE_CONTROL_RECOVERY](../Contracts/EYE_MODE_CONTROL_RECOVERY.md).
+
+The latest local camera/native-output logs were read without changing profiles or
+the running controller. They showed valid head movement while output remained armed
+but never enabled: the saved-center gate was not reached. No driver error or live
+slider edit was recorded in that session. Reconnecting output repeatedly disarmed
+it, and face loss required another explicit Start. Some captures also had invalid
+Head Y, which remains a separate detector availability issue.
+
+Behavior: Signals and Live curves now expose **Center head & start** for Mouse
+test and copied head mappings. It releases first, captures a fresh valid head pose
+with no known eye action held, saves that Processing center and starts with a
+neutral driver command. Existing precise dead zone, head motion response and
+detector ranges stay intact. Range endpoints cannot become a center. Stop, loss,
+stale input (including silence before the first capture), source restart and
+settings/mapping changes cancel pending centering. Normal Start keeps its old
+saved-center behavior. Diagnostics name the center blocker and pending capture;
+missing faces no longer imply erased head calibration.
+
+**Require calibrated wink for clicks** in Live curves selects wink intent (default)
+or plain anatomical open/closed for both independent eye channels. Plain closure
+is immediate and ignores wink metadata/training; ordinary blinks also click.
+Unknown releases each eye and requires its own fresh reopening. Holding closed
+never repeats a click. Changing the source stops output, validates the editor's
+mapping/generation and never replays cached samples. The existing Head movement
+response **Eye clicks** switch still enables/disables both eye channels. Logs now
+include source choice, per-eye known/ready/down and pending centering.
+
+Interfaces: mapping `input_mapping_v7` adds boolean `require_wink`; fully validated
+v1–v6 import with true and keep their earlier click enable and response. Copies,
+exports, named tuning profiles and tuning defaults preserve the eye source. Saved
+mapping/tuning response includes the recentered position. Face v3, detector v13,
+SignalFrame and driver ABI remain unchanged. No Vision or Drivers source changes.
+
+Verification:
+- `python3 -m unittest discover -s tests/processing -q`: **169 passed**. New cases
+  cover both mapping families, independent instant closure, invalid/confidence
+  handling, held unknowns, raw polarity, click disable, v6 migration, validation,
+  persistence, stale editor rejection, fresh center startup, range/eye gates and
+  cancellation on Stop/loss/staleness/restart/settings/mapping changes.
+- All `tests/integration/test_*.py` modules run separately with Vision's venv,
+  `RUN_TK_TESTS=1` and the existing compiled library: **157 passed, no skips**.
+  Native UI tests invoke the actual eye checkbox and both recenter buttons,
+  inspect waiting/running state, and verify saved-center display. Compiled driver
+  tests confirm neutral enable after offset head input, subsequent X/Y movement,
+  exactly one click per closure without wink metadata, and proper release/rearm.
+- Full App: `Vision/.venv/bin/python -m App --source demo --mapping mouse-test
+  --headless --frames 490 --output dry-run --driver-library <main compiled library>`:
+  **490 accepted**, **659 movement events**, **3 clicks per side**, no keys/scroll,
+  no source/driver error; final output disabled with neutral pointer and released
+  buttons. No native OS events or real camera test was performed.
+- Ruff F, `git diff --check` and integration scope against `02cebf3` passed.
+
+Handoff: restart App from main, load compatible head calibration, connect Live
+mouse + keyboard, hold a comfortable pose and press **Center head & start**. Open
+**Live curves** and uncheck **Require calibrated wink for clicks** for plain eye
+closure; changing it stops output, so explicitly Start afterward. Eye geometry
+is still needed where Vision requires it; wink training is optional in plain mode.
+Save as… retains tuning and eye choice. See [editor guide](LIVE_CURVE_EDITOR_GUIDE.md).
+Real-camera comfort and OS permission behavior remain user testing; private local
+logs/profiles were not committed or edited.

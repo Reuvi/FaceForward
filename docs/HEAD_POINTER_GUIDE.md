@@ -1,5 +1,13 @@
 # Head pointer movement and wink clicks
 
+**Current recovery and eye option:** use **Signals → Center head & start** if Start
+waits for the old head center. Hold a comfortable pose with eyes open; the next
+valid capture establishes the center and starts output. Save a tuning profile to
+keep it. **Live curves → Require calibrated wink for clicks** can be unchecked for
+plain open/closed clicks without wink training. Ordinary blinks also click.
+The Eye clicks switch in Mapping settings enables/disables both click channels.
+
+
 Mouse test uses calibrated Head X/Y as smooth velocity control. Small movements
 request very slow, precise cursor motion; larger turns travel faster. Holding a
 position keeps moving, and returning to neutral stops. Left/right calibrated Wink
@@ -32,12 +40,13 @@ In **Mapping settings… → Head movement response**:
 | Speed-aware acceleration and return braking | On | Adds transient speed response to the precision curve |
 | Movement boost | .75 | Up to 75% extra speed during fast outward turns, capped at the existing maximum |
 | Return braking | .65 | Up to 65% reduction in requested speed during fast returns, with stronger deceleration |
-| Calibrated winks | On | Left wink → left click; right wink → right click |
+| Eye clicks | On | Each eye activates its matching mouse button; choose wink or plain closure in Live curves |
 
 Holding a wink produces one click. Reopen before the next wink; each eye works
 independently. Unknown eye input releases that button and requires its actual
-reopening before another activation. Anatomical closure alone cannot click.
-Unchecking **Calibrated winks** restores pointer-only control. Clicks do not drag.
+reopening before another activation. Anatomical closure alone clicks only when
+Require calibrated wink is unchecked in Live curves.
+Unchecking **Eye clicks** restores pointer-only control. Clicks do not drag.
 
 The built-in pointer curve uses a dead zone of **.03**, activation margin **.005**,
 response exponent **1.8**, gain **1.4**, smoothing **20 ms** and no interpolation

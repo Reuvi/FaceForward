@@ -56,7 +56,7 @@ def response_preview(state,channel):
             closed=200<=t<800
             eye.sample(closed,t,appearance_intent=not legacy_eye_timing(state),reopened=not closed)
             raw.append((t/1000,int(closed)));out.append((t/1000,int(eye.down)))
-        return {'Wink':raw,'Command':out}
+        return {'Eye action':raw,'Command':out}
     head=channel.startswith('head_')
     if head:
         gates=[HeadGate(getattr(Mapping.from_dict(state['mapping']),channel))]
@@ -80,7 +80,10 @@ def response_preview(state,channel):
                 if capture:gate.sample(value,t,True)
                 output=(gate.direction+1)/2
             else:
-                raw=value if dimensions==1 else (value,.5) if axis==0 else (.5,value)
+                centers=[gate.config.center_y] if dimensions==1 else [gate.config.center_x,gate.config.center_y]
+                # The synthetic relative turn starts/ends at the saved center.
+                centers[axis]+=(1-centers[axis])*.6*amount
+                raw=centers[0] if dimensions==1 else tuple(centers)
                 if capture:gate.push(raw,t)
                 output=(gate.step(t,delay,.01)[axis if dimensions==2 else 0]+1)/2
             result[name].append((t/1000,output))
@@ -100,4 +103,4 @@ def live_values(state,channel):
         raw=diag[channel]['raw']
         return [('Key direction',raw,(diag[channel]['direction']+1)/2 if raw is not None else None)]
     raw=diag[channel+'_closed']
-    return [('Wink',None if raw is None else int(raw),snap[channel+'_click'] if raw is not None else None)]
+    return [('Eye action',None if raw is None else int(raw),snap[channel+'_click'] if raw is not None else None)]

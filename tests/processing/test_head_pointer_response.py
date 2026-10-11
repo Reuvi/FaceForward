@@ -138,7 +138,7 @@ class HeadPointerResponseTests(unittest.TestCase):
 
     def test_off_switch_matches_previous_filter_and_v4_import_keeps_it_off(self):
         mapping=mouse_test_mapping()
-        legacy=mapping.to_dict();legacy['format']='input_mapping_v4';del legacy['head_motion'];del legacy['head_wink_clicks']
+        legacy=mapping.to_dict();legacy['format']='input_mapping_v4';del legacy['head_motion'];del legacy['head_wink_clicks'];del legacy['require_wink']
         loaded=Mapping.from_dict(legacy)
         self.assertFalse(loaded.head_motion.enabled)
         core=HeadMouseProcessor(loaded,subject_id='person')

@@ -24,7 +24,7 @@ class Slider:
 
 def legacy_eye_timing(state):
     mapping=state['mapping']
-    if mapping and mapping['input_mode']=='head-mouse':return False
+    if mapping and (mapping['input_mode']=='head-mouse' or not mapping['require_wink']):return False
     return ((state.get('raw') or {}).get('format')=='raw_mouse_v1' or
             state.get('runtime',{}).get('source')=='mock')
 
@@ -39,7 +39,8 @@ def channels(state):
                 result.append((axis,axis.replace('_',' ').title()+' → '+' / '.join(bindings[d] for d in directions)))
     if mapping is None:result.append(('scroll','Head Y → scroll'))
     if not mapping or mapping['input_mode']!='head-mouse' or mapping['head_wink_clicks']:
-        result.extend((side,side.title()+' wink → '+side+' click') for side in ('left','right'))
+        mode=' wink' if not mapping or mapping['require_wink'] else ' open/closed'
+        result.extend((side,side.title()+mode+' → '+side+' click') for side in ('left','right'))
     return result
 
 
@@ -156,7 +157,7 @@ def default_profile(state):
         # A user's routing/identity and pointer mode are separate from response tuning.
         base=replace(base,id=mapping.id,name=mapping.name,revision=mapping.revision+1,
                      bindings=mapping.bindings,pointer_mode=mapping.pointer_mode,
-                     head_wink_clicks=mapping.head_wink_clicks)
+                     head_wink_clicks=mapping.head_wink_clicks, require_wink=mapping.require_wink)
         data={**state,'mapping':base.to_dict()}
     else:
         data={**state,'config':replace(MouseConfig(),pointer_source=state['config']['pointer_source']).to_dict()}
