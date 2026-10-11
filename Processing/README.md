@@ -1,5 +1,10 @@
 # Mouse processing prototype
 
+Planning the next preset: [gaming keyboard mouse mapping 1](GAMING_KEYBOARD_MOUSE_MAPPING_1.md)
+maps independent eye actions to mouse buttons, head directions to W/Space/Shift/S,
+and pupils to pointer movement. It includes noise thresholds and the proposed
+driver handoff; it is not implemented or selectable yet.
+
 Async neural tongue frames now preserve their original capture time. Repeated
 origins do not add interpolation samples; stale tongue releases pointer motion
 without stopping fresh eye/head inputs. See
