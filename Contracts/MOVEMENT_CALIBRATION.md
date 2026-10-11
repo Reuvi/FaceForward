@@ -1,5 +1,10 @@
 # Head/tongue calibration and shared raw diagnostics
 
+[JOYSTICK_DETECTION.md](JOYSTICK_DETECTION.md) adds pupil calibration and replaces
+the camera tongue appearance backend with pinned neural masks/preset v6. The
+color-only statements below describe the earlier developer baseline; head pitch
+and range normalization are unchanged.
+
 This increment belongs to Reuvi's integration task, base `482fa65`. The active
 mode remains mouse testing, but detection calibration is independent of device
 transfer functions. No mouse velocity, acceleration or driver-format change is

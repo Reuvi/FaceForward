@@ -108,6 +108,14 @@ class IntegratedDesktop(DesktopLab):
         self.selected_text = tk.StringVar()
         label(selection, textvariable=self.selected_text, foreground=MUTED).pack(side="left", padx=15)
 
+        pointer_row = ttk.Frame(self.vision_page)
+        pointer_row.pack(fill="x", pady=(0,6))
+        label(pointer_row,"Pointer joystick input").pack(side="left",padx=(0,8))
+        self.pointer_choice = tk.StringVar(value="Tongue tip")
+        self.pointer_picker = ttk.Combobox(pointer_row,textvariable=self.pointer_choice,values=("Tongue tip","Pupil direction"),state="readonly",width=20)
+        self.pointer_picker.pack(side="left")
+        self.pointer_picker.bind("<<ComboboxSelected>>",lambda event:self.guarded(lambda:self.session.set_pointer_source("gaze" if self.pointer_choice.get()=="Pupil direction" else "tongue")))
+        label(pointer_row,"Changing input stops preview. Calibrate that input before starting it.",foreground=MUTED).pack(side="left",padx=8)
         self.profile_text = tk.StringVar()
         label(self.vision_page, textvariable=self.profile_text, foreground=MUTED).pack(anchor="w", pady=(0,8))
 
@@ -123,7 +131,7 @@ class IntegratedDesktop(DesktopLab):
         self.raw_ratios = tk.StringVar(value="No camera landmarks received")
         label(raw_page, "Raw camera measurements / single user", style="Heading.TLabel").pack(anchor="w",pady=(0,8))
         label(raw_page, textvariable=self.raw_ratios, style="Panel.TLabel", font=("Menlo", 10), justify="left", wraplength=480).pack(anchor="w")
-        label(raw_page, "Raw graphs below use every captured sample. Calibrate in Detection calibration; device mappings come afterward.\nTongue tip needs appearance training and a visible front edge; inspect its mask.",
+        label(raw_page, "Raw graphs below use every captured sample. Calibrate in Detection calibration; device mappings come afterward.\nTongue uses a local segmentation mask; pupils use eye-relative iris position. Calibrate their ranges before preview.",
               style="Small.TLabel", wraplength=470).pack(anchor="w", pady=12)
         self.input_result = tk.StringVar()
         label(raw_page, textvariable=self.input_result, style="Small.TLabel", wraplength=470).pack(anchor="w")
@@ -272,6 +280,7 @@ class IntegratedDesktop(DesktopLab):
         set_var(self.source_detail, state["error"] or details[state["mode"]])
         single = state["mode"] in ("camera", "detector-demo")
         set_var(self.selected_text, ("Single user: " + ("face detected" if ids and fresh else "tracking paused")) if single else "Processing subject: " + selected)
+        set_var(self.pointer_choice, "Pupil direction" if self.session.lab.state()["config"]["pointer_source"]=="gaze" else "Tongue tip")
         set_var(self.profile_text, "Profile: " + state["profile_label"] + (" | saved calibration active; retained while tracking pauses" if state["profile_bound"] else " | Save active profile to keep calibration after closing the app"))
         face = next((face for face in faces if face["subject_id"] == selected), None)
         for name in SIGNALS:

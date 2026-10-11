@@ -625,3 +625,34 @@ Reuvi integration, branch `work/reuvi/integration/tongue-pupil-joysticks`, base
 contracts, guides and relevant tests. User reports color segmentation unusable
 and requests pupil direction as a second joystick. Preserve working head pitch.
 Contract: JOYSTICK_DETECTION.md, landed before implementation. No Drivers changes.
+
+### Tongue/pupil joystick handoff
+
+- Contract landed first as d9403ca. Camera uses the pinned local YOLOv8n-seg backend;
+  its mask feeds the existing visible front-boundary midpoint estimator. Neural
+  setup removes color background capture, patch clicks and pixel-recall gating.
+  Color fixtures remain available for developer tests, with no camera fallback.
+- Added both-eye iris-direction measurement, full-screen center/four-direction
+  guide with Space-to-capture, rests/sounds, retry, fresh checks, normalized 0–1
+  output, raw per-eye scopes and camera-setup plots using one capture history.
+- Explicit App pointer selector uses existing Processing `pointer_source` and
+  preserves all other settings while stopping preview. No transfer-function or
+  Drivers changes. Head pitch detector/calibration/normalization is preserved.
+- Detector v6 persists model identity and pupil fits/head reference. Old files are
+  validated; incompatible color ranges are removed when neural mode is active.
+  Eyes/head survive. Restored pupil/tongue ranges require rechecks. Unknown control
+  inputs remain invalid; dark held values are display-only.
+- 268 unique tests pass: 118 Vision (including real local MediaPipe and tongue model
+  smoke checks), 80 integration (native Tk enabled), 70 Processing. The 490-frame
+  headless demo accepted every capture, observed all four actions and finished
+  disabled/released. Focused tests cover decoder/NMS/errors, missing-model absence
+  rejection, pupil direction/closure/loss, range normalization, old-profile migration,
+  persistence/rechecks, source selection/settings preservation and native popup keys.
+- Changed Python passes Ruff F; whitespace and integration scope checks pass.
+  Warmed tongue inference on generated crop: median43.74ms/p95 46.60ms, 20 calls,
+  ONNX Runtime1.31.0 CPU/four threads. This excludes camera/MediaPipe/UI.
+- Model/dependency installed locally on Reuvi's machine, not committed. Runtime
+  remains offline. Source/license/setup: Vision/TONGUE_MODEL_NOTICE.md.
+- Testing instructions: docs/TONGUE_PUPIL_TESTING.md. Remaining: actual camera
+  tongue precision/tip quality, pupil drift under head motion, end-to-end FPS and
+  personal usability; no synthetic-test claim of live human accuracy.

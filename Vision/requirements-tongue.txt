@@ -1,0 +1,2 @@
+# Optional local CPU segmentation backend, in addition to requirements.txt.
+onnxruntime>=1.20,<2

@@ -1,9 +1,10 @@
 # Tongue segmentation research: decision and evaluation plan
 
-The supplied research is useful for the next detector iteration. **The current
-App still uses local color segmentation; no pretrained tongue model is installed
-or active in this calibration increment.** Head/tongue range calibration and the
-shared raw views are implemented independently of a future semantic detector.
+**Implemented update:** the camera now uses this pinned local ONNX segmentation
+model. See [current setup and testing](../docs/TONGUE_PUPIL_TESTING.md) and
+[model provenance/license](TONGUE_MODEL_NOTICE.md). The color backend remains for
+developer fixtures. The following records the earlier evaluation and design;
+its statements about a future backend are historical, not current runtime status.
 Do not describe a successful calibration or a synthetic test as tongue accuracy.
 
 ## What the current detector can and cannot measure

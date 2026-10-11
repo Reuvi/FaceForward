@@ -1,5 +1,13 @@
 # Test the visible tongue tip
 
+**Current camera update:** tongue uses local neural segmentation without background
+capture or tissue clicks. A pupil-direction joystick and full-screen range guide
+are also available. Follow [the tongue/pupil test guide](TONGUE_PUPIL_TESTING.md)
+for current camera instructions, profile v6, model setup and limitations. Color
+appearance instructions below now apply only to the legacy developer/synthetic
+backend. Head pitch and the visible-boundary tip definition remain unchanged.
+
+
 The current detector uses your calibrated tongue color and a geometric front-edge
 estimate. The cyan point is the **middle of the visible front boundary**, where
 tongue-colored tissue meets its surroundings. It is not the center of the whole

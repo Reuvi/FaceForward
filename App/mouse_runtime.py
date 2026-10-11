@@ -70,7 +70,7 @@ class MouseSession:
 
     def detector_command(self, name, *args):
         allowed = {"start_eye_guide", "start_wink_guide", "present_eye_step", "start_movement_guide", "present_movement_step",
-                   "collect", "cancel", "freeze_mouth", "mark_tongue", "clear_tongue_marks", "fit_tongue", "reset_tongue", "retry_tongue_step", "configure", "reset_calibration"}
+                   "load_tongue_model", "reset_pupil", "collect", "cancel", "freeze_mouth", "mark_tongue", "clear_tongue_marks", "fit_tongue", "reset_tongue", "retry_tongue_step", "configure", "reset_calibration"}
         if name not in allowed:
             raise ValueError("Unsupported calibration command")
         with self.lock:
@@ -85,6 +85,17 @@ class MouseSession:
                 self.profile_label = "Modified calibration — save profile to keep it"
                 self.profile_binding = None
             return result
+
+    def set_pointer_source(self, source):
+        if source not in ("tongue", "gaze"):
+            raise ValueError("Choose tongue or pupil direction")
+        with self.lock:
+            self.lab.disconnect("Pointer source changed; start preview again when ready")
+            config = self.lab.state()["config"]
+            config["pointer_source"] = source
+            self.lab.settings({"config": config})
+            self.profile_label = "Modified pointer source — save profile to keep it"
+            self.profile_binding = None
 
     def detector_state(self):
         with self.lock:
@@ -264,8 +275,10 @@ class MouseSession:
                 core = self.detector_runtime.workbench
                 if changed_source:
                     core.reset_calibration()
+                    core.tongue_model = None
                 core.disconnect("Source starting; calibration retained. Waiting for the face.")
                 core.validation.clear()
+                core.pupil_ready = False
                 self.detector_runtime.preview = None
                 self.detector_runtime.preview_due = 0
                 self.detector_runtime.previous_timestamp = None
@@ -329,6 +342,13 @@ class MouseSession:
         from Vision.capture import OpenCVCamera
         from Vision.landmarks import MediaPipeDetector
         self.ensure_detector_runtime()
+        from Vision.tongue_segment import SegmentedTongueModel
+        with self.lock:
+            core = self.detector_runtime.workbench
+            if not isinstance(core.tongue_model, SegmentedTongueModel):
+                core.tongue_model = SegmentedTongueModel()
+                core.tongue_range = None
+                core.validation.clear()
         index = 0
         with MediaPipeDetector(model, include_pose=True, include_expressions=True) as detector, OpenCVCamera(camera_id, fps=fps, clock=self.clock) as camera:
             while not self.stop_event.is_set() and (count is None or index < count):

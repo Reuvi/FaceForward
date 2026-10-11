@@ -38,9 +38,11 @@ class LabRuntime:
             kind = "synthetic" if demo else "camera"
             if self.source_kind is not None and self.source_kind != kind:
                 self.workbench.reset_calibration()
+                self.workbench.tongue_model = None
             self.source_kind = kind
             self.workbench.disconnect("Starting source; calibration retained. Waiting for the face.")
             self.workbench.validation.clear()
+            self.workbench.pupil_ready = False
             self.preview = None
             self.timing = {}
             self.preview_due = 0
@@ -55,6 +57,10 @@ class LabRuntime:
                 if demo:
                     session = CaptureSession()
                 else:
+                    from .tongue_segment import SegmentedTongueModel
+                    if not isinstance(self.workbench.tongue_model, SegmentedTongueModel):
+                        self.workbench.tongue_model = SegmentedTongueModel()
+                        self.workbench.tongue_range = None
                     detector = stack.enter_context(MediaPipeDetector(model, include_pose=True, include_expressions=True))
                     camera = stack.enter_context(OpenCVCamera(camera_id, fps=fps))
                 self.previous_timestamp = None
@@ -118,6 +124,9 @@ class LabRuntime:
                 state=movement.state(self.clock())
                 if movement.kind=="head":
                     controls["head"]={"neutral":.5,"up":.2,"down":.8}[state["name"]]
+                elif movement.kind == "pupil":
+                    x,y=dict(center=(.5,.5),left=(0,.5),right=(1,.5),up=(.5,0),down=(.5,1))[state["name"]]
+                    controls.update(pupil_x=x,pupil_y=y,left_closed=False,right_closed=False,left_ratio=.25,right_ratio=.25)
                 else:
                     controls["tongue"]=state["name"]!="absent"
                     x,y={"absent":(.5,.5),"center":(.5,.5),"left":(.3,.5),
@@ -156,7 +165,7 @@ class LabRuntime:
             b = (int((box.x+box.width)*w), int((box.y+box.height)*h))
             cv2.rectangle(image, a, b, color, 2)
             cv2.putText(image, face["subject_id"], (a[0], max(15,a[1]-5)), cv2.FONT_HERSHEY_SIMPLEX, .45, color, 1)
-            for index in (13, 14, 61, 291, 168, 263, 362, 133, 33):
+            for index in (13, 14, 61, 291, 168, 263, 362, 133, 33, 469, 470, 471, 472, 474, 475, 476, 477):
                 if index < len(obs.points):
                     cv2.circle(image, tuple(round(v) for v in obs.points[index]), 2, color, -1)
         core = self.workbench
@@ -198,7 +207,8 @@ class LabRuntime:
                       "head_y", "tongue_x", "tongue_y", "left_wink_bit", "right_wink_bit"}
             needed.update(side+"_"+key for side in ("left","right")
                           for key in ("blink","squint","cheek","brow","wink_score"))
-            needed.update(("tongue_tip_x","tongue_tip_y"))
+            needed.update(("tongue_tip_x","tongue_tip_y","pupil_raw_x","pupil_raw_y","gaze_x","gaze_y"))
+            needed.update(side+"_pupil_"+axis for side in ("left","right") for axis in ("x","y"))
             cutoff = self.workbench.trace[-1]["timestamp_ms"]-8000 if self.workbench.trace else 0
             scope_subject = state.get("scope_subject", state["selected"])
             for row in reversed(self.workbench.trace):

@@ -12,7 +12,7 @@ from .tracking import Box
 
 def demo_image(*, left_closed=False, right_closed=False, head=0.5,
                tongue=False, tongue_x=0.5, tongue_y=0.5, left_ratio=None, right_ratio=None,
-               natural_blink=False):
+               natural_blink=False, pupil_x=.5, pupil_y=.5):
     """Anatomical right is image-left. Head value shifts Y and supplies a fake pitch."""
     offset = (head - 0.5) * 80
     if natural_blink:left_closed=right_closed=True
@@ -32,8 +32,9 @@ def demo_image(*, left_closed=False, right_closed=False, head=0.5,
         for index, (a, b) in enumerate(pairs):
             x = cx + (index - 1) * 12
             points[a], points[b] = (x, cy-gap/2), (x, cy+gap/2)
-        for i in iris:
-            points[i] = (cx, cy)
+        for j, i in enumerate(iris):
+            angle = j*math.pi/2
+            points[i] = (cx-(pupil_x-.5)*24+5*math.cos(angle), cy+(pupil_y-.5)*12+5*math.sin(angle))
         cv2.ellipse(bgr, (cx, int(cy)), (30, max(1, int(gap/2))), 0, 0, 360, (45, 45, 45), -1)
         if not closed:
             cv2.circle(bgr, (cx, int(cy)), 5, (160, 90, 50), -1)

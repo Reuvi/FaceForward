@@ -21,6 +21,9 @@ Vision/.venv/bin/python -m App --source camera --model Vision/.local/face_landma
 ```
 
 Follow [the unified workflow and saved-profile guide](App/README.md).
+The [new tongue + pupil joystick guide](docs/TONGUE_PUPIL_TESTING.md) covers local
+neural tongue masks (no color clicking), full-screen pupil calibration, the input
+selector, saved ranges and live testing. [Install the optional local tongue model](Vision/TONGUE_MODEL_NOTICE.md) once; camera runtime stays offline.
 The [head/tongue calibration guide](docs/MOVEMENT_CALIBRATION_GUIDE.md) covers guided
 position fitting, raw graphs on camera setup, shared readings and saved profiles.
 The [tongue-tip testing guide](docs/TONGUE_TIP_TESTING.md) explains the visible

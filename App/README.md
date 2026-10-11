@@ -1,5 +1,11 @@
 # One native lab: detection calibration + mouse processing
 
+Current update: [tongue segmentation + pupil joystick testing](../docs/TONGUE_PUPIL_TESTING.md).
+Camera tongue uses local neural masks; pupils have a full-screen range guide.
+Choose **Pointer joystick input** on the source tab. Detector preset v6 stores
+these fits; combined profile v3 is unchanged. Head pitch remains unchanged.
+
+
 Run **one `App` window** for the complete testing workflow. The original Processing
 lab now contains **Detection calibration** as another tab. One camera/inference
 worker supplies the calibrated measurements to both the detector view and the

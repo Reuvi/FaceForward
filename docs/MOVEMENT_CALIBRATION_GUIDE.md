@@ -1,5 +1,13 @@
 # Head and tongue calibration, raw views, and the device boundary
 
+**Current camera update:** tongue uses local neural segmentation without background
+capture or tissue clicks. A pupil-direction joystick and full-screen range guide
+are also available. Follow [the tongue/pupil test guide](TONGUE_PUPIL_TESTING.md)
+for current camera instructions, profile v6, model setup and limitations. Color
+appearance instructions below now apply only to the legacy developer/synthetic
+backend. Head pitch and the visible-boundary tip definition remain unchanged.
+
+
 Use the same local Python/Tk App. **Vision source & raw signals** is the camera
 setup tab. It now defaults to raw measurements and shows raw graphs before any
 personal position calibration. **Detection calibration** uses that same capture

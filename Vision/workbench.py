@@ -7,6 +7,7 @@ from .features import DetectionConfig, analyze_features
 from .wink_guide import EyeCalibrationFlow
 from .movement_guide import MovementGuide
 from .wink_model import NAMES, measure as measure_winks, score as wink_score, classify as classify_wink
+from .pupil import PupilReading, measure as measure_pupils, pose_supported, MEASUREMENT as PUPIL_MEASUREMENT
 from .pipeline import VisionPipeline
 from .signals import SINGLE_SUBJECT, invalid, make_face, measurement, monotonic_ms
 from .tongue import TONGUE_MEASUREMENT, TongueModel, TongueResult, mouth_crop, sample_colors
@@ -50,6 +51,9 @@ class DetectorWorkbench:
         self.wink_vectors = {}
         self.wink_readings = {}
         self.head = None
+        self.pupil_range = self.pupil_pose = None
+        self.pupil_ready = False
+        self.pupil = PupilReading()
         self.tongue_range = None
         self.positives, self.negatives = [], []
         self.tongue_marks = []
@@ -66,6 +70,9 @@ class DetectorWorkbench:
         self.winks.clear()
         self.wink_readings.clear()
         self.head = None
+        self.pupil_range = self.pupil_pose = None
+        self.pupil_ready = False
+        self.pupil = PupilReading()
         self.tongue_range = None
         self.job = None
         self.eye_guide = None
@@ -90,6 +97,7 @@ class DetectorWorkbench:
         self.selected = None
         self.observations = {}
         self.features = {}
+        self.pupil = PupilReading()
         self.wink_vectors = {}
         self.wink_readings = {}
         self.reasons = {}
@@ -101,7 +109,9 @@ class DetectorWorkbench:
                     left=dict(value=None,known=False,state="unknown"),right=dict(value=None,known=False,state="unknown"))
 
     def reset_calibration(self):
+        segment = self.tongue_model if hasattr(self.tongue_model, "measurement") else None
         self._clear_calibration()
+        self.tongue_model = segment
         self.disconnect("Calibration cleared; calibrate or load a saved profile")
 
     def expire(self):
@@ -135,16 +145,23 @@ class DetectorWorkbench:
         return encode_preset(self)
 
     def load_calibration(self, data):
-        from .presets import decode_preset, decode_winks, decode_tongue_range
+        from .presets import decode_preset, decode_winks, decode_tongue_range, decode_pupil
         self._require_idle()
         config, eyes, head, tongue = decode_preset(data)
         winks = decode_winks(data)
         tongue_range = decode_tongue_range(data, config)
+        pupil_range, pupil_pose = decode_pupil(data, config)
+        active_segment = self.tongue_model if hasattr(self.tongue_model, "measurement") else None
+        if active_segment is not None and not hasattr(tongue, "measurement"):
+            tongue, tongue_range = active_segment, None
+        elif active_segment is not None and hasattr(tongue, "measurement"):
+            tongue.path = active_segment.path
         self.expire()
         self._clear_calibration()
-        self._invalidate("left_eye_open", "right_eye_open", "head_y", "tongue_x", "tongue_y")
+        self._invalidate("left_eye_open", "right_eye_open", "head_y", "tongue_x", "tongue_y", "gaze_x", "gaze_y")
         self.config, self.eyes, self.head, self.tongue_model = config, eyes, head, tongue
         self.winks = winks
+        self.pupil_range, self.pupil_pose = pupil_range, pupil_pose
         self.tongue_range = tongue_range
         self.pipeline.tracker.max_gap_ms = config.stale_ms
         self.notice = "Profile loaded. Check live readings; output remains stopped."
@@ -152,6 +169,10 @@ class DetectorWorkbench:
             self.notice += " Old image-position head fit removed; run the head pitch guide. Other compatible fits retained."
         if data["version"]<5 and data.get("tongue") is not None:
             self.notice += " Old centroid tongue calibration removed; repeat appearance and tip range. Compatible eyes/pitch retained."
+        if pupil_range is not None:
+            self.notice += " Recheck saved pupil range."
+        if active_segment is not None and data.get("tongue_measurement") != active_segment.measurement:
+            self.notice += " Color tongue range removed; segmentation needs its own position guide."
         if tongue is not None:
             self.notice += (" Recheck saved tongue range." if tongue_range else
                             " Run tongue position guide to learn a personal range.")
@@ -266,20 +287,29 @@ class DetectorWorkbench:
     def start_movement_guide(self, kind, recheck=False):
         self._require_subject()
         self._require_idle()
-        if kind not in ("head","tongue") or type(recheck) is not bool:
-            raise ValueError("Choose head or tongue calibration")
-        if recheck and (kind!="tongue" or self.tongue_range is None):
-            raise ValueError("A saved tongue range is required for rechecking")
+        if kind not in ("head","tongue","pupil") or type(recheck) is not bool:
+            raise ValueError("Choose head, tongue or pupil calibration")
+        saved = self.pupil_range if kind == "pupil" else self.tongue_range if kind == "tongue" else None
+        if recheck and saved is None:
+            raise ValueError("A saved range is required for rechecking")
         if kind=="tongue" and self.tongue_model is None:
             raise ValueError("Train tongue appearance first: empty mouth, freeze/mark tongue, fit")
-        if kind=="head":
+        if kind == "pupil":
+            if self.pupil.xy is None or self.pupil.pose is None:
+                raise ValueError("Both open pupils and head pose must be visible before calibration")
+            if not recheck:
+                self.pupil_range = None
+                self.pupil_pose = self.pupil.pose
+            self.pupil_ready = False
+            self._invalidate("gaze_x", "gaze_y")
+        elif kind=="head":
             self.head=None
             self._invalidate("head_y")
         else:
             if not recheck:self.tongue_range=None
             self.validation.clear()
             self._invalidate("tongue_x","tongue_y")
-        self.movement_guide=MovementGuide(kind,self.config,existing=self.tongue_range if recheck else None)
+        self.movement_guide=MovementGuide(kind,self.config,existing=saved if recheck else None)
         self.generation+=1
         self.notice=f"Guided {kind}: follow the target at comfortable limits"
 
@@ -294,11 +324,11 @@ class DetectorWorkbench:
         self._require_subject()
         self._require_idle()
         guide = self.movement_guide
-        if guide is None or guide.kind != "tongue" or guide.passed:
-            raise ValueError("There is no failed tongue pose to retry")
+        if guide is None or guide.kind not in ("tongue", "pupil") or guide.passed:
+            raise ValueError("There is no failed tongue/pupil pose to retry")
         guide.retry()
         self.generation += 1
-        self.notice = "Retry this tongue pose. Get comfortable, then press I'm in position — capture."
+        self.notice = f"Retry this {guide.kind} pose. Get comfortable, then press I'm in position — capture."
 
     def _guide_movement(self, timestamp):
         guide=self.movement_guide
@@ -306,22 +336,47 @@ class DetectorWorkbench:
         if guide.kind=="head":
             feature=self.features["head"]
             guide.feed(timestamp,(feature.value,),feature.quality>0)
+        elif guide.kind == "pupil":
+            guide.feed(timestamp, self.pupil.xy, self.pupil.xy is not None and pose_supported(self.pupil.pose, self.pupil_pose))
         else:
             value=self.tongue.xy
             if guide.steps[guide.index][0]=="absence":
                 value=(1,) if self.tongue.candidate_present else None
-            guide.feed(timestamp,value,self.crop is not None and self.features["face"].quality>0)
+            guide.feed(timestamp,value,self.crop is not None and self.features["face"].quality>0
+                       and not (self.tongue_model and self.tongue_model.report.get("error")))
         if not guide.active:
             self.notice=guide.report
             if guide.passed:
                 if guide.kind=="head":
                     self.head=guide.fits["y"]
+                elif guide.kind == "pupil":
+                    self.pupil_range = dict(guide.fits)
+                    self.pupil_ready = True
                 else:
                     self.tongue_range=dict(guide.fits)
                     count=sum(v["samples"] for v in guide.checks.values())
                     rate=sum(v["samples"]*v["detected_fraction"] for v in guide.checks.values())/count
                     self.validation={"validate_absent":guide.absence,
                                      "validate_visible":{"passed":True,"detected_fraction":rate,"samples":count}}
+
+    def load_tongue_model(self, path):
+        from .tongue_segment import SegmentedTongueModel
+        self._require_idle()
+        model = SegmentedTongueModel(path)
+        model.verify_file()
+        self.reset_tongue()
+        self.tongue_model = model
+        self.notice = "Local tongue segmentation ready. Inspect its mask, then start the position guide."
+
+    def reset_pupil(self):
+        if self.movement_guide and self.movement_guide.kind == "pupil":
+            self.movement_guide = None
+        self._require_idle()
+        self.pupil_range = self.pupil_pose = None
+        self.pupil_ready = False
+        self._invalidate("gaze_x", "gaze_y")
+        self.generation += 1
+        self.notice = "Pupil calibration cleared; eyes, head and tongue retained."
 
     def _require_idle(self):
         if self.calibrating:
@@ -374,6 +429,7 @@ class DetectorWorkbench:
         self.notice = "Appearance model fitted. Inspect the mask, then start tongue position guide."
 
     def reset_tongue(self):
+        segment = self.tongue_model if hasattr(self.tongue_model, "measurement") else None
         # Reset must work during this channel's collection, including failed or
         # paused guides, without cancelling unrelated eye/head work.
         if self.job and self.job.target in ("tongue_absent", "validate_absent", "validate_visible"):
@@ -385,7 +441,8 @@ class DetectorWorkbench:
         self.job = None
         self.positives, self.negatives = [], []
         self.tongue_marks = []
-        self.tongue_model = None
+        self.tongue_model = segment
+        if segment is not None: segment.reset_tracking()
         self.tongue_range = None
         self.validation.clear()
         self.frozen_crop = None
@@ -393,7 +450,8 @@ class DetectorWorkbench:
                         if key not in ("tongue_absent", "validate_absent", "validate_visible")}
         self.tongue = TongueResult()
         self.generation += 1
-        self.notice = "Tongue reset. Start at 1: open your mouth with tongue hidden, then capture background."
+        self.notice = ("Tongue range cleared; local segmentation retained. Inspect the mask, then start position guide." if segment else
+                       "Tongue reset. Start at 1: open your mouth with tongue hidden, then capture background.")
         self.reasons["tongue"] = "Tongue model uncalibrated"
 
     def _finish_collection(self):
@@ -487,6 +545,7 @@ class DetectorWorkbench:
         if previous_session is not None and previous_session != self.session:
             self.disconnect("Source restarted; calibration retained")
             self.validation.clear()
+            self.pupil_ready = False
         elif previous_timestamp is not None and frame["timestamp_ms"] - previous_timestamp > self.config.stale_ms:
             self.disconnect("Capture gap; unfinished capture cancelled, completed calibration retained")
         if not 0 <= self.clock() - frame["timestamp_ms"] <= self.config.stale_ms:
@@ -500,15 +559,19 @@ class DetectorWorkbench:
             self.selected = SINGLE_SUBJECT
             self.observations = current_observations
         self.features = {}
+        self.pupil = PupilReading()
         self.wink_vectors = {}
         self.wink_readings = {}
         self.crop = None
         self.tongue = TongueResult()
+        if hasattr(self.tongue_model, "measurement"):
+            self.tongue_model.report.update(confidence=None, inference_ms=None)
         self.reasons = {}
         if self.selected:
             observation = self.observations[self.selected]
             self.features = analyze_features(captured.bgr, observation, self.config)
             self.wink_vectors = measure_winks(observation,self.features)
+            self.pupil = measure_pupils(observation, self.features, self.eyes)
             self.crop, mouth_reason = mouth_crop(captured.bgr, observation, self.config)
             if self.crop is not None and self.features["face"].quality > 0 and self.tongue_model is not None:
                 self.tongue = self.tongue_model.detect(self.crop, self.config, timestamp_ms=frame["timestamp_ms"])
@@ -551,6 +614,19 @@ class DetectorWorkbench:
                 value = self.head.normalize(feature.value)
                 values["head_y"] = measurement(value, feature.quality)
                 self.reasons["head"] = "Calibrated head Y" if value is not None else "Outside calibrated head range"
+            self.reasons["pupil"] = self.pupil.reason
+            if self.pupil.xy is not None:
+                if self.pupil_range and self.pupil_ready and pose_supported(self.pupil.pose, self.pupil_pose):
+                    xy = [self.pupil_range[k].normalize(v) for k, v in zip(("x", "y"), self.pupil.xy)]
+                    if all(v is not None for v in xy):
+                        values["gaze_x"], values["gaze_y"] = [measurement(v, self.pupil.quality) for v in xy]
+                        self.reasons["pupil"] = "Calibrated pupil joystick direction"
+                    else:
+                        self.reasons["pupil"] = "Outside calibrated pupil range"
+                elif not self.pupil_range or not self.pupil_ready:
+                    self.reasons["pupil"] = "Run pupil guide" if not self.pupil_range else "Recheck saved pupil range"
+                else:
+                    self.reasons["pupil"] = "Head turned outside pupil calibration; return toward your calibration pose"
             passed = all(self.validation.get(name, {}).get("passed", False) for name in ("validate_absent", "validate_visible"))
             self.reasons["tongue"] = self.tongue.reason
             if self.tongue.xy is not None:
@@ -569,7 +645,8 @@ class DetectorWorkbench:
                               for face in frame["faces"]]
         frame["diagnostic_only"] = True
         frame["position_space"] = "personal_tongue_tip_v1"
-        frame["tongue_measurement"] = TONGUE_MEASUREMENT
+        frame["tongue_measurement"] = getattr(self.tongue_model, "measurement", TONGUE_MEASUREMENT)
+        frame["gaze_measurement"] = PUPIL_MEASUREMENT
         intent = dict(format="eye_intent_v1",subject_id=SINGLE_SUBJECT,
                       **{key:frame[key] for key in ("session_id","sequence","timestamp_ms")})
         signals = frame["faces"][0]["signals"] if frame["faces"] else {}
@@ -593,7 +670,7 @@ class DetectorWorkbench:
         frame = self.frame
         signals = next((f["signals"] for f in frame["faces"] if f["subject_id"] == self.selected), {})
         row = {"session_id": frame["session_id"], "sequence": frame["sequence"], "timestamp_ms": frame["timestamp_ms"],
-               "position_space": frame["position_space"], "tongue_measurement": TONGUE_MEASUREMENT,
+               "position_space": frame["position_space"], "tongue_measurement": frame["tongue_measurement"],
                "tongue_raw_units": "mouth_widths",
                "tongue_tip_x": self.tongue.xy[0] if self.tongue.xy else None,
                "tongue_tip_y": self.tongue.xy[1] if self.tongue.xy else None,
@@ -609,6 +686,15 @@ class DetectorWorkbench:
                "tongue_candidate_x": self.tongue.xy[0] if self.tongue.xy else None,
                "tongue_candidate_y": self.tongue.xy[1] if self.tongue.xy else None,
                "tongue_area_fraction": self.tongue.area_fraction, "tongue_quality": self.tongue.quality}
+        row.update(pupil_raw_x=self.pupil.xy[0] if self.pupil.xy else None,
+                   pupil_raw_y=self.pupil.xy[1] if self.pupil.xy else None,
+                   pupil_reason=self.reasons.get("pupil", self.pupil.reason),
+                   tongue_inference_ms=(self.tongue_model.report.get("inference_ms") if self.tongue_model else None),
+                   tongue_model_confidence=(self.tongue_model.report.get("confidence") if self.tongue_model else None))
+        for side in ("left", "right"):
+            eye = self.pupil.eyes.get(side, {})
+            for axis, index in (("x", 0), ("y", 1)):
+                row[side+"_pupil_"+axis] = eye["xy"][index] if eye.get("xy") else None
         for side in ("left", "right", "head"):
             feature = self.features.get(side)
             row[side + "_raw"] = feature.value if feature else None
@@ -616,7 +702,7 @@ class DetectorWorkbench:
             row[side + "_reason"] = self.reasons.get(side, "No selected subject")
             for key in ("brightness", "focus", "clipped_fraction"):
                 row[side + "_" + key] = feature.metrics.get(key) if feature else None
-        for key in ("left_eye_open", "right_eye_open", "head_y", "tongue_x", "tongue_y"):
+        for key in ("left_eye_open", "right_eye_open", "head_y", "tongue_x", "tongue_y", "gaze_x", "gaze_y"):
             item = signals.get(key, {})
             row[key] = item.get("value")
             row[key + "_valid"] = item.get("valid", False)
@@ -642,6 +728,9 @@ class DetectorWorkbench:
         self.expire()
         return {"frame": self.frame, "selected": self.selected, "notice": self.notice,
                 "scope_subject": SINGLE_SUBJECT,
+                "pupil": asdict(self.pupil), "pupil_ready": self.pupil_ready,
+                "pupil_range": {k:asdict(v) for k,v in self.pupil_range.items()} if self.pupil_range else None,
+                "tongue_backend": "segmentation" if hasattr(self.tongue_model, "measurement") else "color",
                 "wink_readings": dict(self.wink_readings),
                 "wink_models": {side:model["report"] for side,model in self.winks.items()},
                 "features": {k: asdict(v) for k, v in self.features.items()}, "reasons": dict(self.reasons),

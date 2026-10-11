@@ -1,37 +1,65 @@
 """Step-by-step native tongue appearance setup; no image processing here."""
 
 import tkinter as tk
-from tkinter import ttk
+from tkinter import filedialog, ttk
 
 
 class TongueSetupPanel:
     def __init__(self, parent, call):
+        self.neural = ttk.Frame(parent)
+        ttk.Label(self.neural, text="Local tongue segmentation — no color sampling", font=("Arial",12,"bold"), wraplength=420).pack(anchor="w")
+        ttk.Label(self.neural, text="1  Open your mouth and show the front of your tongue past the lip.\n2  Check green follows tongue tissue and cyan follows the front-edge midpoint.\n3  Start the position guide above: hide tongue first, then center / left / right / up / down.\nNo background capture or clicking is needed.", wraplength=420, justify="left").pack(anchor="w", pady=5)
+        self.backend_status = tk.StringVar()
+        ttk.Label(self.neural, textvariable=self.backend_status, wraplength=420).pack(anchor="w")
+        def choose():
+            path = filedialog.askopenfilename(parent=parent, title="Choose tongue_seg.onnx", filetypes=[("ONNX model", "*.onnx")])
+            if path: call("load_tongue_model", path)
+        self.load_model = ttk.Button(parent, text="Load local tongue segmentation model…", command=choose)
+        self.load_model.pack(fill="x", pady=4)
+        self.legacy_top = ttk.Frame(parent)
+        self.legacy_top.pack(fill="x")
+        self.legacy_bottom = ttk.Frame(parent)
         self.hint = tk.StringVar()
-        ttk.Label(parent, textvariable=self.hint, wraplength=420, justify="left",
+        ttk.Label(self.legacy_top, textvariable=self.hint, wraplength=420, justify="left",
                   font=("Arial", 12, "bold")).pack(fill="x", pady=8)
-        self.background = ttk.Button(parent, text="1  Capture background — tongue hidden",
+        self.background = ttk.Button(self.legacy_top, text="1  Capture background — tongue hidden",
                                      command=lambda: call("collect", "tongue_absent"))
         self.background.pack(fill="x", pady=3)
-        ttk.Label(parent, text="Open your mouth, keep your tongue behind your teeth. Hold until capture finishes.",
+        ttk.Label(self.legacy_top, text="Open your mouth, keep your tongue behind your teeth. Hold until capture finishes.",
                   wraplength=420).pack(anchor="w")
-        self.freeze = ttk.Button(parent, text="2  Freeze / retake tongue photo", command=lambda: call("freeze_mouth"))
+        self.freeze = ttk.Button(self.legacy_top, text="2  Freeze / retake tongue photo", command=lambda: call("freeze_mouth"))
         self.freeze.pack(fill="x", pady=(10, 3))
-        ttk.Label(parent, text="Show your tongue past the lip so its front edge is visible. Freeze, then click inside tongue tissue below—not lips, gums, teeth or an edge.",
+        ttk.Label(self.legacy_top, text="Show your tongue past the lip so its front edge is visible. Freeze, then click inside tongue tissue below—not lips, gums, teeth or an edge.",
                   wraplength=420).pack(anchor="w")
         self.mouth = tk.Label(parent, bg="#14202c", fg="white", text="Open your mouth to see the crop")
         self.mouth.pack(pady=6)
-        self.clear = ttk.Button(parent, text="Clear tongue marks — keep background",
+        self.legacy_bottom.pack(fill="x")
+        self.clear = ttk.Button(self.legacy_bottom, text="Clear tongue marks — keep background",
                                 command=lambda: call("clear_tongue_marks"))
         self.clear.pack(fill="x", pady=3)
-        self.fit = ttk.Button(parent, text="3  Fit and inspect tongue color", command=lambda: call("fit_tongue"))
+        self.fit = ttk.Button(self.legacy_bottom, text="3  Fit and inspect tongue color", command=lambda: call("fit_tongue"))
         self.fit.pack(fill="x", pady=3)
-        ttk.Label(parent, text="Green should cover the tongue. Cyan marks its front-edge midpoint. Move slowly; if the mask follows lips or gums, reset and redo the background/marks. If there is no cyan tip, read the reason below and expose a clear front edge.",
+        ttk.Label(self.legacy_bottom, text="Green should cover the tongue. Cyan marks its front-edge midpoint. Move slowly; if the mask follows lips or gums, reset and redo the background/marks. If there is no cyan tip, read the reason below and expose a clear front edge.",
                   wraplength=420).pack(anchor="w", pady=6)
-        ttk.Label(parent, text="4  Use Start tongue position guide above. Hide the tongue for its first check, then show it at center and each comfortable direction. Every pose waits for I'm in position — capture. A failed pose can be retried alone.",
+        ttk.Label(self.legacy_bottom, text="4  Use Start tongue position guide above. Hide the tongue for its first check, then show it at center and each comfortable direction. Every pose waits for I'm in position — capture. A failed pose can be retried alone.",
                   wraplength=420).pack(anchor="w", pady=6)
 
     def update(self, state):
         busy = state["calibrating"]
+        self.load_model.configure(state="disabled" if busy else "normal")
+        if state.get("tongue_backend") == "segmentation":
+            self.legacy_top.pack_forget(); self.legacy_bottom.pack_forget()
+            self.neural.pack(fill="x", before=self.mouth)
+            report = state.get("tongue_fit") or {}
+            elapsed = report.get("inference_ms")
+            confidence = report.get("confidence")
+            self.backend_status.set((f"CPU inference: {elapsed:.1f} ms" if elapsed is not None else "Waiting for a clear mouth image") +
+                                    (f" · score {confidence:.2f}" if confidence is not None else "") +
+                                    ("\n"+report["error"] if report.get("error") else ""))
+            return
+        self.neural.pack_forget()
+        self.legacy_top.pack(fill="x", before=self.mouth)
+        self.legacy_bottom.pack(fill="x", after=self.mouth)
         visible = bool(state["selected"])
         colors = state["tongue_pixels"]
         background = colors["negative"] >= 100

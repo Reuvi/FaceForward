@@ -1,4 +1,9 @@
-# Experimental color-mask tongue tip
+# Tongue visible front-boundary tip
+
+Current camera backend is neural segmentation, superseding color-only setup
+below. See [JOYSTICK_DETECTION.md](JOYSTICK_DETECTION.md). Crop/tip geometry stays
+the same, but model identity/ranges are versioned separately. Legacy color remains
+for developer fixtures.
 
 Current calibration usability update: keep **Reset tongue** visible outside the
 scrolling setup controls. It cancels tongue collection/position guidance and clears

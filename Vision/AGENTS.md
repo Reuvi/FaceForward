@@ -62,3 +62,16 @@ with no natural-blink class, blink counts, or mandatory surrounding-muscle contr
 The tongue guide waits for the user to acknowledge each pose, supports retrying a
 failed pose, and has an always-visible reset that cancels only tongue work.
 Clear tongue marks preserves background samples; frozen overlays show actual marks.
+
+## Neural tongue and pupil joystick update
+
+Read Contracts/JOYSTICK_DETECTION.md (relative to repository root) and
+docs/TONGUE_PUPIL_TESTING.md. Camera tongue now uses pinned local ONNX masks with
+no color calibration; synthetic/developer fixtures retain the legacy color path.
+Pupil calibration produces eye-relative direction, not screen gaze; both eyes
+must be usable. Head pitch remains unchanged and known to work for the user.
+Detector v6 stores neural model identity/pupil range/head reference; v1–v5 remain
+readable. Tongue and pupil loaded/restarted ranges require fresh checks. Keep all
+sources in the same worker/trace, no runtime downloads, no stale mask reuse, and
+no fallback from neural detection to color. Pointer source is explicitly chosen
+in App and changing it stops preview. See Vision/TONGUE_MODEL_NOTICE.md for license.

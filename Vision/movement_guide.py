@@ -14,11 +14,11 @@ TONGUE_TARGETS = (
 )
 
 
-def validate_range(value, config, *, bounds=(-.8, .8)):
+def validate_range(value, config, *, bounds=(-.8, .8), separation=None, label="Tongue"):
     if value is None:
         return None
     if not isinstance(value, dict) or set(value) != {"x", "y"}:
-        raise ValueError("Tongue range needs x and y axis fits")
+        raise ValueError(f"{label} range needs x and y axis fits")
     result = {}
     for name, fields in value.items():
         if not isinstance(fields, dict) or set(fields) != {
@@ -27,23 +27,23 @@ def validate_range(value, config, *, bounds=(-.8, .8)):
             "high",
             "endpoint_tolerance",
         }:
-            raise ValueError("Invalid tongue range fields")
+            raise ValueError(f"Invalid {label.lower()} range fields")
         fit = AxisCalibration(**fields)
         if (
             not bounds[0] <= fit.low < fit.center < fit.high <= bounds[1]
             or min(fit.center - fit.low, fit.high - fit.center)
-            < config.tongue_position_separation
+            < (config.tongue_position_separation if separation is None else separation)
             or fit.endpoint_tolerance != config.endpoint_tolerance
         ):
-            raise ValueError("Tongue range is too small or does not match settings")
+            raise ValueError(f"{label} range is too small or does not match settings")
         result[name] = fit
     return result
 
 
 class MovementGuide:
     def __init__(self, kind, config, *, existing=None):
-        if kind not in ("head", "tongue"):
-            raise ValueError("Movement guide must be head or tongue")
+        if kind not in ("head", "tongue", "pupil"):
+            raise ValueError("Movement guide must be head, tongue or pupil")
         self.kind, self.config = kind, config
         targets = HEAD_TARGETS if kind == "head" else TONGUE_TARGETS
         self.steps = [("absence", "absent", None)] if kind == "tongue" else []
@@ -156,10 +156,12 @@ class MovementGuide:
                         [v[index] for v in self.groups[name]]
                         for name in (low, "center", high)
                     ),
-                    min_separation=c.tongue_position_separation,
+                    min_separation=.015 if self.kind == "pupil" else c.tongue_position_separation,
                 )
                 self.fits[key] = replace(fit, endpoint_tolerance=c.endpoint_tolerance)
-            validate_range({key: asdict(fit) for key, fit in self.fits.items()}, c)
+            validate_range({key: asdict(fit) for key, fit in self.fits.items()}, c,
+                           bounds=(-.5,.5) if self.kind == "pupil" else (-.8,.8),
+                           separation=.015 if self.kind == "pupil" else None, label=self.kind.title())
 
     def _finish(self):
         role, name, target = self.steps[self.index]
@@ -175,7 +177,7 @@ class MovementGuide:
                 rate = sum(usable) / len(usable)
                 if rate > 0.05:
                     raise ValueError(
-                        f"Absent check failed: candidate on {rate:.0%} of frames; recollect appearance"
+                        f"Absent check failed: candidate on {rate:.0%} of frames; inspect the live tongue mask before retrying"
                     )
                 self.absence = {
                     "passed": True,
@@ -263,6 +265,8 @@ class MovementGuide:
                 if name == "neutral"
                 else f"{movement} {name.upper()} to a comfortable limit"
             )
+        elif self.kind == "pupil":
+            instruction = f"Look {name.upper()} with your eyes, keeping your head comfortably still. Both eyes open; use comfortable directions, not forced extremes."
         else:
             instruction = (
                 "Show your tongue at its comfortable CENTER"

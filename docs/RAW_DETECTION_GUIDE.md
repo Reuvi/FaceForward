@@ -1,5 +1,13 @@
 # Raw detection status and where to test it
 
+**Current camera update:** tongue uses local neural segmentation without background
+capture or tissue clicks. A pupil-direction joystick and full-screen range guide
+are also available. Follow [the tongue/pupil test guide](TONGUE_PUPIL_TESTING.md)
+for current camera instructions, profile v6, model setup and limitations. Color
+appearance instructions below now apply only to the legacy developer/synthetic
+backend. Head pitch and the visible-boundary tip definition remain unchanged.
+
+
 Current head/tongue update: use the [movement calibration guide](MOVEMENT_CALIBRATION_GUIDE.md)
 for guided position fitting, raw graphs on camera setup and shared capture data.
 Detector presets are now v5 (combined profiles remain v3). The

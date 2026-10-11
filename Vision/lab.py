@@ -9,10 +9,11 @@ from tkinter import filedialog, messagebox, ttk
 import cv2
 
 from .eye_view import EyeGuidePanel
-from .movement_view import MovementPanel, draw_position, draw_raw_scopes, draw_calibrated_scope
+from .movement_view import MovementPanel, draw_position, draw_raw_scopes, draw_calibrated_scope, draw_pupil_scope
 from .eye_scope import draw_eye_scope, draw_feature_scope
 from .features import DetectionConfig
 from .tongue_view import TongueSetupPanel
+from .pupil_view import PupilPanel
 from .lab_runtime import LabRuntime
 
 
@@ -94,6 +95,12 @@ class DetectionLab:
         self.mouth=self.tongue_setup.mouth
         self.mouth.bind("<Button-1>",self.mark_tongue)
         ttk.Label(tongue,textvariable=self.tongue_details,justify="left",wraplength=420,font=("Menlo",10)).pack(anchor="w",pady=6)
+        self.pupil_tab=self.tab(tabs,"4 Pupils")
+        self.text(self.pupil_tab,"Use your pupil direction as a joystick. Center stops; farther left/right/up/down means more input. Both eyes must be open and visible. This is eye direction, not exact screen gaze.")
+        self.pupil_panel=PupilPanel(self.pupil_tab,root,self.call)
+        ttk.Button(self.pupil_tab,text="Reset pupil calibration",command=lambda:self.call("reset_pupil")).pack(fill="x",pady=4)
+        self.pupil_details=tk.StringVar()
+        ttk.Label(self.pupil_tab,textvariable=self.pupil_details,wraplength=440,justify="left").pack(anchor="w",pady=8)
         settings=self.tab(tabs,"Settings")
         self.text(settings,"Edit tunables below. Applying clears calibration; your face reconnects automatically. Saving stores these tunables only. Use Save active profile in the main App to save learned calibration. Head calibration always uses pitch.")
         ttk.Button(settings,text="Reset all calibration",command=lambda:self.call("reset_calibration")).pack(fill="x",pady=5)
@@ -219,18 +226,20 @@ class DetectionLab:
             state=self.runtime.snapshot()
             self.eye_panel.update(state)
         if hidden:
+            self.pupil_panel.close_window()
             if state.get("movement_guide") and state["movement_guide"]["active"]:
                 self.call("cancel")
             self.after_id=self.root.after(200,self.tick)
             return
         guide=state.get("movement_guide")
-        expected=self.head_tab if guide and guide["kind"]=="head" else self.tongue_tab
+        expected=({"head":self.head_tab,"tongue":self.tongue_tab,"pupil":self.pupil_tab}.get(guide["kind"]) if guide else None)
         if guide and guide["active"] and self.calibration_tabs.select()!=str(expected):
             self.call("cancel")
             state=self.runtime.snapshot()
         self.eye_panel.update(state)
         self.head_panel.update(state)
         self.tongue_panel.update(state)
+        self.pupil_panel.update(state)
         self.tongue_setup.update(state)
         tongue_busy = (state["collecting"] in ("tongue_absent", "validate_absent", "validate_visible")
                        or bool(state.get("movement_guide") and state["movement_guide"]["kind"] == "tongue" and state["movement_guide"]["active"]))
@@ -271,9 +280,12 @@ class DetectionLab:
         self.eye_details.set("\n".join(eye_lines))
         head=state["features"].get("head",{})
         self.head_details.set(f"Raw pitch: {self.fmt(head.get('value'))}°\nNormalized Y: {self.fmt(signals.get('head_y',{}).get('value'))}\nQuality: {head.get('quality',0):.2f}\n{state['reasons'].get('head','Waiting for face')}\n\nLearned references: " + (f"\nUp {state['head']['low']:.1f}° = 0\nNeutral {state['head']['center']:.1f}° = .5\nDown {state['head']['high']:.1f}° = 1" if state["head"] else "not calibrated"))
+        pupil=state.get("pupil",{})
+        self.pupil_details.set("Raw position (eye widths): "+str(pupil.get("xy"))+"\n"+state["reasons"].get("pupil",pupil.get("reason","Waiting"))+"\n"+
+            "\n".join(f"{side.title()}: {v.get('xy')} · {v.get('reason')}" for side,v in pupil.get("eyes",{}).items()))
         val=state["validation"]
         self.tongue_details.set(f"{'FROZEN — click tissue' if state['frozen'] else 'LIVE crop / green candidate mask'}\n{state['reasons'].get('tongue','Waiting for face')}\nRaw tip (mouth widths): {state['candidate']}\nPixels: {state['tongue_pixels']}\n" + "\n".join(f"{k}: {'PASS' if v['passed'] else 'FAIL'} ({v['detected_fraction']:.0%}, n={v['samples']})" for k,v in val.items()))
-        self.metrics.set("\n".join(f"{k:16} {self.fmt(signals.get(k,{}).get('value'))}   {'valid' if signals.get(k,{}).get('valid') else 'unavailable'}" for k in ("left_eye_open","right_eye_open","head_y","tongue_x","tongue_y")))
+        self.metrics.set("\n".join(f"{k:16} {self.fmt(signals.get(k,{}).get('value'))}   {'valid' if signals.get(k,{}).get('valid') else 'unavailable'}" for k in ("left_eye_open","right_eye_open","head_y","tongue_x","tongue_y","gaze_x","gaze_y")))
         if self.calibration_tabs.select()==str(self.eye_tab):
             draw_eye_scope(self.eye_scope,state)
             self.movement_scope_picker.pack_forget()
@@ -285,9 +297,10 @@ class DetectionLab:
         else:
             self.eye_scope_picker.pack_forget()
             self.movement_scope_picker.pack(fill="x",before=self.scope)
-            kind="tongue" if self.calibration_tabs.select()==str(self.tongue_tab) else "head"
+            kind="pupil" if self.calibration_tabs.select()==str(self.pupil_tab) else "tongue" if self.calibration_tabs.select()==str(self.tongue_tab) else "head"
             draw_position(self.eye_scope,state,kind)
             if self.movement_scope_mode.get()=="Calibrated positions":draw_calibrated_scope(self.scope,state)
+            elif kind=="pupil":draw_pupil_scope(self.scope,state)
             else:draw_raw_scopes(self.scope,state)
         self.after_id=self.root.after(100,self.tick)
 
@@ -298,6 +311,7 @@ class DetectionLab:
         self.eye_panel.close()
         self.head_panel.close()
         self.tongue_panel.close()
+        self.pupil_panel.close()
 
     def close(self):
         self.close_panels()

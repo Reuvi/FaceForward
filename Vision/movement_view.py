@@ -44,11 +44,12 @@ def draw_raw_scopes(canvas, state):
             .8,
         ),
     )
+    specs += (("Raw pupils · eye widths", (("pupil_raw_x", "X", "#55cfff"), ("pupil_raw_y", "Y", "#ff9cd5")), -.3, .3),)
     rows = state["trace"]
     start = (rows[-1]["timestamp_ms"] if rows else 0) - 8000
     for index, (title, series, low, high) in enumerate(specs):
-        x = index * width / 3
-        size = width / 3
+        x = index * width / len(specs)
+        size = width / len(specs)
         canvas.create_text(
             x + 8,
             5,
@@ -128,7 +129,7 @@ def display_point(state, keys):
             current = bool(
                 state["selected"] and row["sequence"] == frame.get("sequence")
             )
-            if current and keys[0] in ("head_y", "tongue_x"):
+            if current and keys[0] in ("head_y", "tongue_x", "gaze_x"):
                 signals = next(
                     (
                         face["signals"]
@@ -160,10 +161,11 @@ def draw_calibrated_scope(canvas, state):
             ("head_y", "Head Y", "#b18bff"),
             ("tongue_x", "Tongue X", "#75e3a8"),
             ("tongue_y", "Tongue Y", "#f2d66f"),
+            ("gaze_x", "Pupil X", "#55cfff"), ("gaze_y", "Pupil Y", "#ff9cd5"),
         )
     ):
         canvas.create_text(
-            8 + index * width / 3,
+            8 + index * width / 5,
             26,
             text=title,
             fill=color,
@@ -283,12 +285,12 @@ def draw_position(canvas, state, kind):
         for index, (keys, title, color) in enumerate(
             (
                 (
-                    ("tongue_tip_x", "tongue_tip_y"),
-                    "Raw tip · mouth widths",
+                    ("pupil_raw_x", "pupil_raw_y") if kind == "pupil" else ("tongue_tip_x", "tongue_tip_y"),
+                    "Raw pupils · eye widths" if kind == "pupil" else "Raw tip · mouth widths",
                     "#75e3a8",
                 ),
                 (
-                    ("tongue_x", "tongue_y"),
+                    ("gaze_x", "gaze_y") if kind == "pupil" else ("tongue_x", "tongue_y"),
                     "Personal position · center (.5, .5)",
                     "#6ed7fe",
                 ),
@@ -313,7 +315,7 @@ def draw_position(canvas, state, kind):
             canvas.create_text(
                 x0 + 3,
                 y0 + 3,
-                text="−.8,−.8 · left/up" if index==0 else "0,0 · left/up",
+                text=("−.5,−.5 · left/up" if kind == "pupil" else "−.8,−.8 · left/up") if index==0 else "0,0 · left/up",
                 fill="#adbbcc",
                 anchor="nw",
                 font=("Arial", 8),
@@ -321,14 +323,14 @@ def draw_position(canvas, state, kind):
             canvas.create_text(
                 x1 - 3,
                 y1 - 3,
-                text=".8,.8 · right/down" if index==0 else "1,1 · right/down",
+                text=(".5,.5 · right/down" if kind == "pupil" else ".8,.8 · right/down") if index==0 else "1,1 · right/down",
                 fill="#adbbcc",
                 anchor="se",
                 font=("Arial", 8),
             )
             def plot_value(value):
-                return (value+.8)/1.6 if index==0 else value
-            bounds = state.get("tongue_range")
+                return (value+.5 if kind == "pupil" else (value+.8)/1.6) if index==0 else value
+            bounds = state.get("pupil_range" if kind == "pupil" else "tongue_range")
             if index == 0 and bounds:
                 canvas.create_rectangle(
                     x0 + plot_value(bounds["x"]["low"]) * (x1 - x0),
@@ -401,22 +403,22 @@ class MovementPanel:
         row.pack(fill="x", pady=5)
         self.start = ttk.Button(
             row,
-            text="Start head pitch guide" if kind == "head" else "Start tongue position guide",
+            text="Start head pitch guide" if kind == "head" else f"Start {kind} position guide",
             command=lambda: call("start_movement_guide", kind),
         )
         self.start.pack(side="left")
         ttk.Button(row, text="Cancel", command=lambda: call("cancel")).pack(
             side="left", padx=5
         )
-        if kind == "tongue":
+        if kind in ("tongue", "pupil"):
             self.ready = ttk.Button(self.frame, text="I'm in position — capture", command=self.capture_pose)
             self.ready.pack(fill="x", pady=3)
             self.retry = ttk.Button(self.frame, text="Retry this pose", command=lambda: call("retry_tongue_step"))
             self.retry.pack(fill="x", pady=3)
             self.recheck = ttk.Button(
                 self.frame,
-                text="Recheck saved tongue range",
-                command=lambda: call("start_movement_guide", "tongue", True),
+                text=f"Recheck saved {kind} range",
+                command=lambda: call("start_movement_guide", kind, True),
             )
             self.recheck.pack(fill="x", pady=3)
 
@@ -427,13 +429,13 @@ class MovementPanel:
             if state["calibrating"] or self.kind == "tongue" and not state["tongue_fit"]
             else "normal"
         )
-        if self.kind == "tongue":
-            ours = guide and guide["kind"] == "tongue"
+        if self.kind in ("tongue", "pupil"):
+            ours = guide and guide["kind"] == self.kind
             self.ready.configure(state="normal" if ours and guide["active"] and guide["waiting"] and guide["phase"] == "prepare" else "disabled")
             self.retry.configure(state="normal" if ours and not guide["active"] and not guide["passed"] and not state["calibrating"] else "disabled")
             self.recheck.configure(
                 state="normal"
-                if state.get("tongue_range") and not state["calibrating"]
+                if state.get(self.kind+"_range") and not state["calibrating"]
                 else "disabled"
             )
         if not guide or guide["kind"] != self.kind:
@@ -441,6 +443,8 @@ class MovementPanel:
             self.instruction.set(
                 "Neutral → up → down, followed by new checks."
                 if self.kind == "head"
+                else "Follow the full-screen dot with your eyes; keep your head still. Press Space at each target to capture." if self.kind == "pupil"
+                else "Inspect the live segmentation mask below, then start this guide. Each pose waits for capture." if state.get("tongue_backend")=="segmentation"
                 else "First complete the numbered appearance steps below. Then start this guide. Each pose waits for I'm in position — capture."
             )
             self.progress.set(
@@ -471,19 +475,19 @@ class MovementPanel:
         )
         self.progress.set(
             "Get into the pose, then press I'm in position — capture. No samples recorded yet."
-            if self.kind == "tongue" and guide["active"] and guide["waiting"] and guide["phase"] == "prepare" else
+            if self.kind in ("tongue", "pupil") and guide["active"] and guide["waiting"] and guide["phase"] == "prepare" else
             f"{guide['phase'].upper()} · {guide['remaining_ms'] / 1000:.1f}s · {guide['samples']} usable / {guide['rejected']} unavailable"
             if guide["active"]
-            else "Retry this pose to keep earlier captures, or Reset tongue to start over."
-            if self.kind == "tongue" and not guide["passed"] else
+            else f"Retry this pose to keep earlier captures, or Reset {self.kind} to start over."
+            if self.kind in ("tongue", "pupil") and not guide["passed"] else
             "Raw and calibrated positions appear beside the camera. Output remains stopped."
         )
         if self.kind == "tongue" and guide["active"]:
-            hint = ("Tongue should be hidden · color candidate: " + ("YES" if state.get("candidate_present") else "no")
+            hint = ("Tongue should be hidden · candidate: " + ("YES" if state.get("candidate_present") else "no")
                     if guide["name"] == "absent" else "Live tip: " + state.get("tip_reason", "Waiting for camera"))
             self.progress.set(self.progress.get() + "\n" + hint)
         if (guide["active"] and guide["waiting"] and self.pending is None
-                and not (self.kind == "tongue" and guide["phase"] == "prepare")):
+                and not (self.kind in ("tongue", "pupil") and guide["phase"] == "prepare")):
             self.pending = self.root.after_idle(lambda: self.present(event))
 
     def capture_pose(self):
@@ -499,3 +503,22 @@ class MovementPanel:
         if self.pending is not None:
             self.root.after_cancel(self.pending)
         self.sounds.close()
+
+
+def draw_pupil_scope(canvas, state):
+    """Independent eye measurements from the same captured trace used by setup."""
+    canvas.delete("all")
+    w,h=max(360,canvas.winfo_width()),max(160,canvas.winfo_height())
+    rows=state["trace"];start=(rows[-1]["timestamp_ms"] if rows else 0)-8000
+    canvas.create_text(8,5,text="Raw pupils · each eye · eye-width units",fill="white",anchor="nw")
+    specs=(("left_pupil_x","Left X","#55cfff"),("left_pupil_y","Left Y","#c39aff"),
+           ("right_pupil_x","Right X","#ffa663"),("right_pupil_y","Right Y","#75e3a8"))
+    for index,(key,label,color) in enumerate(specs):
+        canvas.create_text(8+index*w/4,28,text=label,fill=color,anchor="nw")
+        for unknown,segment in trace_runs(scope_samples(rows,key,state["scope_subject"],state["generation"]),
+                                          max_gap=state["config"]["stale_ms"],start=start):
+            points=[]
+            for timestamp,value in segment:
+                points.extend((8+(timestamp-start)/8000*(w-16),h-24-(max(-.5,min(.5,value))+.5)*(h-76)))
+            canvas.create_line(*points,fill=darker(color) if unknown else color,width=2)
+    canvas.create_text(w-8,h-3,text="0 = eye-corner center · dark = unknown display hold",fill="#adbbcc",anchor="se")
