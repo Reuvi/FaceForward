@@ -14,18 +14,19 @@ Choose an input from the menu. Only controls used by that mapping appear:
 | Gaming pupils, velocity | Velocity curve, gain, smoothing, acceleration/braking, delay and quick-move boost/fade |
 | Gaming head keys | Each axis's press threshold, release threshold, smoothing and press confirmation time |
 | Mouse and scroll: Head Y | Scroll curve, smoothing, ramp/braking, delay and quick-move boost/fade |
-| Left/right eye actions (wink or plain closure) | Live independent ON/OFF and click-command state; one click per activation |
+| Left/right eye actions (wink or plain closure) | Live independent ON/OFF state; keys hold and mouse buttons click once per activation |
+| Mouth open | Live binary input/action; no calibration or response sliders |
 
-**Require calibrated wink for clicks** selects the eye source for this mapping.
+**Require calibrated wink for eye actions** selects the eye source for this mapping.
 Leave it checked for trained wink actions. Uncheck it for plain **open/closed**:
-left closure → left click, right closure → right click, immediately. Ordinary
-blinks also click. Only the Eye open/closed geometry guide is needed in this mode;
+each eye activates its assigned button immediately. In Mouse test, left eye → W
+and right eye → left click. Ordinary blinks also activate those assignments. Only the Eye open/closed geometry guide is needed in this mode;
 wink training and wink intent are ignored. Unknown releases that eye, and actual
 reopening re-arms it. Holding closed never repeats clicks. Changing the flag stops
 output; press Start again. Save as… and mapping export retain the choice.
 
 For Mouse test, **Center head & start** is available on Signals and in the editor.
-Hold a comfortable resting pose and open your eyes. The next fresh valid Head X/Y
+Hold a comfortable resting pose, open your eyes and close your mouth. The next fresh valid Head X/Y
 capture becomes your resting center, then output starts from a neutral command.
 This recovers a controller stuck waiting for the old center without weakening the
 precision dead zone. It uses the currently connected output mode. If the head is

@@ -15,7 +15,7 @@ from gaming_fixtures import frame
 class EyeModeTests(unittest.TestCase):
     def core(self, head=True):
         mapping = mouse_test_mapping() if head else Mapping()
-        core = (HeadMouseProcessor if head else GamingProcessor)(replace(mapping, require_wink=False), subject_id='person')
+        core = (HeadMouseProcessor if head else GamingProcessor)(replace(mapping, require_wink=False, button_bindings=('left_click','right_click','none')), subject_id='person')
         core.arm()
         return core
 
@@ -68,7 +68,7 @@ class EyeModeTests(unittest.TestCase):
     def test_plain_raw_input_uses_configured_polarity_without_timers(self):
         for polarity in (0, 1):
             mapping = mouse_test_mapping()
-            mapping = replace(mapping, require_wink=False, response=replace(mapping.response, closed_value=polarity))
+            mapping = replace(mapping, require_wink=False, button_bindings=('left_click','right_click','none'), response=replace(mapping.response, closed_value=polarity))
             core = HeadMouseProcessor(mapping, 'person');core.arm()
             for seq in (1, 2, 3):
                 data = dict(format='raw_mouse_v1', session_id='raw', subject_id='person', sequence=seq,
@@ -89,7 +89,7 @@ class EyeModeTests(unittest.TestCase):
     def test_mode_validation_migration_and_roundtrip(self):
         plain = replace(mouse_test_mapping(), require_wink=False)
         self.assertEqual(Mapping.from_dict(plain.to_dict()), plain)
-        old = plain.to_dict();old['format']='input_mapping_v6';del old['require_wink']
+        old = plain.to_dict();old['format']='input_mapping_v6';del old['require_wink'];del old['button_bindings']
         loaded = Mapping.from_dict(old)
         self.assertTrue(loaded.require_wink)
         self.assertEqual(loaded.response, plain.response)
@@ -204,7 +204,7 @@ class RecenterTests(unittest.TestCase):
             self.lab.set_eye_mode(True,mapping_id=before['mapping_id'],generation=before['generation'])
         self.assertFalse(self.lab.state()['mapping']['require_wink'])
         self.lab.action({'action':'arm'});self.feed()
-        self.assertEqual(self.feed(left='closed')['snapshot']['left_click'],1)
+        self.assertEqual(self.feed(left='closed')['snapshot']['keys']['w'],1)
 
     def test_profiles_copy_export_and_defaults_preserve_plain_choice(self):
         self.mode(False)
@@ -212,7 +212,7 @@ class RecenterTests(unittest.TestCase):
         self.lab.copy_mapping('Head closure clicks')
         state=self.lab.state()
         self.assertFalse(default_profile(state)['mapping']['require_wink'])
-        self.assertIn(('left','Left open/closed → left click'), channels(state))
+        self.assertIn(('left','Left open/closed → W'), channels(state))
         self.assertEqual(sliders(state,'left'),[])
         with tempfile.TemporaryDirectory() as directory:
             path=Path(directory)/'tuning.json';write_profile(path,profile(state,'Closure clicks'))

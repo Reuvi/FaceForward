@@ -26,7 +26,7 @@ def filter_for(state,channel):
 
 
 def steady_curves(state,channel):
-    if channel in ('left','right'):return {'ON/OFF':[(0,0),(1,1)]}
+    if channel in ('left','right','mouth'):return {'ON/OFF':[(0,0),(1,1)]}
     if channel.startswith('head_'):
         config=getattr(Mapping.from_dict(state['mapping']),channel)
         return {name:[(x/100,1 if 2*x/100-1>=threshold else 0 if 2*x/100-1<=-threshold else .5)
@@ -49,14 +49,14 @@ def steady_curves(state,channel):
 
 def response_preview(state,channel):
     """Synthetic outward turn, hold and return. Never feeds the live controller."""
-    if channel in ('left','right'):
-        eye=EyeGate(getattr(MouseConfig.from_dict(state['config']),channel+'_eye'))
+    if channel in ('left','right','mouth'):
+        eye=EyeGate(None if channel=='mouth' else getattr(MouseConfig.from_dict(state['config']),channel+'_eye'))
         raw=[];out=[]
         for t in range(0,2501,10):
             closed=200<=t<800
-            eye.sample(closed,t,appearance_intent=not legacy_eye_timing(state),reopened=not closed)
+            eye.sample(closed,t,instant=channel=='mouth',appearance_intent=not legacy_eye_timing(state),reopened=not closed)
             raw.append((t/1000,int(closed)));out.append((t/1000,int(eye.down)))
-        return {'Eye action':raw,'Command':out}
+        return {'Mouth open' if channel=='mouth' else 'Eye action':raw,'Command':out}
     head=channel.startswith('head_')
     if head:
         gates=[HeadGate(getattr(Mapping.from_dict(state['mapping']),channel))]
@@ -102,5 +102,10 @@ def live_values(state,channel):
     if channel.startswith('head_'):
         raw=diag[channel]['raw']
         return [('Key direction',raw,(diag[channel]['direction']+1)/2 if raw is not None else None)]
+    if 'button_actions' in diag:
+        action=diag['button_actions']['mouth' if channel=='mouth' else channel+'_eye']
+        raw=action['raw']
+        return [('Mouth open' if channel=='mouth' else 'Eye action',
+                 None if raw is None else int(raw),action['down'] if raw is not None else None)]
     raw=diag[channel+'_closed']
     return [('Eye action',None if raw is None else int(raw),snap[channel+'_click'] if raw is not None else None)]

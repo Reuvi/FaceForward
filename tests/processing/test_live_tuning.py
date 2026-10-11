@@ -44,7 +44,7 @@ class LiveTuningTests(unittest.TestCase):
         self.assertTrue(after['snapshot']['enabled'])
         self.assertEqual(after['message']['output_session_id'],before['message']['output_session_id'])
         self.assertEqual(after['message']['mapping_revision'],before['message']['mapping_revision'])
-        self.assertEqual(after['snapshot']['left_click'],1)
+        self.assertEqual(after['snapshot']['keys']['w'],1)
         self.assertEqual(after['tuning_revision'],before['tuning_revision']+1)
         for _ in range(30):snap=self.feed(head_x=.7,left='wink')
         self.assertGreater(snap['pointer_x'],before['snapshot']['pointer_x'])
@@ -132,7 +132,7 @@ class LiveTuningTests(unittest.TestCase):
 
     def test_channels_and_sliders_only_expose_connected_controls(self):
         state=self.lab.state()
-        self.assertEqual(set(dict(channels(state))),{'pointer','left','right'})
+        self.assertEqual(set(dict(channels(state))),{'pointer','left','right','mouth'})
         keys={s.key for s in sliders(state,'pointer')}
         self.assertIn('speed_gain',keys);self.assertNotIn('boost_gain',keys)
         self.assertEqual(sliders(state,'left'),[])

@@ -1,3 +1,5 @@
+**Current button layout:** read [Mouth buttons and relative movement](../Contracts/MOUTH_BUTTON_RELATIVE.md). Mouse test maps left eye → W, right eye → left click, mouth open → Space, and head X/Y → relative mouse movement. Mapping v8 preserves older imported assignments; mouth needs no calibration.
+
 # Drivers lane
 
 **Current screen pointer:** `../Contracts/SCREEN_POINTER.md` adopts the existing

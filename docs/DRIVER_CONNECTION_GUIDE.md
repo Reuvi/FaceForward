@@ -1,5 +1,9 @@
 # Run the connected mouse and keyboard driver
 
+Current Mouse test layout: left eye → W, right eye → left click, mouth open → Space,
+head X/Y → relative mouse movement. Mouth uses existing jaw-open evidence without
+calibration. Older imported mappings retain their assignments. See [current setup](MOUTH_BUTTON_GUIDE.md).
+
 The App now connects the current Vision → Processing pipeline to the driver's
 native macOS/Linux mouse and keyboard backend. It uses the driver merged from
 `driverTest` (`2e3e734`) with an additive synchronous submission API. Preview is

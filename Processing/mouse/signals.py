@@ -69,6 +69,7 @@ class Sample:
     pointer_sequence: object = None
     head_x: object = None
     instant_eyes: bool = False
+    mouth_open: object = None
 
     def __post_init__(self):
         for side in ("left", "right"):
@@ -100,7 +101,9 @@ def decode(frame, config, subject_id, *, ignore_eyes=False, raw_eyes=False):
                       one_hot_matrix(frame.get(config.pointer_source)),
                       one_hot_vector(frame.get("head_vertical")),
                       head_x=one_hot_vector(frame.get("head_horizontal")), instant_eyes=raw_eyes,
-                      left_reopened=eye("left_eye") is False, right_reopened=eye("right_eye") is False)
+                      left_reopened=eye("left_eye") is False, right_reopened=eye("right_eye") is False,
+                      mouth_open=(bool(frame["mouth_open"]) if finite(frame.get("mouth_open"))
+                                  and frame["mouth_open"] in (0, 1) else None))
 
     if type(frame.get("schema_version")) is not int or frame["schema_version"] != 1:
         raise ValueError("Expected raw_mouse_v1 or SignalFrame schema_version 1")
@@ -131,14 +134,15 @@ def decode(frame, config, subject_id, *, ignore_eyes=False, raw_eyes=False):
         return value == 0 if value in (0, 1) else None
 
     x, y = measurement(config.pointer_source + "_x"), measurement(config.pointer_source + "_y")
-    pointer_source = {}
+    mouth = measurement("mouth_open")
+    pointer_source = dict(mouth_open=bool(mouth) if mouth in (0, 1) else None)
     if config.pointer_source == "tongue" and "tongue_sample" in frame:
         origin = frame["tongue_sample"]
         valid = (isinstance(origin, dict) and origin.get("format") == "tongue_sample_v1"
                  and origin.get("session_id") == session and origin.get("subject_id") == subject_id
                  and type(origin.get("sequence")) is int and 0 <= origin["sequence"] <= sequence
                  and finite(origin.get("timestamp_ms")) and 0 <= origin["timestamp_ms"] <= timestamp)
-        pointer_source = dict(pointer_async=True,
+        pointer_source.update(pointer_async=True,
                               pointer_timestamp_ms=origin["timestamp_ms"] if valid else None,
                               pointer_sequence=origin["sequence"] if valid else None)
         if not valid:

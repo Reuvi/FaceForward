@@ -14,6 +14,7 @@ SIGNALS = (
     "gaze_x", "gaze_y", "tongue_x", "tongue_y",
     "left_eye_open", "right_eye_open", "head_x", "head_y",
 )
+OPTIONAL_SIGNALS = ("mouth_open",)
 
 
 def finite_number(value):
@@ -43,11 +44,12 @@ def measurement(value, confidence):
 def make_face(subject_id, measurements=None):
     """Include all eight signals; missing measurements are never neutralized."""
     measurements = {} if measurements is None else measurements
-    if set(measurements) - set(SIGNALS):
+    if set(measurements) - set(SIGNALS + OPTIONAL_SIGNALS):
         raise ValueError("unknown signal name")
     result = {
         "subject_id": subject_id,
-        "signals": {name: deepcopy(measurements.get(name, invalid())) for name in SIGNALS},
+        "signals": {name: deepcopy(measurements.get(name, invalid()))
+                    for name in SIGNALS + tuple(k for k in OPTIONAL_SIGNALS if k in measurements)},
     }
     _validate_face(result)
     return result
@@ -65,7 +67,7 @@ def _validate_face(face):
     signals = face.get("signals")
     if not isinstance(signals, dict) or not set(SIGNALS) <= signals.keys():
         raise ValueError("all eight signals are required")
-    for name in SIGNALS:
+    for name in SIGNALS + tuple(k for k in OPTIONAL_SIGNALS if k in signals):
         item = signals[name]
         if not isinstance(item, dict) or not {"value", "confidence", "valid"} <= item.keys():
             raise ValueError(f"incomplete measurement: {name}")
@@ -74,6 +76,8 @@ def _validate_face(face):
         if item["valid"]:
             if not unit_number(item["value"]):
                 raise ValueError(f"invalid measurement value: {name}")
+            if name == "mouth_open" and item["value"] not in (0, 1):
+                raise ValueError("mouth_open must be binary")
         elif item["value"] is not None or item["confidence"] != 0:
             raise ValueError(f"unavailable measurement must be null/0/false: {name}")
 

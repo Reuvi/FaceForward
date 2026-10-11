@@ -14,6 +14,14 @@ MOUSE_TEST_ID = "mouse-test"
 KEYS = ("w", "a", "s", "d", "space", "left_shift")
 DIRECTIONS = ("down", "up", "left", "right")
 DEFAULT_BINDINGS = ("w", "space", "left_shift", "s")
+BUTTON_INPUTS = ("left_eye", "right_eye", "mouth")
+BUTTON_OUTPUTS = KEYS + ("left_click", "right_click", "none")
+DEFAULT_BUTTON_BINDINGS = ("left_click", "right_click", "none")
+
+
+def action_label(action):
+    return {"left_click": "Left click", "right_click": "Right click",
+            "none": "Unassigned", "left_shift": "Left Shift"}.get(action, action.upper())
 
 
 @dataclass(frozen=True)
@@ -70,6 +78,7 @@ class Mapping:
     head_motion: HeadMotionConfig = field(default_factory=HeadMotionConfig)
     head_wink_clicks: bool = False
     require_wink: bool = True
+    button_bindings: tuple = DEFAULT_BUTTON_BINDINGS
 
     def __post_init__(self):
         if not isinstance(self.id, str) or not re.fullmatch(r"[a-z][a-z0-9-]{0,63}", self.id) or self.id == "mouse":
@@ -111,9 +120,12 @@ class Mapping:
             raise ValueError("Head wink clicks must be boolean")
         if self.head_wink_clicks and self.input_mode != "head-mouse":
             raise ValueError("Head wink click setting applies only to head mouse mappings")
+        if (type(self.button_bindings) is not tuple or len(self.button_bindings) != 3
+                or any(v not in BUTTON_OUTPUTS for v in self.button_bindings)):
+            raise ValueError("Button bindings must use supported keys, mouse buttons or none")
 
     def to_dict(self):
-        return {"format": "input_mapping_v7", "id": self.id, "name": self.name,
+        return {"format": "input_mapping_v8", "id": self.id, "name": self.name,
                 "revision": self.revision, "response": self.response.to_dict(),
                 "pointer_gain": self.pointer_gain, "head_x": asdict(self.head_x),
                 "head_y": asdict(self.head_y), "bindings": dict(zip(DIRECTIONS, self.bindings)),
@@ -123,33 +135,40 @@ class Mapping:
                 "target_smoothing_ms": self.target_smoothing_ms,
                 "target_interpolation_ms": self.target_interpolation_ms,
                 "head_motion": asdict(self.head_motion), "head_wink_clicks": self.head_wink_clicks,
-                "require_wink": self.require_wink}
+                "require_wink": self.require_wink,
+                "button_bindings": dict(zip(BUTTON_INPUTS, self.button_bindings))}
 
     @classmethod
     def from_dict(cls, data):
         fields = {"format", "id", "name", "revision", "response", "pointer_gain", "head_x", "head_y", "bindings"}
-        if not isinstance(data, dict):
-            raise ValueError("Expected an input_mapping_v1/v2/v3/v4/v5/v6/v7 file")
-        version = data.get("format")
-        if version in ("input_mapping_v2", "input_mapping_v3", "input_mapping_v4", "input_mapping_v5", "input_mapping_v6", "input_mapping_v7"):
+        versions = tuple(f"input_mapping_v{i}" for i in range(1, 9))
+        if not isinstance(data, dict) or data.get("format") not in versions:
+            raise ValueError("Expected an input_mapping_v1–v8 file")
+        version = versions.index(data["format"]) + 1
+        if version >= 2:
             fields |= {"input_mode", "adaptive_pointer"}
-        if version in ("input_mapping_v3", "input_mapping_v4", "input_mapping_v5", "input_mapping_v6", "input_mapping_v7"):
+        if version >= 3:
             fields |= {"pointer_mode", "target_jitter"}
-        if version in ("input_mapping_v4", "input_mapping_v5", "input_mapping_v6", "input_mapping_v7"):
+        if version >= 4:
             fields |= {"pointer_down_gain", "target_smoothing_ms", "target_interpolation_ms"}
-        if version in ("input_mapping_v5", "input_mapping_v6", "input_mapping_v7"):
+        if version >= 5:
             fields.add("head_motion")
-        if version in ("input_mapping_v6", "input_mapping_v7"):
+        if version >= 6:
             fields.add("head_wink_clicks")
-        if version == "input_mapping_v7":
+        if version >= 7:
             fields.add("require_wink")
-        if set(data) != fields or version not in ("input_mapping_v1", "input_mapping_v2", "input_mapping_v3", "input_mapping_v4", "input_mapping_v5", "input_mapping_v6", "input_mapping_v7"):
-            raise ValueError("Expected an input_mapping_v1/v2/v3/v4/v5/v6/v7 file")
-        if version in ("input_mapping_v5", "input_mapping_v6", "input_mapping_v7") and (not isinstance(data["head_motion"], dict) or
+        if version >= 8:
+            fields.add("button_bindings")
+        if set(data) != fields:
+            raise ValueError("Expected complete input_mapping_v1–v8 settings")
+        if version >= 5 and (not isinstance(data["head_motion"], dict) or
                 set(data["head_motion"]) != {"enabled", "speed_gain", "return_brake"}):
             raise ValueError("Malformed head motion settings")
         if not isinstance(data["bindings"], dict) or set(data["bindings"]) != set(DIRECTIONS):
             raise ValueError("Mapping needs down/up/left/right bindings")
+        buttons = data.get("button_bindings", dict(zip(BUTTON_INPUTS, DEFAULT_BUTTON_BINDINGS)))
+        if not isinstance(buttons, dict) or set(buttons) != set(BUTTON_INPUTS):
+            raise ValueError("Mapping needs left_eye/right_eye/mouth button bindings")
         try:
             response = MouseConfig.from_dict(data["response"])
             return cls(data["id"], data["name"], data["revision"], response,
@@ -161,7 +180,7 @@ class Mapping:
                        data.get("target_smoothing_ms", response.pointer.smoothing_ms),
                        data.get("target_interpolation_ms", response.interpolation_ms),
                        HeadMotionConfig(**data.get("head_motion", {})), data.get("head_wink_clicks", False),
-                       data.get("require_wink", True))
+                       data.get("require_wink", True), tuple(buttons[k] for k in BUTTON_INPUTS))
         except TypeError as exc:
             raise ValueError("Malformed mapping settings") from exc
 
@@ -173,7 +192,8 @@ def mouse_test_mapping():
                        exponent=1.8, acceleration=10, deceleration=14))
     return Mapping(id=MOUSE_TEST_ID, name="Mouse test", input_mode="head-mouse", pointer_mode="velocity",
                    bindings=("none",) * 4, pointer_gain=1.4, pointer_down_gain=3, response=response,
-                   head_motion=HeadMotionConfig(enabled=True), head_wink_clicks=True)
+                   head_motion=HeadMotionConfig(enabled=True), head_wink_clicks=True,
+                   button_bindings=("w", "left_click", "space"))
 
 
 def read_mapping(path):

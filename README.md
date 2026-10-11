@@ -8,7 +8,9 @@ Latest recovery: **Mouse test → Center head & start** captures your current re
 
 Current editor: **Signals → Live curves…** adjusts response curves and timing with connected sliders. Save/load named tuning profiles or restore the tuned defaults. [Live curve editor guide](docs/LIVE_CURVE_EDITOR_GUIDE.md).
 
-Current update: Gaming uses raw pupils to choose an approximate **screen destination**; the cursor arrives and stops. **Mouse test** uses precise head X/Y velocity with faster large/quick turns and matching left/right calibrated wink clicks. See [head movement and clicks](docs/HEAD_POINTER_GUIDE.md), [screen pointer setup and limits](docs/SCREEN_POINTER_GUIDE.md) and [run instructions](App/README.md).
+Current head layout: **Mouse test** maps left eye → held **W**, right eye → **left click**, and mouth open → held **Space**. Head X/Y uses **relative mouse movement**. Mouth needs no calibration. Existing measured response settings remain reusable. [Setup and behavior](docs/MOUTH_BUTTON_GUIDE.md).
+
+Pupil mapping: Gaming uses raw pupils to choose an approximate **screen destination**; the cursor arrives and stops. **Mouse test** uses precise head X/Y velocity with faster large/quick turns and the button layout above. See [head movement and clicks](docs/HEAD_POINTER_GUIDE.md), [screen pointer setup and limits](docs/SCREEN_POINTER_GUIDE.md) and [run instructions](App/README.md).
 
 Current MVP: **eyes/winks, Head Y, Head X and pupils**. Tongue detection has been
 removed from the live app, calibration and graphs. Pupils control the pointer with

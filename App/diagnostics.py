@@ -51,6 +51,9 @@ def pointer_status(source, lab):
             ". Use Center head & start to set your resting position." if head_only else ". Press Start when ready.")
     if not snap["enabled"]:
         pending = []
+        mouth = diag.get("button_actions", {}).get("mouth", {})
+        if mouth.get("raw") and mouth.get("output") != "none":
+            return "Waiting to start: close your mouth to release its button action."
         radius = diag.get("pointer_radius")
         if not target and radius is not None and radius > config["pointer"]["deadzone"]:
             if head_only:
@@ -78,7 +81,7 @@ def pointer_status(source, lab):
     x, y = 2*snap["pointer_x"]-1, 2*snap["pointer_y"]-1
     motion = diag.get("head_motion")
     detail = " · "+motion["phase"] if head_only and motion else ""
-    return f"Pointer request: X {x:+.1%}, Y {y:+.1%}{detail}."
+    return f"Relative pointer request: X {x:+.1%}, Y {y:+.1%}{detail}."
 
 
 class DiagnosticLog:
@@ -167,6 +170,8 @@ class DiagnosticLog:
                      "head_wink_clicks":(lab.get("mapping") or {}).get("head_wink_clicks", False),
                      "require_wink":(lab.get("mapping") or {}).get("require_wink", True),
                      "eyes":diag.get("eyes"), "head_center_pending":diag.get("head_center_pending", False),
+                     "mouth_open":signals.get("mouth_open"), "button_actions":diag.get("button_actions"),
+                     "keys":snap.get("keys"),
                      "tuning_revision":lab.get("tuning_revision", 0),
                      "target_jitter":diag.get("target_jitter"), "min_confidence":lab["config"]["min_confidence"],
                      "pointer_gain":(lab.get("mapping") or {}).get("pointer_gain",1),

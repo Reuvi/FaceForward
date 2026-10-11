@@ -17,7 +17,7 @@ class MouseTestMappingTests(unittest.TestCase):
         self.lab = Lab(clock=lambda:self.now)
         self.addCleanup(self.lab.close)
         self.lab.select_mapping(MOUSE_TEST_ID)
-        mapping=self.lab.state()['mapping'];mapping['head_wink_clicks']=False
+        mapping=self.lab.state()['mapping'];mapping['head_wink_clicks']=False;mapping['button_bindings']['mouth']='none'
         self.lab.update_mapping(mapping)
         self.lab.settings({'runtime':{'source':'external','subject_id':'person'}})
 
@@ -97,9 +97,9 @@ class MouseTestMappingTests(unittest.TestCase):
         self.assertTrue(self.feed(x=None,y=None,left='unknown',right='unknown')['enabled'])
 
     def test_mapping_versions_and_invalid_head_keyboard_bindings(self):
-        current=Mapping().to_dict();self.assertEqual(current['format'],'input_mapping_v7')
+        current=Mapping().to_dict();self.assertEqual(current['format'],'input_mapping_v8')
         legacy=deepcopy(current);legacy['format']='input_mapping_v1'
-        for key in ('pointer_down_gain','target_smoothing_ms','target_interpolation_ms','head_motion','head_wink_clicks','require_wink'):del legacy[key]
+        for key in ('pointer_down_gain','target_smoothing_ms','target_interpolation_ms','head_motion','head_wink_clicks','require_wink','button_bindings'):del legacy[key]
         del legacy['input_mode'];del legacy['adaptive_pointer']
         del legacy['pointer_mode'];del legacy['target_jitter']
         self.assertEqual(Mapping.from_dict(legacy),Mapping(pointer_mode='velocity',pointer_down_gain=1,

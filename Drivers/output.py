@@ -157,14 +157,22 @@ class DriverOutput:
         if gaming:
             known = message.get("known")
             fields = {"left_click", "right_click", "head_x", "head_y", "pointer"}
-            if not isinstance(known, dict) or set(known) != fields or any(type(v) is not bool for v in known.values()):
+            if (not isinstance(known, dict) or set(known) not in (fields, fields | {"keys"})
+                    or any(type(known[k]) is not bool for k in fields)):
                 raise DriverError("Expected complete channel validity")
-            if any(not known[name] and buttons[name] for name in names):
-                raise DriverError("Unknown eye cannot click")
-            if not known["pointer"] and (x != .5 or y != .5 or speed != 0):
-                raise DriverError("Unknown pupils cannot move the pointer")
-            if not known["head_x"] and not known["head_y"] and frame.keys_down:
+            if "keys" in known:
+                key_known = known["keys"]
+                if (not isinstance(key_known, dict) or set(key_known) != set(KEYS)
+                        or any(type(v) is not bool for v in key_known.values())):
+                    raise DriverError("Expected complete key validity")
+                if any(keys[k] and not key_known[k] for k in KEYS):
+                    raise DriverError("Unknown button input cannot hold a key")
+            elif not known["head_x"] and not known["head_y"] and frame.keys_down:
                 raise DriverError("Unknown head axes cannot hold keys")
+            if any(not known[name] and buttons[name] for name in names):
+                raise DriverError("Unknown button input cannot click")
+            if not known["pointer"] and (x != .5 or y != .5 or speed != 0):
+                raise DriverError("Unknown pointer input cannot move the pointer")
         neutral = (not frame.keys_down and not any(buttons.values()) and scroll == .5
                    and (target or (x, y) == (.5, .5)))
         if not message["enabled"]:

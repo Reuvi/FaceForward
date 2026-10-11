@@ -1,5 +1,9 @@
 # Named mouse and keyboard mappings
 
+Current Mouse test layout: left eye → W, right eye → left click, mouth open → Space,
+head X/Y → relative mouse movement. Mouth uses existing jaw-open evidence without
+calibration. Older imported mappings retain their assignments. See [current setup](../../docs/MOUTH_BUTTON_GUIDE.md).
+
 The middle phase is implemented: current Vision measurements feed independent
 filters and action gates, then readable keyboard/mouse commands. App can connect
 these to the merged C driver with explicit Preview, Driver dry run and

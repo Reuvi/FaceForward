@@ -151,7 +151,7 @@ class SimpleSignalsWindowTests(unittest.TestCase):
         self.ui.refresh();self.root.update()
         panel=self.ui.mapping_page
         self.assertEqual(panel.selector.get(),'Mouse test')
-        self.assertEqual(len(panel.table.get_children()),5)
+        self.assertEqual(len(panel.table.get_children()),6)
         self.assertIn('calibrated wink or plain open/closed',panel.help_text.get())
         self.assertTrue(panel.wink_clicks.get())
         self.assertIn('Downward boost',panel.help_text.get())
@@ -169,8 +169,8 @@ class SimpleSignalsWindowTests(unittest.TestCase):
         panel.adaptive.set(False);panel._apply()
         self.ui.refresh();self.root.update()
         self.assertFalse(self.session.lab.state()['mapping']['head_wink_clicks'])
-        self.assertEqual(len(panel.table.get_children()),3)
-        self.assertIn('Eyes and pupils are ignored',panel.help_text.get())
+        self.assertEqual(len(panel.table.get_children()),4)
+        self.assertIn('Eye actions are disabled',panel.help_text.get())
         self.assertFalse(self.session.lab.state()['mapping']['adaptive_pointer'])
         self.assertEqual(self.session.lab.state()['mapping']['input_mode'],'head-mouse')
         self.assertFalse(self.session.lab.processor.armed)
@@ -188,7 +188,7 @@ class SimpleSignalsWindowTests(unittest.TestCase):
         self.session.lab.select_mapping('mouse-test')
         self.ui.refresh();self.ui.mapping_page.show_curves();self.root.update()
         editor=self.ui.mapping_page.curve_editor
-        self.assertEqual(set(dict(editor.channel_choices)),{'pointer','left','right'})
+        self.assertEqual(set(dict(editor.channel_choices)),{'pointer','left','right','mouth'})
         self.assertIn('speed_gain',editor.widgets)
         self.assertTrue(editor.curve_canvas.find_all())
         self.assertTrue(editor.time_canvas.find_all())
@@ -197,6 +197,7 @@ class SimpleSignalsWindowTests(unittest.TestCase):
         self.assertAlmostEqual(self.session.lab.state()['mapping']['pointer_gain'],2.2)
         self.assertIn('updated',editor.notice.get())
         self.assertFalse(self.session.lab.processor.armed)
+
         editor.selector.current(1);editor.select_channel();self.root.update()
         self.assertEqual(editor.channel,'left')
         self.assertEqual(editor.widgets,{})
@@ -235,6 +236,28 @@ class SimpleSignalsWindowTests(unittest.TestCase):
         self.assertFalse(editor.window.winfo_viewable())
         editor.show();self.root.update()
         editor.stop()
+        self.assertFalse(self.session.lab.processor.armed)
+
+    def test_mouth_binary_channel_and_new_button_routes_are_connected(self):
+        self.session.lab.select_mapping('mouse-test')
+        self.ui.refresh();self.root.update()
+        panel=self.ui.mapping_page
+        self.assertEqual(panel.pointer_mode.get(),'Relative movement')
+        self.assertEqual({k:v.get() for k,v in panel.button_bindings.items()},
+                         dict(left_eye='w',right_eye='left_click',mouth='space'))
+        self.assertIn('SPACE',panel.table.item('mouth','values')[-1])
+        self.assertIn('W:',panel.table.item('eye_left','values')[-1])
+        panel.show_curves();self.root.update()
+        editor=panel.curve_editor
+        editor.selector.current(next(i for i,(key,_) in enumerate(editor.channel_choices) if key=='mouth'))
+        editor.select_channel();self.root.update()
+        self.assertEqual(editor.widgets,{})
+        self.assertIn('no calibration',editor.explanation.get())
+        self.assertTrue(editor.curve_canvas.find_all())
+        self.assertTrue(editor.time_canvas.find_all())
+        panel.button_bindings['mouth'].set('w');panel._apply()
+        self.ui.refresh();self.root.update()
+        self.assertEqual(self.session.lab.state()['mapping']['button_bindings']['mouth'],'w')
         self.assertFalse(self.session.lab.processor.armed)
 
     def test_target_game_entry_reuses_window_and_keeps_two_main_tabs(self):
@@ -300,7 +323,7 @@ class SimpleSignalsWindowTests(unittest.TestCase):
         self.assertEqual(panel.down_gain.get(),'4')
         self.assertFalse(panel.pointer_widgets['smoothing_ms'][1].winfo_ismapped())
         self.assertFalse(panel.pointer_widgets['deadzone'][1].winfo_ismapped())
-        panel.pointer_mode.set('Velocity');panel.pointer_controls();self.root.update()
+        panel.pointer_mode.set('Relative movement');panel.pointer_controls();self.root.update()
         self.assertFalse(panel.jitter_widget.winfo_ismapped())
         self.assertTrue(all(not widget.winfo_ismapped() for widget in panel.target_widgets))
         self.assertTrue(panel.pointer_widgets['deadzone'][1].winfo_ismapped())

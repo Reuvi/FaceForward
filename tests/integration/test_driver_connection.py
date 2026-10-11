@@ -48,6 +48,80 @@ class DriverConnectionTests(unittest.TestCase):
         self.session.deliver(frame)
         return self.lab.state()["output"]
 
+    def select_legacy_head_clicks(self):
+        self.lab.select_mapping('mouse-test')
+        mapping=self.lab.state()['mapping']
+        mapping['button_bindings']=dict(left_eye='left_click',right_eye='right_click',mouth='none')
+        self.lab.update_mapping(mapping)
+
+    def test_new_head_buttons_hold_w_space_click_right_eye_and_use_relative_driver(self):
+        self.lab.select_mapping('mouse-test');self.lab.action({'action':'arm'})
+        self.assertFalse(self.deliver(mouth_open=1)['enabled'])
+        self.assertTrue(self.deliver(mouth_open=0)['enabled'])
+        for _ in range(30):
+            time.sleep(.01)
+            output=self.deliver(head_x=.7,left_eye_open=0,right_eye_open=0,mouth_open=1)
+            self.assertIsNone(output['error'])
+            self.assertEqual(output['pointer_mode'],'velocity')
+            self.assertEqual(output['held_keys'],17)
+        self.assertEqual(output['event_counts'].get(3),1)
+        self.assertEqual(output['event_counts'].get(4,0),0)
+        self.assertEqual(output['event_counts'].get(7),2)
+        self.assertGreater(output['event_counts'].get(1,0),0)
+        self.assertTrue(any(e['type']==1 and e['x']>0 for e in self.lab.output.events))
+        # Keys follow their own evidence even when both pointer axes are missing.
+        output=self.deliver(head_x=None,head_y=None,left_eye_open=0,right_eye_open=0,mouth_open=1)
+        self.assertEqual(output['held_keys'],17);self.assertIsNone(output['error'])
+        self.assertEqual(self.lab.state()['message']['pointer'],dict(mode='velocity',x=.5,y=.5))
+        output=self.deliver(left_eye_open=0,mouth_open=None)
+        self.assertEqual(output['held_keys'],1)
+        output=self.deliver(left_eye_open=0,mouth_open=1)
+        self.assertEqual(output['held_keys'],1)  # Must close after unknown first.
+        self.deliver(left_eye_open=0,mouth_open=0)
+        output=self.deliver(left_eye_open=0,mouth_open=1)
+        self.assertEqual(output['held_keys'],17)
+        output=self.deliver(left_eye_open=None,mouth_open=1)
+        self.assertEqual(output['held_keys'],16)
+        self.lab.action({'action':'stop'})
+        self.assertEqual(self.lab.state()['output']['held_keys'],0)
+        self.assertFalse(self.lab.state()['output']['enabled'])
+        self.assertFalse(self.deliver(mouth_open=0)['enabled'])
+
+    def test_existing_jaw_blendshape_reaches_space_through_app_without_mouth_calibration(self):
+        try:
+            from Vision.demo_detection import demo_image
+        except ImportError:
+            self.skipTest('Vision pixel dependencies required')
+        from Vision.calibration import AxisCalibration
+        from Vision.capture import CapturedImage
+        from Vision.signals import Envelope
+        self.session.prepare_source('detector-demo')
+        self.lab.select_mapping('mouse-test')
+        core=self.session.ensure_detector_runtime().workbench
+        core.head=core.head_x=AxisCalibration(-20,0,20)
+        image,observations=demo_image()
+
+        def capture(score):
+            self.now+=20;self.sequence+=1
+            observations[0].expressions['jawOpen']=score
+            self.session.deliver_detection(CapturedImage(Envelope('detector',self.sequence,self.now),image),
+                                           observations,preview=False)
+            return self.lab.state()['output']
+
+        capture(.1)  # Attach source/subject before requesting output.
+        self.lab.action({'action':'arm'})
+        self.assertTrue(capture(.1)['enabled'])
+        self.assertEqual(capture(.8)['held_keys'],16)
+        self.assertEqual(capture(.8)['event_counts'].get(7),1)
+        self.assertEqual(capture(None)['held_keys'],0)
+        self.assertEqual(capture(.8)['held_keys'],0)
+        capture(.1)
+        self.assertEqual(capture(.8)['held_keys'],16)
+        output=capture(.1)
+        self.assertEqual(output['held_keys'],0)
+        self.assertIsNone(output['error'])
+        self.assertEqual(self.lab.state()['snapshot']['diagnostics']['mouth_open'],False)
+
     def test_recenter_recovers_offset_head_and_compiled_driver_movement(self):
         self.lab.select_mapping('mouse-test');self.lab.action({'action':'arm'})
         self.assertFalse(self.deliver(head_x=.3,head_y=.7)['enabled'])
@@ -70,7 +144,7 @@ class DriverConnectionTests(unittest.TestCase):
         self.assertEqual(self.lab.state()['message']['pointer'],dict(mode='velocity',x=.5,y=.5))
 
     def test_plain_closure_source_reaches_driver_without_winks_and_does_not_repeat(self):
-        self.lab.select_mapping('mouse-test')
+        self.select_legacy_head_clicks()
         state=self.lab.state()
         self.lab.set_eye_mode(False,mapping_id=state['mapping_id'],generation=state['generation'])
         self.lab.action({'action':'arm'})
@@ -151,7 +225,7 @@ class DriverConnectionTests(unittest.TestCase):
         self.assertEqual(self.lab.state()['message']['pointer'],dict(mode='velocity',x=.5,y=.5))
 
     def test_head_winks_emit_one_compiled_click_per_activation_and_require_reopen_after_unknown(self):
-        self.lab.select_mapping('mouse-test');self.lab.action({'action':'arm'})
+        self.select_legacy_head_clicks();self.lab.action({'action':'arm'})
         output=self.deliver(left_eye_open=0)
         self.assertFalse(output['enabled']);self.assertIsNone(output['error'])
         self.assertTrue(self.deliver(gaze_x=None,gaze_y=None)['enabled'])
@@ -187,7 +261,7 @@ class DriverConnectionTests(unittest.TestCase):
         self.assertIsNone(self.lab.state()['output']['error'])
 
     def test_head_live_curve_edits_keep_driver_running_without_duplicate_winks(self):
-        self.lab.select_mapping('mouse-test');self.lab.action({'action':'arm'});self.deliver()
+        self.select_legacy_head_clicks();self.lab.action({'action':'arm'});self.deliver()
         for _ in range(10):self.deliver(head_x=.7,left_eye_open=0)
         core=self.lab.processor
         old=self.lab.state()['message']['output_session_id']

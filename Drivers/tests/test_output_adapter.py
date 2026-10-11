@@ -59,6 +59,27 @@ class OutputAdapterTests(unittest.TestCase):
         self.assertEqual(ups,[1,32])
         self.assertEqual(self.output.status().held_key_mask,0)
 
+    def test_routed_keys_have_independent_validity_without_head(self):
+        keys = command(0,0)['keys'];keys.update(w=1,space=1)
+        known = command(0,0)['known']
+        known.update(head_x=False,head_y=False,keys=dict.fromkeys(keys,False))
+        known['keys'].update(w=True,space=True)
+        for _ in range(3):self.send(keys=keys,known=known)
+        self.assertEqual(self.output.status().held_key_mask,17)
+        self.assertCountEqual([e['x'] for e in self.output.events if e['type']==7],[1,16])
+        self.send(enabled=False,known=known)
+        self.assertEqual(self.output.status().held_key_mask,0)
+
+    def test_unknown_and_malformed_key_validity_fail_closed(self):
+        for bad in (None, {}, {'w':True}, dict.fromkeys(command(0,0)['keys'],1),
+                    dict.fromkeys(command(0,0)['keys'],False)):
+            self.output.pause();self.send()
+            keys = command(0,0)['keys'];keys['space']=1
+            known = command(0,0)['known'];known['keys']=bad
+            with self.assertRaises(DriverError):self.send(keys=keys,known=known)
+            self.assertFalse(self.output.status().enabled)
+            self.assertEqual(self.output.status().held_key_mask,0)
+
     def test_capture_age_cannot_be_renewed_by_output_ticks(self):
         source = self.send()["source"]
         self.now += 251

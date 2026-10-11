@@ -1,18 +1,19 @@
-# Head pointer movement and wink clicks
+# Head pointer movement and button actions
 
 **Current recovery and eye option:** use **Signals → Center head & start** if Start
 waits for the old head center. Hold a comfortable pose with eyes open; the next
 valid capture establishes the center and starts output. Save a tuning profile to
-keep it. **Live curves → Require calibrated wink for clicks** can be unchecked for
+keep it. **Live curves → Require calibrated wink for eye actions** can be unchecked for
 plain open/closed clicks without wink training. Ordinary blinks also click.
-The Eye clicks switch in Mapping settings enables/disables both click channels.
+The Enable eye button actions switch enables/disables both eyes; mouth remains independent.
 
 
 Mouse test uses calibrated Head X/Y as smooth velocity control. Small movements
 request very slow, precise cursor motion; larger turns travel faster. Holding a
-position keeps moving, and returning to neutral stops. Left/right calibrated Wink
-actions click the matching mouse button. Pupils, keyboard actions and scroll are
-ignored. Your head calibration and 3× downward boost are unchanged.
+position keeps moving, and returning to neutral stops. The current button layout is left eye → held W, right eye → one left click,
+and mouth open → held Space. Pupils, head-direction keys and scroll are ignored.
+Mouth needs no calibration. The driver uses relative deltas, not screen targets;
+[setup and game-testing limits](MOUTH_BUTTON_GUIDE.md). Your head calibration and 3× downward boost are unchanged.
 
 **Speed-aware acceleration and return braking** adds a bounded boost for quick
 outward turns and stronger braking when returning to center. Slow adjustments and
@@ -40,13 +41,13 @@ In **Mapping settings… → Head movement response**:
 | Speed-aware acceleration and return braking | On | Adds transient speed response to the precision curve |
 | Movement boost | .75 | Up to 75% extra speed during fast outward turns, capped at the existing maximum |
 | Return braking | .65 | Up to 65% reduction in requested speed during fast returns, with stronger deceleration |
-| Eye clicks | On | Each eye activates its matching mouse button; choose wink or plain closure in Live curves |
+| Enable eye button actions | On | Left eye holds W, right eye clicks left; choose wink or plain closure in Live curves |
 
-Holding a wink produces one click. Reopen before the next wink; each eye works
+Holding the left eye action holds W; holding the right produces one left click. Reopen before the next wink; each eye works
 independently. Unknown eye input releases that button and requires its actual
 reopening before another activation. Anatomical closure alone clicks only when
 Require calibrated wink is unchecked in Live curves.
-Unchecking **Eye clicks** restores pointer-only control. Clicks do not drag.
+Unchecking **Enable eye button actions** disables eye outputs. Set Mouth to none in Mapping settings for pointer-only control. Clicks do not drag.
 
 The built-in pointer curve uses a dead zone of **.03**, activation margin **.005**,
 response exponent **1.8**, gain **1.4**, smoothing **20 ms** and no interpolation
@@ -72,7 +73,8 @@ Signals/logs show movement phase plus independent left/right eye action rows.
 
 Export the mapping to keep custom settings across restarts. Face-profile loading
 keeps the response and wink checkbox. Older mapping exports retain their previous
-curve and import with wink clicks off; enable clicks and export again to opt in.
+curve and button assignments, with mouth unassigned; v1–v5 also keep eye clicks off.
+Choose new button assignments in Mapping settings to opt in.
 Mappings before v5 also import with speed-aware boost/braking off.
 
 ## Implementation and checks

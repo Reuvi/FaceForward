@@ -1,5 +1,9 @@
 # Native detection lab: calibration, measurements, and test procedure
 
+Current Mouse test layout: left eye → W, right eye → left click, mouth open → Space,
+head X/Y → relative mouse movement. Mouth uses existing jaw-open evidence without
+calibration. Older imported mappings retain their assignments. See [current setup](../docs/MOUTH_BUTTON_GUIDE.md).
+
 > Current behavior: [raw pupil control](../Contracts/RAW_PUPIL_CONTROL.md) supersedes pupil fitting/head compensation below. No pupil guide is required or exposed; old fits are retained as inactive data.
 
 > Pupil quality update: completed guided eye geometry can support naturally narrow open eyes; strong closure and uncertain iris evidence still reject. Coordinates and saved fits are unchanged. See [quality guide](../docs/PUPIL_QUALITY_GUIDE.md).

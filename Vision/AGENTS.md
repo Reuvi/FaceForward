@@ -1,3 +1,5 @@
+**Current button layout:** read [Mouth buttons and relative movement](../Contracts/MOUTH_BUTTON_RELATIVE.md). Mouse test maps left eye → W, right eye → left click, mouth open → Space, and head X/Y → relative mouse movement. Mapping v8 preserves older imported assignments; mouth needs no calibration.
+
 # Vision lane
 
 **Current raw pupil decision:** follow `Contracts/RAW_PUPIL_CONTROL.md` (repository root).

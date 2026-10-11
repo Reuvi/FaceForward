@@ -11,6 +11,7 @@ from .wink_model import NAMES, measure as measure_winks, score as wink_score, cl
 from .pupil import normalize as normalize_pupils, PupilReading, measure as measure_pupils, matrix_sample as pupil_matrix, MEASUREMENT as PUPIL_MEASUREMENT
 from .pipeline import VisionPipeline
 from .signals import SINGLE_SUBJECT, invalid, make_face, measurement, monotonic_ms
+from .mouth import mouth_open
 
 
 TARGETS = ("left_open", "left_closed", "right_open", "right_closed",
@@ -427,7 +428,8 @@ class DetectorWorkbench:
                     else:
                         self.winks = dict(self.eye_guide.models)
                     self.notice = self.eye_guide.report
-            values = {}
+            height, width = captured.bgr.shape[:2]
+            values = {"mouth_open": mouth_open(observation, width, height)}
             for side in ("left", "right"):
                 feature, calibration = self.features[side], self.eyes.get(side)
                 reason = feature.reason
@@ -508,6 +510,11 @@ class DetectorWorkbench:
                    pupil_raw_x=self.pupil.xy[0] if self.pupil.xy else None,
                    pupil_raw_y=self.pupil.xy[1] if self.pupil.xy else None,
                    pupil_reason=self.reasons.get("pupil", self.pupil.reason))
+        mouth = signals.get("mouth_open", {})
+        observation = self.observations.get(self.selected)
+        row["mouth_open"] = mouth.get("value") if mouth.get("valid") else None
+        row["mouth_score"] = (observation.expressions.get("jawOpen")
+                              if observation and mouth.get("valid") else None)
         grid = frame["pupil_matrix"]
         row.update(pupil_matrix_row=grid["row"], pupil_matrix_column=grid["column"],
                    pupil_matrix_size=grid["size"], pupil_matrix_valid=grid["valid"])

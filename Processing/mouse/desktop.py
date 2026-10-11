@@ -87,7 +87,7 @@ class Scope(ttk.Frame):
         channel_runs = []
         for channel, key in enumerate(self.keys):
             samples = ((row["t"], row.get(key), row.get("scope_context", 0)) for row in rows)
-            stepped = channel == 0 or key in ("left_out", "right_out", "eye_overlap") or key.endswith("_qualified")
+            stepped = channel == 0 or key in ("left_out", "right_out", "eye_overlap") or key.endswith(("_qualified", "_action_out"))
             runs = []
             for unknown, points in trace_runs(samples, step=stepped, start=end-8):
                 coords = []
@@ -309,8 +309,8 @@ class DesktopLab:
         for parent, specs in ((axis, (("Pointer X / left ↔ right", ("raw_x", "interp_x", "out_x")),
                                      ("Pointer Y / up ↔ down", ("raw_y", "interp_y", "out_y")),
                                      ("Scroll Y / up ↔ down", ("raw_scroll", "interp_scroll", "out_scroll")))),
-                              (eyes, (("Left eye → left click (independent)", ("left_raw", "left_dwell", "left_out")),
-                                      ("Right eye → right click (independent)", ("right_raw", "right_dwell", "right_out"))))):
+                              (eyes, (("Left eye → assigned button", ("left_raw", "left_dwell", "left_action_out")),
+                                      ("Right eye → assigned button", ("right_raw", "right_dwell", "right_action_out"))))):
             parent.rowconfigure(0, weight=1)
             for index, (title, keys) in enumerate(specs):
                 if getattr(self,"appearance_eyes",False) and keys[0] in ("left_raw","right_raw"):

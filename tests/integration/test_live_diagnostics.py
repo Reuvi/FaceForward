@@ -78,7 +78,7 @@ class LiveDiagnosticsTests(unittest.TestCase):
         self.assertIn("filtering",pointer_status(*self.feed(.8)))
         for _ in range(6):
             state = self.feed(.8)
-        self.assertIn("Pointer request",pointer_status(*state))
+        self.assertIn("Relative pointer request",pointer_status(*state))
 
     def test_head_start_blocker_points_to_recenter_and_distinguishes_missing_face(self):
         self.lab.select_mapping('mouse-test')

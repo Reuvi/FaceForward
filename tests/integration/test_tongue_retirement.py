@@ -87,7 +87,10 @@ class TongueRetirement(unittest.TestCase):
                 self.assertEqual(frame['eye_intent']['sequence'], i)
                 self.assertEqual(frame['pupil_matrix']['sequence'], i)
                 self.assertFalse(any('tongue' in key for key in frame))
-                self.assertFalse(any('tongue' in key or 'mouth' in key for key in self.core.trace[-1]))
+            # The later mouth-button request permits only these scalar fields;
+            # no tongue/crop/model diagnostics are restored.
+            self.assertFalse(any('tongue' in key or ('mouth' in key and key not in ('mouth_open','mouth_score'))
+                                 for key in self.core.trace[-1]))
         self.assertEqual(len(self.core.trace),30)
         self.assertFalse(hasattr(self.core, 'async_tongue'))
         self.assertFalse(hasattr(self.core, 'tongue_model'))

@@ -5,7 +5,7 @@ import tkinter as tk
 from tkinter import filedialog, simpledialog, ttk
 
 from Processing.mouse.desktop import Scope, label, set_var, BG, TEXT, MUTED, GREEN
-from .config import DIRECTIONS, KEYS
+from .config import BUTTON_INPUTS, BUTTON_OUTPUTS, DIRECTIONS, KEYS
 
 
 class MappingPanel(ttk.Frame):
@@ -80,7 +80,7 @@ class MappingPanel(ttk.Frame):
         self.pointer_mode = tk.StringVar()
         label(group, "Pointer behavior").grid(row=2, column=0, sticky="w", pady=3)
         self.mode_widget = ttk.Combobox(group, textvariable=self.pointer_mode, state="readonly",
-                                       values=("Screen destination", "Velocity"), width=22)
+                                       values=("Screen destination", "Relative movement"), width=22)
         self.mode_widget.grid(row=2, column=1, columnspan=3, sticky="ew", padx=5)
         self.mode_widget.bind("<<ComboboxSelected>>", lambda event: self.pointer_controls())
         self.binding_group = ttk.Frame(group)
@@ -116,6 +116,14 @@ class MappingPanel(ttk.Frame):
             widget = ttk.Entry(group, textvariable=var, width=8)
             widget.grid(row=row, column=1, sticky="w", padx=5)
             self.target_widgets.extend((title_widget, widget))
+        self.button_bindings = {}
+        for row, source in enumerate(BUTTON_INPUTS, start=8):
+            label(group, source.replace("_", " ").title()).grid(row=row, column=0, sticky="w", pady=3)
+            var = tk.StringVar()
+            self.button_bindings[source] = var
+            widget = ttk.Combobox(group, textvariable=var, state="readonly", values=BUTTON_OUTPUTS, width=14)
+            widget.grid(row=row, column=1, columnspan=3, sticky="ew", padx=5)
+            self.edit_widgets.append(widget)
         self.adaptive = tk.BooleanVar(value=True)
         self.adaptive_widget = ttk.Checkbutton(settings_parent, text="Adaptive pointer smoothing (1€)", variable=self.adaptive)
         self.adaptive_widget.pack(anchor="w", pady=5)
@@ -131,7 +139,7 @@ class MappingPanel(ttk.Frame):
             self.motion_fields[key] = var
             ttk.Entry(self.motion_group, textvariable=var, width=8).grid(row=1, column=col*2+1, padx=5)
         self.wink_clicks = tk.BooleanVar()
-        ttk.Checkbutton(self.motion_group, text="Eye clicks: left eye → left click, right eye → right click (source in Live curves)",
+        ttk.Checkbutton(self.motion_group, text="Enable eye button actions (wink/open-closed source in Live curves)",
                         variable=self.wink_clicks).grid(row=2, column=0, columnspan=4, sticky="w", pady=4)
         self.pointer_group = None
         if compact:
@@ -251,6 +259,7 @@ class MappingPanel(ttk.Frame):
         data["head_motion"] = dict(enabled=self.motion_enabled.get(),
                                    **{key:float(var.get()) for key,var in self.motion_fields.items()})
         data["head_wink_clicks"] = self.wink_clicks.get()
+        data["button_bindings"] = {key: var.get() for key, var in self.button_bindings.items()}
         data.update({key:float(var.get()) for key,var in self.target_fields.items()})
         data["revision"] += 1
         for (axis, key), var in self.fields.items():
@@ -322,16 +331,18 @@ class MappingPanel(ttk.Frame):
                 group.grid_remove() if head_only else group.grid()
             self.adaptive_widget.configure(state="normal" if mapping else "disabled")
             self.adaptive.set(mapping.get("adaptive_pointer", True) if mapping else False)
-            self.pointer_mode.set("Screen destination" if mapping and mapping["pointer_mode"] == "target" else "Velocity")
+            self.pointer_mode.set("Screen destination" if mapping and mapping["pointer_mode"] == "target" else "Relative movement")
             self.target_jitter.set(mapping["target_jitter"] if mapping else .01)
             self.down_gain.set(mapping["pointer_down_gain"] if mapping else 1)
             for key, var in self.target_fields.items():
                 var.set(mapping[key] if mapping else 0)
             self.mode_widget.configure(state="disabled" if head_only or not mapping else "readonly")
             self.pointer_controls()
-            head_help = ("Head X + Head Y move the pointer together; both axes need calibration. Small movements give precise slow speed; larger, faster turns travel quickly. "
-                         + ("Each eye clicks its matching mouse button. Choose calibrated wink or plain open/closed in Live curves. Pupils, keys and scroll are ignored."
-                            if mapping and mapping["head_wink_clicks"] else "Eyes and pupils are ignored; no clicks, keys or scroll."))
+            head_help = ("Head X + Head Y send relative mouse movement; both axes need calibration. Small movements give precise slow speed; larger, faster turns travel quickly. "
+                         "Buttons use the assignments above: keys hold while active; mouse buttons click once per activation. Mouth open needs no calibration. "
+                         + ("Choose calibrated wink or plain open/closed eyes in Live curves. "
+                            if mapping and mapping["head_wink_clicks"] else "Eye actions are disabled. ")
+                         + "Pupils, head-direction keys and scroll are ignored.")
             self.help_text.set((head_help
                                if head_only else "Head thresholds use the fraction of your calibrated range from neutral. Choose wink or plain eye open/closed clicks in Live curves; both are immediate.")
                                + (" Screen destination moves to a point and stops; without screen calibration its alignment is approximate. Fixation dead band 0.002 means 0.2% of the screen. Position smoothing/delay belong to this mapping. Velocity keeps moving while off-center."
@@ -351,6 +362,8 @@ class MappingPanel(ttk.Frame):
                     var.set(mapping[axis][key])
                 for key, var in self.bindings.items():
                     var.set(mapping["bindings"][key])
+                for key, var in self.button_bindings.items():
+                    var.set(mapping["button_bindings"][key])
         if state["runtime"]["source"] == "external":
             self.mock.pack_forget()
         elif not self.mock.winfo_manager():

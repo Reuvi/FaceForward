@@ -1,3 +1,5 @@
+**Current button layout:** read [Mouth buttons and relative movement](../Contracts/MOUTH_BUTTON_RELATIVE.md). Mouse test maps left eye → W, right eye → left click, mouth open → Space, and head X/Y → relative mouse movement. Mapping v8 preserves older imported assignments; mouth needs no calibration.
+
 **Current measured pointer tuning:** read [../Contracts/TARGET_GAME.md](../Contracts/TARGET_GAME.md). Native target trials collect actual cursor/head data; repeated baseline/candidate comparisons choose local personal defaults. Practice/invalid data cannot tune.
 
 **Latest eye mode / head recovery:** read [../Contracts/EYE_MODE_CONTROL_RECOVERY.md](../Contracts/EYE_MODE_CONTROL_RECOVERY.md). Mapping v7 adds a persisted require_wink flag; explicit plain closure bypasses wink intent with immediate independent eye gates. Center head & start uses a fresh head sample. These supersede older wink-only restrictions only when selected.

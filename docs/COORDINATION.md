@@ -1,5 +1,49 @@
 # Main chat and agent coordination hub
 
+## Mouth button and relative head-control handoff
+
+- Task / lane / branch / worktree: Reuvi integration, explicitly requested mouth
+  and eye routing plus relative mouse output, `codex/integration/mouth-relative-controls`
+  in `.worktrees/reuvi-integration-mouth-relative-controls`. Base `1ab873f`.
+  Contract first: `d95e714`, [MOUTH_BUTTON_RELATIVE.md](../Contracts/MOUTH_BUTTON_RELATIVE.md).
+- Changed paths: Vision mouth measurement/optional SignalFrame validation and
+  trace; Processing mapping configuration, button routing, signals, trace and
+  connected settings/curve UI; Drivers Python validity adapter; App diagnostics;
+  corresponding tests, instructions and runbooks. No native C driver/ABI changes.
+- Before → after: Mouse test now uses left eye → held W, right eye → one left
+  click, mouth open → held Space. Existing jawOpen is converted to a fixed binary
+  signal without calibration or another model. Head X/Y keeps the same response
+  and existing relative velocity path, now labeled Relative movement. Missing
+  head axes stop only pointer motion; unknown buttons release independently and
+  require their own inactive baseline. Stop/loss/staleness release all outputs.
+- Profiles: mapping v8 stores button bindings; strict v1–v7 migration preserves
+  old routing, tuning and eye mode with mouth unassigned. Face/detector profiles
+  remain v3/v13. The explicitly requested private personal-default upgrade changes
+  routing only and retains a rollback copy outside Git. Source recordings and
+  measured response values are not changed or committed.
+- Verification: Processing suite **204 passed**. All 16 integration modules were
+  run in isolated Python processes with Vision dependencies and `RUN_TK_TESTS=1`:
+  **168 tests passed** after updating the retired-tongue assertion to permit only
+  the two new mouth scalars. Driver integration **23 passed**, including synthetic
+  jaw blendshape → workbench → App → compiled Space events without mouth training.
+  Vision suite **162 tests, 159 passed / 3 optional skips**. Native macOS build
+  succeeded; **5/5 CTest groups passed**, including Python adapter validity tests.
+  Ruff F, `git diff --check`, and integration scope check passed.
+- Whole mock pipeline: `python3 -m App --source demo --mapping mouse-test
+  --factory-defaults --headless --frames 490 --output dry-run --no-diagnostics`
+  accepted **490/490** frames; emitted **665 movement, 3 left clicks, 4 key downs
+  and 4 key ups**, no right click or scroll, ending disabled with held keys 0.
+  These are synthetic inputs through the actual compiled driver, not OS injection.
+- Run: restart App from the updated checkout using
+  `Vision/.venv/bin/python -m App --source camera --output native --mapping mouse-test`.
+  Load the existing face calibration, open eyes, close mouth, then Center head &
+  start. Local personal defaults load stopped. [Runbook](MOUTH_BUTTON_GUIDE.md).
+- Remaining evidence: real mouth reliability and Roblox consumption of relative
+  Quartz deltas need operator testing. No game compatibility or smoother human
+  control is claimed. No live camera/native input, dependencies, images, new
+  calibration or tongue worker were used during checks.
+
+
 ## Target-game continuation and existing-data review handoff
 
 - Task / lane / branch / worktree: Reuvi integration continuation on

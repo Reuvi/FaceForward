@@ -7,7 +7,7 @@ from pathlib import Path
 import tempfile
 
 from Processing.mouse.config import MouseConfig, number
-from Processing.mappings.config import Mapping, mouse_test_mapping
+from Processing.mappings.config import Mapping, action_label, mouse_test_mapping
 
 
 @dataclass(frozen=True)
@@ -40,7 +40,10 @@ def channels(state):
     if mapping is None:result.append(('scroll','Head Y → scroll'))
     if not mapping or mapping['input_mode']!='head-mouse' or mapping['head_wink_clicks']:
         mode=' wink' if not mapping or mapping['require_wink'] else ' open/closed'
-        result.extend((side,side.title()+mode+' → '+side+' click') for side in ('left','right'))
+        result.extend((side,side.title()+mode+' → '+action_label(mapping['button_bindings'][side+'_eye'])
+                       if mapping else side.title()+mode+' → '+side+' click') for side in ('left','right'))
+    if mapping and mapping['button_bindings']['mouth'] != 'none':
+        result.append(('mouth','Mouth open → '+action_label(mapping['button_bindings']['mouth'])))
     return result
 
 
@@ -50,8 +53,8 @@ def sliders(state, channel):
     result=[]
     def add(key,label,lo,hi,step,path,unit=''):
         result.append(Slider(key,label,lo,hi,step,tuple(path.split('.')),unit))
-    if channel in ('left','right'):
-        if legacy_eye_timing(state):
+    if channel in ('left','right','mouth'):
+        if channel != 'mouth' and legacy_eye_timing(state):
             add('dwell_ms','Closure confirmation',50,3000,10,f'config.{channel}_eye.dwell_ms','ms')
             add('release_ms','Reopen confirmation',0,500,5,f'config.{channel}_eye.release_ms','ms')
         return result
@@ -157,7 +160,8 @@ def default_profile(state):
         # A user's routing/identity and pointer mode are separate from response tuning.
         base=replace(base,id=mapping.id,name=mapping.name,revision=mapping.revision+1,
                      bindings=mapping.bindings,pointer_mode=mapping.pointer_mode,
-                     head_wink_clicks=mapping.head_wink_clicks, require_wink=mapping.require_wink)
+                     head_wink_clicks=mapping.head_wink_clicks, require_wink=mapping.require_wink,
+                     button_bindings=mapping.button_bindings)
         data={**state,'mapping':base.to_dict()}
     else:
         data={**state,'config':replace(MouseConfig(),pointer_source=state['config']['pointer_source']).to_dict()}

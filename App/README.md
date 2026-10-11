@@ -1,6 +1,6 @@
 # Native face mouse and keyboard preview
 
-The app now tracks **independent eyes/winks, Head Y, Head X and pupils**.
+The app now tracks **independent eyes/winks, mouth open, Head Y, Head X and pupils**.
 Tongue detection has been retired: no tongue tab, calibration, graphs, mouth crop,
 model or background worker runs. Gaming uses pupils for the mouse pointer; Mouse test uses head X/Y. The application
 is local Python/Tk. Output is selectable: Preview, Driver dry run, or Live mouse +
@@ -8,7 +8,7 @@ keyboard. Native output is explicitly enabled with the Camera source; Stop and
 closing App release it. [Build and live-output instructions](../docs/DRIVER_CONNECTION_GUIDE.md).
 Without a measured personal default, the default is **gaming keyboard mouse mapping 1**: left/right eye actions →
 left/right mouse, head down/up/left/right → W/Space/Shift/S, pupils → an approximate
-screen destination where the cursor stops. **Mouse test** combines calibrated head X/Y into precise pointer velocity and uses left/right calibrated winks (or optional plain eye closures) for matching clicks; pupils, keys and scroll are ignored. The previous **Mouse and scroll** mode remains selectable. See
+screen destination where the cursor stops. **Mouse test** combines calibrated head X/Y into relative pointer movement: left eye → held W, right eye → one left click, mouth open → held Space. Pupils, head-direction keys and scroll are ignored. Mouth needs no calibration; eyes use your saved wink/plain-closure choice. [New button layout and relative mode](../docs/MOUTH_BUTTON_GUIDE.md). The previous **Mouse and scroll** mode remains selectable. See
 [the Processing runbook](../Processing/mappings/README.md) for tuning and saved mappings.
 
 ## Measured target game
@@ -35,7 +35,7 @@ See actual response curves/live markers and a synthetic ramp/settling preview.
 Pointer velocity/target, head-key gates and scroll expose the controls they use;
 calibrated winks show independent binary click states. Live response edits preserve
 running control. **Save as…**, **Load…**, **Personal default** and **Factory defaults** manage local
-tuning files; loading/defaults stop output. Uncheck **Require calibrated wink for clicks**
+tuning files; loading/defaults stop output. Uncheck **Require calibrated wink for eye actions**
 for immediate plain open/closed input; ordinary blinks also click. Changing the flag
 stops output. **Center head & start** captures a new resting center in Mouse test
 and starts the connected output. Face calibration stays separate.
@@ -55,7 +55,7 @@ Vision/.venv/bin/python -m App --source detector-demo
 # Automatic gaming command exercise; no calibration required.
 Vision/.venv/bin/python -m App --source demo
 
-# Head-only mouse test (load/calibrate Head X and Head Y, then Start live control).
+# Head mouse and button layout (load/calibrate Head X and Head Y, then Start live control).
 Vision/.venv/bin/python -m App --source camera --output native --mapping mouse-test
 
 # Previous mouse/scroll exercise.
@@ -105,19 +105,19 @@ default is a labeled synthetic demo; choose **Camera** to open your camera.
    approximate screen coordinates. No pupil-center startup gate is needed.
    This has not been calibrated to the actual point you are looking at;
    [behavior and accuracy limits](../docs/SCREEN_POINTER_GUIDE.md).
-7. **Mapping settings… → Pointer behavior** chooses Screen destination or Velocity.
+7. **Mapping settings… → Pointer behavior** chooses Screen destination or Relative movement.
    Destination mode exposes position smoothing (20 ms), delay (0 ms), downward
    boost (4×), pointer gain (2×) and a fixation dead band (.002). Velocity exposes the original central dead zone,
    activation margin, response curve, acceleration and deceleration. Applying changes
-   stops output. The pointer uses pupils in gaming or head X/Y in Mouse test. **Adaptive pointer smoothing (1€)** reduces stationary jitter and responds faster to deliberate motion; uncheck it to compare the fixed filter. In Mouse test, unused dwell/key settings are hidden; its Eye clicks checkbox is in Head movement response. Detector setup remains
+   stops output. The pointer uses pupils in gaming or head X/Y in Mouse test. **Adaptive pointer smoothing (1€)** reduces stationary jitter and responds faster to deliberate motion; uncheck it to compare the fixed filter. In Mouse test, unused dwell/key settings are hidden; its Enable eye button actions checkbox is in Head movement response. Detector setup remains
    independent in Calibration. Mouse test also offers **Speed-aware acceleration
    and return braking**: fast outward turns accelerate, returning toward neutral
    brakes, and holding a position keeps its usual speed. Uncheck it to compare
    the response without transient boost/braking. Small movements now give much slower precision speed; larger turns still reach full speed. [Head pointer tuning](../docs/HEAD_POINTER_GUIDE.md).
 8. To control the OS, build Drivers and choose **Output → Live mouse + keyboard →
-   Connect output** on Signals, then **Start live control**. Native eyes
-   produce one complete click per activation (no dragging); head keys stay held
-   until neutral/invalid. **Driver dry run** exercises the actual library without
+   Connect output** on Signals, then **Start live control**. Mapped mouse buttons
+   produce one complete click per activation (no dragging); keyboard actions stay held
+   until their input releases or becomes invalid. **Driver dry run** exercises the actual library without
    OS input. Any driver error stops output and remains visible in the UI.
 
 **Mouse test setup:** choose **Signals → Active mapping → Mouse test**, load a
@@ -127,10 +127,10 @@ connect **Live mouse + keyboard**, hold a comfortable pose and choose **Center h
 Normal **Start live control** instead waits for the saved center. The status now
 identifies that blocker and offers recentering; restarting the driver is unnecessary.
 Head movement needs no eye/pupil calibration. For clicks, enable **Mapping settings →
-Head movement response → Eye clicks**. Use **Live curves → Require calibrated wink
-for clicks** to select trained wink actions (checked) or plain eye open/closed
+Head movement response → Enable eye button actions**. Use **Live curves → Require calibrated wink
+for eye actions** to select trained wink actions (checked) or plain eye open/closed
 (unchecked). Plain mode requires only eye geometry; ordinary blinks also click.
-Each closure/action clicks once until reopening. Both calibrated head inputs must
+Left-eye activation holds W; right-eye activation clicks once until reopening. Mouth opening holds Space until closed, with no guide or adjustable threshold. Both calibrated head inputs must
 be valid; raw yaw alone is insufficient. Changing mappings or eye mode stops output.
 
 Pupils use raw direction without a guide or personal pupil fit. They can use completed guided eye geometry as additional evidence for naturally narrow open eyes. Without it, generic checks still work. Raw coordinates and saved pupil/head fits are unchanged; closure, ambiguous iris evidence and missing input still stop motion. See [quality changes and measured software comparison](../docs/PUPIL_QUALITY_GUIDE.md).
@@ -176,7 +176,7 @@ Save the migrated profile to preserve the new format. Existing files are not
 rewritten automatically.
 
 Gaming names, head thresholds, key bindings and pointer gain use separate
-`input_mapping_v7` files (v1/v2 import as velocity; v3–v6 retain their response; v1–v5 head mappings keep clicks off; all older versions default to requiring winks) exported from **Signals → Mapping settings…**. Mode, gains and target filtering belong to the mapping. Face profiles continue
+`input_mapping_v8` files (v1/v2 import as velocity; old mappings retain their response and original eye-click assignments, with mouth unassigned; v1–v5 head mappings keep eye actions off) exported from **Signals → Mapping settings…**. Mode, gains and target filtering belong to the mapping. Face profiles continue
 to contain detector fits and the existing mouse response settings. Loading a face
 profile applies its response to the selected mapping and stops output; it keeps
 that mapping's name, head settings, bindings, gains and target filtering. Mouse test

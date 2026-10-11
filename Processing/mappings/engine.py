@@ -4,9 +4,9 @@ from dataclasses import replace
 import math
 import uuid
 
-from Processing.mouse.engine import AxisFilter, MouseProcessor
+from Processing.mouse.engine import AxisFilter, EyeGate, MouseProcessor
 from Processing.mouse.signals import decode, finite
-from .config import DIRECTIONS, KEYS, Mapping, mouse_test_mapping
+from .config import BUTTON_INPUTS, DIRECTIONS, KEYS, Mapping, action_label, mouse_test_mapping
 from .target import TargetFilter
 from .head_pointer import HeadPointerFilter
 
@@ -79,6 +79,7 @@ class GamingProcessor(MouseProcessor):
         self.mapping = mapping or Mapping()
         self.head_x = HeadGate(self.mapping.head_x)
         self.head_y = HeadGate(self.mapping.head_y)
+        self.mouth = EyeGate(None)  # Binary-only gate: no dwell/configuration path.
         self.output_session_id = str(uuid.uuid4())
         super().__init__(self.mapping.response, subject_id)
         self.pointer = (TargetFilter(replace(self.config.pointer, smoothing_ms=self.mapping.target_smoothing_ms),
@@ -98,11 +99,13 @@ class GamingProcessor(MouseProcessor):
 
     def arm(self):
         super().arm()
+        self.mouth.reset()
         self.head_x.reset()
         self.head_y.reset()
 
     def disarm(self, reason="Preview stopped"):
         super().disarm(reason)
+        self.mouth.reset()
         self.head_x.reset()
         self.head_y.reset()
 
@@ -111,26 +114,59 @@ class GamingProcessor(MouseProcessor):
         if result["accepted"]:
             self.head_x.sample(self.sample.head_x, self.sample.timestamp_ms, self.armed)
             self.head_y.sample(self.sample.scroll, self.sample.timestamp_ms, self.armed)
+            if self.armed:
+                value = self.sample.mouth_open
+                self.mouth.sample(value, self.sample.timestamp_ms, known=value is not None,
+                                  reopened=value is False, instant=True)
         return result
 
+    def buttons_released(self):
+        if self.sample is None:
+            return False
+        actions = ((self.sample.left_known and self.sample.left_closed) or self.left.down,
+                   (self.sample.right_known and self.sample.right_closed) or self.right.down,
+                   self.sample.mouth_open is True or self.mouth.down)
+        return not any(active and binding != "none"
+                       for active, binding in zip(actions, self.mapping.button_bindings))
+
     def can_enable(self):
-        usable = self.pointer.valid or self.head_x.ready or self.head_y.ready or self.left.ready or self.right.ready
-        eyes_released = (self.sample is not None and
-                         not (self.sample.left_known and self.sample.left_closed) and
-                         not (self.sample.right_known and self.sample.right_closed))
+        usable = self.pointer.valid or self.head_x.ready or self.head_y.ready or self.left.ready or self.right.ready or self.mouth.ready
         return (usable and self.pointer.neutral() and self.head_x.neutral and self.head_y.neutral
-                and eyes_released and not self.left.down and not self.right.down)
+                and self.buttons_released())
 
     def tick(self, now_ms):
         snap = super().tick(now_ms)
         keys = dict.fromkeys(KEYS, 0)
+        key_known = dict.fromkeys(KEYS, False)
         directions = (self.head_y.direction == 1, self.head_y.direction == -1,
                       self.head_x.direction == -1, self.head_x.direction == 1)
-        if snap["enabled"]:
-            for key, active in zip(self.mapping.bindings, directions):
-                if key != "none" and active:
-                    keys[key] = 1
+        for key, active, gate in zip(self.mapping.bindings, directions,
+                                     (self.head_y, self.head_y, self.head_x, self.head_x)):
+            if key != "none":
+                key_known[key] |= gate.raw is not None
+                keys[key] |= int(snap["enabled"] and active)
         diag = snap["diagnostics"]
+        fresh = (self.received_ms is not None and self.sample is not None
+                 and 0 <= now_ms-self.sample.timestamp_ms <= self.config.stale_ms
+                 and 0 <= now_ms-self.received_ms <= self.config.stale_ms)
+        raw_mouth = self.sample.mouth_open if fresh else None
+        diag["mouth_open"] = raw_mouth
+        diag["button_actions"] = {}
+        clicks = {"left_click": 0, "right_click": 0}
+        click_known = dict.fromkeys(clicks, False)
+        for source, gate, raw, output in zip(BUTTON_INPUTS, (self.left, self.right, self.mouth),
+                                           (diag["left_closed"], diag["right_closed"], raw_mouth),
+                                           self.mapping.button_bindings):
+            active = int(snap["enabled"] and raw is not None and gate.down)
+            diag["button_actions"][source] = dict(raw=raw, known=raw is not None,
+                                                  ready=gate.ready, down=active, output=output)
+            if output in keys:
+                keys[output] |= active
+                key_known[output] |= raw is not None
+            elif output in clicks:
+                clicks[output] |= active
+                click_known[output] |= raw is not None
+        snap.update(clicks)
         snap.update(keys=keys, scroll_y=.5, mapping_id=self.mapping.id,
                     mapping_name=self.mapping.name, mapping_revision=self.mapping.revision,
                     pointer_input="head" if self.mapping.input_mode == "head-mouse" else "pupils",
@@ -150,8 +186,7 @@ class GamingProcessor(MouseProcessor):
                     eyes={side:dict(known=getattr(self.sample, side+"_known", False) and diag[side+"_closed"] is not None,
                                    ready=getattr(self, side).ready, down=getattr(self, side).down)
                           for side in ("left", "right")})
-        snap["known"] = {"left_click": diag["left_closed"] is not None,
-                         "right_click": diag["right_closed"] is not None,
+        snap["known"] = {**click_known, "keys": key_known,
                          "head_x": self.head_x.raw is not None,
                          "head_y": self.head_y.raw is not None,
                          "pointer": diag["raw_pointer"] is not None}
@@ -166,13 +201,26 @@ class GamingProcessor(MouseProcessor):
     def instructions(self, snap):
         rows = []
         diag = snap["diagnostics"]
-        for side in ("left", "right"):
-            gate = getattr(self, side)
-            raw = diag[side+"_closed"]
-            status = "unknown; released" if raw is None else "waiting for reopen" if not gate.ready else "active" if snap[side+"_click"] else "released"
-            rows.append({"id": "eye_"+side, "input": side.title()+" eye action", "raw": None if raw is None else int(raw),
-                         "filtered": None if raw is None else int(raw), "threshold": "Calibrated wink" if self.mapping.require_wink else "Open / closed",
-                         "instruction": side.title()+" mouse: "+status})
+        for source, action in diag["button_actions"].items():
+            mouth = source == "mouth"
+            raw, output = action["raw"], action["output"]
+            if mouth and output == "none":
+                continue
+            if output == "none":
+                status = "unassigned"
+            elif raw is None:
+                status = "unknown; released"
+            elif not snap["armed"]:
+                status = "output stopped"
+            elif not action["ready"]:
+                status = "waiting for close" if mouth else "waiting for reopen"
+            else:
+                status = "active" if action["down"] else "released"
+            rows.append({"id": "mouth" if mouth else "eye_"+source.split("_")[0],
+                         "input": "Mouth open" if mouth else source.replace("_", " ").capitalize()+" action",
+                         "raw": None if raw is None else int(raw), "filtered": None if raw is None else int(raw),
+                         "threshold": "Binary · no calibration" if mouth else "Calibrated wink" if self.mapping.require_wink else "Open / closed",
+                         "instruction": action_label(output)+": "+status})
         for name, gate, direction, key in zip(DIRECTIONS, (self.head_y,self.head_y,self.head_x,self.head_x),
                                               (1,-1,-1,1), self.mapping.bindings):
             on = (.5+direction*gate.config.activation/2)
@@ -208,12 +256,12 @@ class GamingProcessor(MouseProcessor):
                          "raw": point[index] if point is not None else None,
                          "filtered": filtered[index] if filtered is not None else None,
                          "threshold": f"Radius {self.config.pointer.deadzone+self.config.pointer.hysteresis:.2f} / {self.config.pointer.deadzone:.2f}",
-                         "instruction": "Pointer: "+instruction})
+                         "instruction": "Relative pointer: "+instruction})
         return rows
 
 
 class HeadMouseProcessor(GamingProcessor):
-    """Head X/Y pointer with optional wink or plain closure clicks; no keys/scroll."""
+    """Relative head X/Y pointer with independent eye/mouth button actions."""
 
     def __init__(self, mapping=None, subject_id="mock-person"):
         mapping = mapping or mouse_test_mapping()
@@ -231,7 +279,7 @@ class HeadMouseProcessor(GamingProcessor):
         super().arm()
         self.center_requested = center
         self.center_capture_at = self.last_tick if center else None
-        if center:self.reason = "Center head: hold a comfortable pose and open your eyes"
+        if center:self.reason = "Center head: hold a comfortable pose, open eyes and close mouth"
 
     def disarm(self, reason="Preview stopped"):
         self.center_requested = False
@@ -255,8 +303,8 @@ class HeadMouseProcessor(GamingProcessor):
             sample = self.sample
             if sample.pointer is None:
                 self.reason = "Center head: waiting for valid Head X and Head Y"
-            elif any(getattr(sample, side+"_known") and getattr(sample, side+"_closed") for side in ("left", "right")):
-                self.reason = "Center head: open your eyes before starting"
+            elif not self.buttons_released():
+                self.reason = "Center head: open your eyes and close your mouth before starting"
             elif not all(.05 <= value <= .95 for value in sample.pointer):
                 self.reason = "Center head: move away from the calibrated range limits"
             else:
@@ -282,11 +330,8 @@ class HeadMouseProcessor(GamingProcessor):
                        pointer_timestamp_ms=None, pointer_sequence=None)
 
     def can_enable(self):
-        eyes_released = (self.sample is not None and
-                         not (self.sample.left_known and self.sample.left_closed) and
-                         not (self.sample.right_known and self.sample.right_closed))
-        return (not self.center_requested and self.pointer.valid and self.pointer.neutral() and eyes_released
-                and not self.left.down and not self.right.down)
+        return (not self.center_requested and self.pointer.valid and self.pointer.neutral()
+                and self.buttons_released())
 
     def instructions(self, snap):
         all_rows = super().instructions(snap)
@@ -297,6 +342,7 @@ class HeadMouseProcessor(GamingProcessor):
             if motion and snap["enabled"] and snap["known"]["pointer"]:
                 row["instruction"] += " · "+motion["phase"]
         rows.append(dict(id="ignored", input="Other inputs", raw=None, filtered=None,
-                         threshold="Ignored", instruction="No pupil movement, keys or scroll" if self.mapping.head_wink_clicks
-                         else "No clicks, keys or scroll"))
-        return (all_rows[:2] if self.mapping.head_wink_clicks else []) + rows
+                         threshold="Ignored", instruction="No pupil movement, head-direction keys or scroll"))
+        buttons = [r for r in all_rows if (r["id"] == "mouth" and self.mapping.button_bindings[2] != "none") or
+                   (r["id"] in ("eye_left", "eye_right") and self.mapping.head_wink_clicks)]
+        return buttons + rows
