@@ -67,6 +67,7 @@ class Sample:
     pointer_async: bool = False
     pointer_timestamp_ms: object = None
     pointer_sequence: object = None
+    head_x: object = None
 
     def __post_init__(self):
         for side in ("left", "right"):
@@ -96,7 +97,8 @@ def decode(frame, config, subject_id):
             return value == config.closed_value if finite(value) and value in (0, 1) else None
         return Sample(session, sequence, timestamp, subject_id, eye("left_eye"), eye("right_eye"),
                       one_hot_matrix(frame.get(config.pointer_source)),
-                      one_hot_vector(frame.get("head_vertical")))
+                      one_hot_vector(frame.get("head_vertical")),
+                      head_x=one_hot_vector(frame.get("head_horizontal")))
 
     if type(frame.get("schema_version")) is not int or frame["schema_version"] != 1:
         raise ValueError("Expected raw_mouse_v1 or SignalFrame schema_version 1")
@@ -160,6 +162,6 @@ def decode(frame, config, subject_id):
         return Sample(session,sequence,timestamp,subject_id,*bits,
                       (x,y) if x is not None and y is not None else None,measurement("head_y"),
                       appearance_intent=True,left_reopened=measurement("left_eye_open")==1,
-                      right_reopened=measurement("right_eye_open")==1, **pointer_source)
+                      right_reopened=measurement("right_eye_open")==1, head_x=measurement("head_x"), **pointer_source)
     return Sample(session, sequence, timestamp, subject_id, eye("left_eye_open"), eye("right_eye_open"),
-                  (x, y) if x is not None and y is not None else None, measurement("head_y"), **pointer_source)
+                  (x, y) if x is not None and y is not None else None, measurement("head_y"), head_x=measurement("head_x"), **pointer_source)

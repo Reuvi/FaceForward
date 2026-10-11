@@ -54,4 +54,5 @@ def raw_frame(sequence, timestamp_ms, state=None, *, session_id="mock-session", 
         "tongue": matrix(state["x"], state["y"], rows, columns),
         "gaze": matrix(state["x"], state["y"], rows, columns),
         "head_vertical": vector(state["scroll"], vector_size),
+        "head_horizontal": vector(state.get("head_x", .5), vector_size),
     }

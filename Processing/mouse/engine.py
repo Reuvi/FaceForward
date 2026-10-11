@@ -65,8 +65,9 @@ class EyeGate:
 class AxisFilter:
     """Buffered interpolation → radial dead zone → curve → boost → limited velocity."""
 
-    def __init__(self, config, dimensions):
+    def __init__(self, config, dimensions, *, gain=1):
         self.config = config
+        self.gain = gain
         self.dimensions = dimensions
         self.history = deque(maxlen=512)
         self.valid = False
@@ -145,7 +146,7 @@ class AxisFilter:
         strength = 0.0
         if self.active:
             strength = ((min(1.0, magnitude) - config.deadzone) / (1 - config.deadzone)) ** config.exponent
-            strength = min(1.0, strength * (1 + self.boost))
+            strength = min(1.0, strength * self.gain * (1 + self.boost))
         self.target = tuple(v / magnitude * strength if magnitude else 0.0 for v in signed)
         alpha = 1.0 if config.smoothing_ms == 0 else -math.expm1(-dt * 1000.0 / config.smoothing_ms)
         desired = tuple(v + alpha * (t - v) for v, t in zip(self.velocity, self.target))
@@ -222,11 +223,18 @@ class MouseProcessor:
             self.eye_sample = normalized
             return normalized
 
+    def decode_sample(self, frame):
+        return decode(frame, self.config, self.subject_id)
+
+    def can_enable(self):
+        has_signal = self.pointer.valid or self.scroll.valid or self.left.ready or self.right.ready
+        return has_signal and self.pointer.neutral() and self.scroll.neutral()
+
     def accept(self, frame, received_ms):
         if not finite(received_ms):
             raise ValueError("received_ms must be finite")
         try:
-            sample = decode(frame, self.config, self.subject_id)
+            sample = self.decode_sample(frame)
             if not 0 <= received_ms - sample.timestamp_ms <= self.config.stale_ms:
                 raise ValueError("Sample is future-dated or stale")
         except ValueError as exc:
@@ -299,8 +307,7 @@ class MouseProcessor:
         if self.armed and not fresh and self.received_ms is not None:
             self.disarm("Input stale; start preview again")
         if self.armed and fresh and not self.enabled:
-            has_signal = (self.pointer.valid or self.scroll.valid or self.left.ready or self.right.ready)
-            if has_signal and self.pointer.neutral() and self.scroll.neutral():
+            if self.can_enable():
                 self.enabled = True
                 self.reason = "Running"
         pointer = self.pointer.step(now_ms, self.config.interpolation_ms, dt)

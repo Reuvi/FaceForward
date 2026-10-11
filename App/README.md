@@ -1,9 +1,13 @@
-# Native face mouse MVP
+# Native face mouse and keyboard preview
 
 The app now tracks **independent eyes/winks, Head Y, Head X and pupils**.
 Tongue detection has been retired: no tongue tab, calibration, graphs, mouth crop,
 model or background worker runs. Pupils are the mouse pointer input. The application
-is local Python/Tk; it does not use a browser or send real OS mouse events.
+is local Python/Tk; it does not use a browser or send real OS mouse/keyboard events.
+The default is **gaming keyboard mouse mapping 1**: left/right eye actions →
+left/right mouse, head down/up/left/right → W/Space/Shift/S, pupils → pointer
+velocity. The previous **Mouse and scroll** mode remains selectable. See
+[the Processing runbook](../Processing/mappings/README.md) for tuning and saved mappings.
 
 ## Open and test
 
@@ -16,8 +20,11 @@ Vision/.venv/bin/python -m App --source camera --model Vision/.local/face_landma
 # Generated face pixels follow calibration prompts; no camera required.
 Vision/.venv/bin/python -m App --source detector-demo
 
-# Automatic four-action mouse exercise; no calibration required.
+# Automatic gaming command exercise; no calibration required.
 Vision/.venv/bin/python -m App --source demo
+
+# Previous mouse/scroll exercise.
+Vision/.venv/bin/python -m App --source demo --mapping mouse
 ```
 
 Restart an already-open app to get these changes. A sole visible face attaches as
@@ -33,14 +40,14 @@ camera/demo/replay. No second application is required.
    A recognized wink remains ON while held. Eyes are independent; there is no
    opposite-eye or duration gate. [Eye testing guide](../docs/EYE_CALIBRATION_GUIDE.md).
 3. **2 Head Y**: run **Start head pitch guide**. Comfortable up/neutral/down map
-   to 0/.5/1. Pitch controls vertical scroll in mouse mode. **Retry current step**
+   to 0/.5/1. Pitch controls Space/W in gaming mode or scroll in mouse mode. **Retry current step**
    repeats a capture/check; choose a pose beside **Redo selected step** to redo
    just neutral, up or down, including from a loaded profile. Other references and
    the last working fit stay intact; changed references require fresh checks.
    [Head Y retry instructions](../docs/HEAD_Y_RETRY_GUIDE.md).
 4. **3 Head X**: run **Start head yaw guide**. Comfortable left/neutral/right map
    to 0/.5/1. **Retry this pose** keeps successful prior captures and a previous
-   completed fit. Head X is observable but is not mapped to the mouse yet.
+   completed fit. Gaming maps left/right to Shift/S independently of pitch.
    [Head X testing](../docs/HEAD_HORIZONTAL_TESTING.md).
 5. **4 Pupils**: press **Start / restart pupil guide**. Keep looking at center
    while turning/nodding your head, then center your head and follow the eye targets.
@@ -49,11 +56,14 @@ camera/demo/replay. No second application is required.
    or **Reset pupils only** leave eyes and head fits intact. An **11×11 square
    matrix** highlights the cell; a white dot shows continuous position.
    [Full guide and engineering details](../docs/PUPIL_HEAD_CALIBRATION_GUIDE.md).
-6. To exercise Processing, open **Live lab**, center your head/pupil direction,
-   open both eyes, and press **Start preview**. Test left wink, right wink,
-   pupil movement and head pitch separately. Movement is relative velocity,
-   not an estimate of the screen location you are looking at.
-7. **Transfer settings** changes mouse dead zones, smoothing, acceleration and
+6. Open **Signal mapping**, center your head/pupil direction, open both eyes,
+   and press **Start preview**. Inspect raw → filtered → instruction for each
+   input. Head X/Y have separate activation/release thresholds, smoothing and
+   confirmation settings. Change key bindings or use **Copy as…** to make another
+   named mapping; **Export mapping** saves it locally. **Live lab** also shows
+   the simulated pointer. Pupil movement requests relative velocity, not the
+   screen location you are looking at.
+7. **Transfer settings** changes pointer dead zones, smoothing, acceleration and
    preview speeds. These device response functions are separate from detection.
    Applying changes stops preview. Its pointer source is fixed to `gaze` (pupils).
 
@@ -87,6 +97,13 @@ Loading disarms output; inspect readings and explicitly start preview again.
 Save the migrated profile to preserve the new format. Existing files are not
 rewritten automatically.
 
+Gaming names, head thresholds, key bindings and pointer gain use separate
+`input_mapping_v1` files exported from **Signal mapping**. Face profiles continue
+to contain detector fits and the existing mouse response settings. Loading a face
+profile applies its response to the selected mapping and stops output; it keeps
+that mapping's name, head settings and bindings. Export mapping settings separately
+after tuning them; named copies are otherwise held only for the current app session.
+
 Brief face loss and same-source restarts keep completed fits. Switching source
 kind, applying detector settings, or **Reset all calibration** clears them.
 Closing the app clears memory, so save first. Leaving a running guide cancels its
@@ -101,7 +118,7 @@ Vision.LabRuntime → DetectorWorkbench: eyes/winks + pitch/yaw + pupils
     ├─ shared capture trace → source screen / calibration / CSV
     └─ SignalFrame v1 → MouseSession → Processing.Lab.ingest
                                        ↓ independent 100 Hz Processing clock
-                                  scopes / simulated mouse preview
+                                  named mapping / scopes / command preview
 ```
 
 Tk draws snapshots separately; camera overlays are capped near 10 Hz. No tongue
@@ -114,7 +131,11 @@ continuous `gaze_x/y`; the additive `pupil_matrix_v1` is available for inspectio
 without quantizing mouse movement. `gaze_measurement` is now
 `head_compensated_iris_direction_v1`; raw iris measurements remain
 `mediapipe_iris_direction_v3`. Independent `eye_intent_v1` samples remain on
-every capture. Driver-facing `mouse_preview_v0` is still provisional.
+every capture. Gaming emits `device_control_v1` with held keys/buttons, velocity,
+validity and original capture provenance. Mouse mode preserves `mouse_preview_v0`.
+See [the new command boundary](../Contracts/GAMING_MAPPING.md). The bounded
+transition journal preserves short eye ON/OFF evidence between output ticks;
+it is not a reliable live-driver transport.
 
 `Vision/legacy_presets.py` validates old files. Retired tongue algorithm modules,
 notices and unit tests remain for historical compatibility/developer use; they

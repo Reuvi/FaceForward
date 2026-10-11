@@ -307,6 +307,9 @@ class MouseSession:
                     with self.lock:
                         if self.stop_event.is_set():
                             raise SourceStopped()
+                        if mode == "demo" and self.lab.mapping_id != "mouse":
+                            from Processing.mappings.demo import gaming_demo_frame
+                            frame = gaming_demo_frame(frame, fps)
                         self.deliver(frame)
                     if count is not None and index + 1 >= count:
                         break

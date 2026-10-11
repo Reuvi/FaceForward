@@ -1,11 +1,13 @@
 # Mouse MVP engineering guide
 
-> Current MVP: tongue has been removed from App and Vision lab. Use
-> [App's current testing/profile guide](../App/README.md) and
-> [pupil matrix testing](../docs/DIRECT_PUPIL_TESTING.md). Eyes and head axes remain;
-> pupils are the pointer input, with no pupil calibration or sensitivity controls.
-> Detector presets are v11; old tongue state is discarded on load. Any tongue
-> setup, backend, recheck or mapping instructions below are historical.
+> Current implementation: [gaming Processing](../Processing/mappings/README.md)
+> adds independent head gates and keyboard states to the preserved mouse engine.
+> App defaults to gaming keyboard mouse mapping 1; mouse/scroll remains selectable.
+> Read [device_control_v1](../Contracts/GAMING_MAPPING.md) for command provenance,
+> bounded transition evidence and lifecycle. Vision supplies calibrated,
+> head-compensated continuous pupils under detector v12; see
+> [pupil calibration](PUPIL_HEAD_CALIBRATION_GUIDE.md). No tongue detector runs.
+> The older mouse/scroll and tongue descriptions below are historical.
 
 Current head/tongue update: use the [movement calibration guide](MOVEMENT_CALIBRATION_GUIDE.md)
 for guided position fitting, raw graphs on camera setup and shared capture data.

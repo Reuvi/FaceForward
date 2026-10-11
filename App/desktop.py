@@ -47,8 +47,8 @@ class CalibrationBridge:
 class IntegratedDesktop(DesktopLab):
     appearance_eyes = True
     heading = "Vision + Processing"
-    subtitle = "Mouse MVP · native signal lab · simulated mouse output"
-    footer = "Mouse preview only    •    Live detector capabilities and raw measurements appear in Vision source & raw signals"
+    subtitle = "Native signal lab · named mouse/keyboard mappings · preview output"
+    footer = "Preview only    •    Choose and tune controls in Signal mapping; real OS output is not connected"
 
     def __init__(self, root, session, options):
         self.session = session
@@ -60,7 +60,7 @@ class IntegratedDesktop(DesktopLab):
         self.table_values = {}
         self.calibration_ui = None
         super().__init__(root, session.lab)
-        root.title("Face Mouse MVP — Vision + Processing")
+        root.title("Face Input Preview — Vision + Processing")
         self.notebook.select(self.vision_page)
         self.start_source()
         self.refresh_vision()

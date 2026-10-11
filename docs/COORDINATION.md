@@ -932,3 +932,30 @@ Handoff:
 - User instructions: `docs/HEAD_Y_RETRY_GUIDE.md`. Restart App, select Detection
   calibration → 2 Head Y. Cancel/loss still discards unfinished captures, retaining
   completed fits; a first-ever incomplete guide has no saved references to reuse.
+
+## Gaming signal processing — implementation handoff
+
+- Task/lane: user-authorized middle phase, integration. Branch
+  `work/reuvi/integration/gaming-signal-processing`, worktree
+  `.worktrees/reuvi-integration-gaming-signal-processing`, base `7175a89`.
+- Contract first: `ba1f76b`; full handoff and runtime commit lookup:
+  [Processing/mappings/HANDOFF.md](../Processing/mappings/HANDOFF.md).
+- App now defaults to **gaming keyboard mouse mapping 1**. Existing calibrated
+  raw input feeds independent head filters (down/up/left/right → W/Space/Shift/S),
+  instantaneous eye intent → mouse states, precise pupils → pointer velocity.
+  Mouse/scroll remains separately selectable. Vision and Drivers code unchanged.
+- Signal mapping shows raw/filtered/threshold/instruction rows, head scopes,
+  bounded action transitions, settings, named copies and local mapping files.
+  Stop/loss/staleness/settings/source/profile changes release and require re-arm.
+- Interfaces: additive `device_control_v1` and `input_mapping_v1`; original
+  SignalFrame v1, face profile v3, detector v12 and mouse_preview_v0 preserved.
+- Checks: 98 Processing + 105 integration tests passed, including native Tk;
+  both 490-frame gaming/mouse demos accepted every frame, showed all their mapped
+  actions and ended disabled/released. Native layout inspected. Benchmarks and
+  exact commands are in the handoff. No camera or real OS input opened.
+- Remaining dependency: latest driverTest still `2e3e734`; held mouse support,
+  ordered action delivery and source-age/lifecycle adapter are required before
+  native output. Current output is explicitly a preview. Human tuning untested.
+- Run in this checkout: `python3 -m App --source demo`, then Signal mapping and
+  Start preview. Read [the runbook](../Processing/mappings/README.md). No main
+  merge/push or changes to other active checkouts were performed.

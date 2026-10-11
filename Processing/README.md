@@ -1,9 +1,18 @@
-# Mouse processing prototype
+# Signal processing and mappings
 
-Planning the next preset: [gaming keyboard mouse mapping 1](GAMING_KEYBOARD_MOUSE_MAPPING_1.md)
-maps independent eye actions to mouse buttons, head directions to W/Space/Shift/S,
-and pupils to pointer movement. It includes noise thresholds and the proposed
-driver handoff; it is not implemented or selectable yet.
+**Implemented:** [gaming keyboard mouse mapping 1](mappings/README.md) maps
+independent calibrated eye actions to mouse buttons, head directions to
+W/Space/Shift/S, and precise calibrated pupils to pointer velocity. Select it in
+**Signal mapping**; App selects it by default. The native panel shows raw and
+filtered values, thresholds and readable commands. Named copies and local mapping
+files support additional presets. Output is a command preview; no real OS input
+is emitted. See [the adopted contract](../Contracts/GAMING_MAPPING.md).
+
+The remaining sections describe the preserved **Mouse and scroll** developer
+mode, including its legacy synthetic eye timers and tongue replay support.
+The current App uses calibrated eye intent without those timers and fixed pupil
+input. No tongue detector runs in App. The [original gaming plan](GAMING_KEYBOARD_MOUSE_MAPPING_1.md)
+records the driver investigation and remaining native-driver prerequisites.
 
 Async neural tongue frames now preserve their original capture time. Repeated
 origins do not add interpolation samples; stale tongue releases pointer motion

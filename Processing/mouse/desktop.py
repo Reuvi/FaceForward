@@ -213,6 +213,9 @@ class DesktopLab:
         self.build_live()
         self.build_settings()
         self.build_inspector()
+        from Processing.mappings.view import MappingPanel
+        self.mapping_page = MappingPanel(self.notebook, self)
+        self.notebook.insert(0, self.mapping_page, text="Signal mapping")
         self.message = tk.StringVar()
         label(self.root, textvariable=self.message, foreground="#ffa79c", wraplength=1300).pack(fill="x", padx=22)
         label(self.root, self.footer,
@@ -362,8 +365,8 @@ class DesktopLab:
             label(group, help_text, style="Small.TLabel", wraplength=245).grid(row=len(fields), column=0, columnspan=2, sticky="w", pady=15)
 
     def build_inspector(self):
-        label(self.inspect_page, "Raw input and provisional driver output", font=("Helvetica Neue", 16, "bold")).pack(anchor="w")
-        label(self.inspect_page, "Serialization is isolated in mouse/output.py. The final emulator format is still pending.", foreground=MUTED).pack(anchor="w", pady=8)
+        label(self.inspect_page, "Raw input and processed command", font=("Helvetica Neue", 16, "bold")).pack(anchor="w")
+        label(self.inspect_page, "Preview only. Gaming commands include held keys/buttons and original capture freshness; no OS driver is connected.", foreground=MUTED).pack(anchor="w", pady=8)
         panes = ttk.Panedwindow(self.inspect_page, orient="horizontal"); panes.pack(fill="both", expand=True)
         self.raw_text, self.output_text = (tk.Text(panes, background=BG, foreground=TEXT, insertbackground=TEXT, font=("Menlo", 10), wrap="none", width=50) for _ in range(2))
         panes.add(self.raw_text, weight=1); panes.add(self.output_text, weight=1)
@@ -384,7 +387,7 @@ class DesktopLab:
         x0, x1 = width * 0.2, width * 0.8
         canvas.create_rectangle(x0, 40, x1, 600, fill="#d9e4d8", outline="", tags="paper")
         canvas.create_text(x0 + 22, 84, anchor="nw", text="Move with intention.", font=("Helvetica Neue", 21, "bold"), fill="#354c3c", tags="paper")
-        canvas.create_text(x0 + 22, 123, anchor="nw", text="The matrix drives this cursor.\nThe head vector scrolls this page.", font=("Helvetica Neue", 12), fill="#354c3c", tags="paper")
+        canvas.create_text(x0 + 22, 123, anchor="nw", text="Inputs move this cursor.\nSee Signal mapping for active controls.", font=("Helvetica Neue", 12), fill="#354c3c", tags="paper")
         for index in range(20):
             y = 200 + index * 19
             canvas.create_line(x0 + 23, y, x1 - 23 - (60 if index % 3 == 0 else 0), y, width=5, fill="#b3c3b1", tags="paper")
@@ -527,6 +530,7 @@ class DesktopLab:
             self.fill_settings()
         self.integrate(state["trace"], state["runtime"])
         self.history.extend(state["trace"])
+        self.mapping_page.refresh(state, self.history)
         if state["trace"]:
             self.after = state["trace"][-1]["id"]
         snap, diag = state["snapshot"], state["snapshot"]["diagnostics"]
@@ -536,7 +540,7 @@ class DesktopLab:
             self.mock_combo.configure(state="disabled" if external else "readonly")
             for widget in self.mock_widgets:
                 widget.configure(state="disabled" if external else "normal")
-        set_var(self.status, snap["status"])
+        set_var(self.status, (snap["mapping_name"]+" · " if "mapping_name" in snap else "")+snap["status"])
         age = "—" if diag["age_ms"] is None else f"{diag['age_ms']:.0f}"
         self.refresh_count += 1
         if self.refresh_count % 5 == 0:

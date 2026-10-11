@@ -1,6 +1,11 @@
 # gaming keyboard mouse mapping 1
 
-Status: implementation plan, not an active mapping. Requested by Reuvi on
+Status: original design record; the Processing middle phase is now implemented.
+Use [the implementation runbook](mappings/README.md) and
+[adopted contract](../Contracts/GAMING_MAPPING.md) for current behavior. Current
+pupils use personal endpoints and head-angle compensation; older fixed-pupil
+assumptions below are superseded by PUPIL_HEAD_CALIBRATION.md. Native driver
+injection remains pending. The original plan was requested by Reuvi on
 2026-10-10. Processing lane; branch `work/reuvi/processing/gaming-mapping-plan`.
 Base: `63fb5d3590d040bb82be7b9962c225c26405adbd`.
 

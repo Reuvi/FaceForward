@@ -1,15 +1,19 @@
 """Native lab controller with an independent 100 Hz processing clock; no network."""
 
 from collections import deque
+from copy import deepcopy
 from dataclasses import replace
+import re
 import threading
 import time
 
 from .config import MouseConfig, number
 from .engine import MouseProcessor
 from .mocks import SCENARIOS, raw_frame, scenario
-from .output import mouse_message
+from .output import control_message
 from Processing.eye_samples import trace_fields
+from Processing.mappings.config import GAMING_ID, Mapping, read_mapping, write_mapping
+from Processing.mappings.engine import GamingProcessor
 
 
 def now_ms():
@@ -22,10 +26,16 @@ class Lab:
         self.clock = clock
         self.locked_source = None
         self.locked_pointer_source = None
+        self.mapping_id = "mouse"
+        self.mappings = {GAMING_ID: Mapping()}
+        self.mouse_config = config or MouseConfig()
+        self.commands = deque(maxlen=512)
+        self.command_id = 0
+        self.last_command_state = None
         self.processor = MouseProcessor(config)
         self.runtime = {"sample_hz": 30, "rows": 9, "columns": 9, "vector_size": 11,
                         "pointer_speed": 900, "scroll_speed": 450, "source": "mock", "subject_id": "mock-person"}
-        self.manual = {"x": 0.5, "y": 0.5, "scroll": 0.5, "left": False, "right": False}
+        self.manual = {"x": 0.5, "y": 0.5, "scroll": 0.5, "head_x": .5, "left": False, "right": False}
         self.scenario_name = "manual"
         self.started = self.scenario_start = self.clock()
         self.next_sample = self.started
@@ -58,7 +68,7 @@ class Lab:
                     )
                     self.processor.accept(self.last_raw, timestamp)
                     self.sample_sequence += 1
-            self.snapshot = self.processor.tick(timestamp)
+            self.take_snapshot(timestamp)
             self.trace_id += 1
             snap, diag = self.snapshot, self.snapshot["diagnostics"]
             point, interpolated = diag["raw_pointer"], diag["interpolated_pointer"]
@@ -81,7 +91,27 @@ class Lab:
                 "right_raw": int(diag["right_closed"]) if diag["right_closed"] is not None else None,
                 "left_out": snap["left_click"], "right_out": snap["right_click"],
                 "left_dwell": diag["left_dwell"], "right_dwell": diag["right_dwell"],
+                "raw_head_x": diag.get("head_x", {}).get("raw"),
+                "filtered_head_x": diag.get("head_x", {}).get("filtered"),
+                "raw_head_y": diag.get("head_y", {}).get("raw"),
+                "filtered_head_y": diag.get("head_y", {}).get("filtered"),
+                **{"key_"+key: snap.get("keys", {}).get(key, 0)
+                   for key in ("w", "a", "s", "d", "space", "left_shift")},
             })
+
+    def take_snapshot(self, timestamp):
+        """Called under the lab lock on captures and ticks, never from drawing."""
+        self.snapshot = self.processor.tick(timestamp)
+        message = control_message(self.snapshot)
+        if message["format"] == "device_control_v1":
+            state = (message["output_session_id"], message["enabled"],
+                     tuple(message["buttons"].values()), tuple(message["keys"].values()))
+            if state != self.last_command_state:
+                self.command_id += 1
+                self.commands.append({"id": self.command_id, "command": message})
+                self.last_command_state = state
+        else:
+            self.last_command_state = None
 
     def start(self):
         if self.thread is not None:
@@ -102,15 +132,23 @@ class Lab:
 
     def close(self):
         self.stop_event.set()
-        if self.thread:
-            self.thread.join(timeout=2)
         with self.lock:
             self.processor.disarm("Lab closed")
-            self.snapshot = self.processor.tick(self.clock())
+            self.take_snapshot(self.clock())
+        if self.thread:
+            self.thread.join(timeout=2)
 
-    def state(self, after=0):
+    def state(self, after=0, *, after_command=None):
         with self.lock:
-            return {"eye_sample": self.processor.eye_sample, "snapshot": self.snapshot, "message": mouse_message(self.snapshot),
+            commands = list(self.commands)
+            gap = after_command is not None and bool(commands) and after_command < commands[0]["id"]-1
+            return {"eye_sample": self.processor.eye_sample, "snapshot": self.snapshot, "message": control_message(self.snapshot),
+                    "mapping_id": self.mapping_id,
+                    "mapping": self.mappings[self.mapping_id].to_dict() if self.mapping_id != "mouse" else None,
+                    "mappings": [{"id": "mouse", "name": "Mouse and scroll"}] +
+                                [{"id": value.id, "name": value.name} for value in self.mappings.values()],
+                    "commands": deepcopy(commands[-8:] if after_command is None else [c for c in commands if c["id"] > after_command]),
+                    "command_id": self.command_id, "command_gap": gap,
                     "trace": [row for row in self.trace if row["id"] > after],
                     "raw": self.last_raw, "runtime": self.runtime.copy(), "manual": self.manual.copy(),
                     "config": self.processor.config.to_dict(), "scenario": self.scenario_name,
@@ -156,15 +194,68 @@ class Lab:
                 raise ValueError("The integrated app owns the input source; use its Vision source tab")
             if not isinstance(runtime["subject_id"], str) or not 1 <= len(runtime["subject_id"]) <= 128:
                 raise ValueError("subject_id must be a nonempty string of at most 128 characters")
-            self.processor = MouseProcessor(config, subject_id=runtime["subject_id"])
+            mapping = None
+            if self.mapping_id != "mouse":
+                mapping = self.mappings[self.mapping_id]
+                config = replace(config, pointer_source="gaze")
+                mapping = replace(mapping, response=config, revision=mapping.revision + int(config != mapping.response))
+            self.processor.disarm("Settings changed; start preview again")
+            self.take_snapshot(self.clock())
+            if self.mapping_id == "mouse":
+                self.mouse_config = config
+                self.processor = MouseProcessor(config, subject_id=runtime["subject_id"])
+            else:
+                self.mappings[self.mapping_id] = mapping
+                self.processor = GamingProcessor(mapping, subject_id=runtime["subject_id"])
             self.runtime = runtime
             self.trace.clear()
             self.generation += 1
             self.last_raw = None
             self.last_ingest = None
             self.pulses = {"left": 0.0, "right": 0.0}
-            self.snapshot = self.processor.tick(self.clock())
+            self.take_snapshot(self.clock())
             self.next_sample = self.clock()
+
+    def select_mapping(self, mapping_id):
+        with self.lock:
+            if mapping_id != "mouse" and mapping_id not in self.mappings:
+                raise ValueError("Unknown mapping")
+            self.processor.disarm("Mapping changed; start preview again")
+            self.take_snapshot(self.clock())
+            self.mapping_id = mapping_id
+            config = self.mouse_config if mapping_id == "mouse" else self.mappings[mapping_id].response
+            self.settings({"config": config.to_dict()})
+
+    def update_mapping(self, data):
+        mapping = Mapping.from_dict(data)  # Validate everything before releasing/replacing.
+        with self.lock:
+            self.mappings[mapping.id] = mapping
+            self.select_mapping(mapping.id)
+
+    def copy_mapping(self, name):
+        with self.lock:
+            if self.mapping_id == "mouse":
+                raise ValueError("Select a gaming mapping to copy")
+            if not isinstance(name, str) or not name.strip():
+                raise ValueError("Enter a mapping name")
+            stem = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:55]
+            if not stem or not stem[0].isalpha():
+                stem = "mapping-"+stem[:47]
+            identity, suffix = stem, 2
+            while identity in self.mappings or identity == "mouse":
+                identity = f"{stem}-{suffix}"
+                suffix += 1
+            mapping = replace(self.mappings[self.mapping_id], id=identity, name=name, revision=1)
+            self.update_mapping(mapping.to_dict())
+
+    def export_mapping(self, path):
+        with self.lock:
+            if self.mapping_id == "mouse":
+                raise ValueError("Select a gaming mapping to export")
+            write_mapping(path, self.mappings[self.mapping_id])
+
+    def import_mapping(self, path):
+        self.update_mapping(read_mapping(path).to_dict())
 
     def action(self, values):
         action = values.get("action")
@@ -175,7 +266,7 @@ class Lab:
             elif action == "stop":
                 self.processor.disarm()
             elif action == "center":
-                self.manual.update(x=0.5, y=0.5, scroll=0.5, left=False, right=False)
+                self.manual.update(x=0.5, y=0.5, scroll=0.5, head_x=.5, left=False, right=False)
                 self.pulses = {"left": 0.0, "right": 0.0}
                 self.scenario_name = "manual"
             elif action == "stream":
@@ -206,7 +297,7 @@ class Lab:
                 self.settings({"config": config.to_dict()})
             else:
                 raise ValueError("Unknown action")
-            self.snapshot = self.processor.tick(self.clock())
+            self.take_snapshot(self.clock())
 
     def disconnect(self, reason, *, clear_eye_history=False):
         """Release output immediately at source EOF/error/stop, before timeout."""
@@ -214,14 +305,17 @@ class Lab:
             self.processor.disarm(reason)
             if clear_eye_history:
                 self.processor.eye_sample = None
-            self.snapshot = self.processor.tick(self.clock())
+            self.take_snapshot(self.clock())
 
     def ingest(self, frame):
         with self.lock:
             if self.runtime["source"] != "external":
                 raise ValueError("Select external source before submitting detector frames")
-            result = self.processor.accept(frame, self.clock())
+            timestamp = self.clock()
+            result = self.processor.accept(frame, timestamp)
             # Show the actual latest input, including subject loss/rejected frames.
             self.last_raw = frame
             self.last_ingest = result
+            if self.mapping_id != "mouse":
+                self.take_snapshot(timestamp)
             return dict(result, eye_sample=self.processor.eye_sample)

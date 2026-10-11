@@ -10,11 +10,13 @@ A hackathon prototype for controlling a computer through a consumer webcam and
 comfortable facial movements. The pipeline separates measurement, personalized
 signal processing, and device output so three teammates can develop independently.
 
-**Repository status:** one native mouse lab with live detector calibration and
-Processing in the same window. Independent eyes, head X/Y and pupil
-measurements feed the existing scopes and simulated mouse. Saved local profiles
-keep detector fits and mouse settings together. Live accuracy validation and the
-real Drivers connection remain pending.
+**Repository status:** one native lab with detector calibration and Processing
+in the same window. **gaming keyboard mouse mapping 1** maps independent eyes
+to mouse buttons, head down/up/left/right to W/Space/Shift/S, and pupils to pointer
+velocity. The Signal mapping tab shows raw values, filters, thresholds and readable
+commands, with named mapping copies and local import/export. Saved face profiles
+keep detector fits and mouse response settings together. Live accuracy validation
+and the real Drivers connection remain pending.
 
 ## Calibrate and test in one window
 
@@ -29,8 +31,8 @@ Vision/.venv/bin/python -m App --source camera --model Vision/.local/face_landma
 Follow [the unified workflow and saved-profile guide](App/README.md).
 [Horizontal head testing](docs/HEAD_HORIZONTAL_TESTING.md) covers the new independent
 Head X yaw guide, raw/normalized graphs and saved horizontal ranges.
-The [pupil testing guide](docs/DIRECT_PUPIL_TESTING.md) explains direct iris
-normalization, downward movement and the square matrix. Historical tongue guides
+The [pupil testing guide](docs/PUPIL_HEAD_CALIBRATION_GUIDE.md) explains personal
+direction ranges, head compensation and the square matrix. Historical tongue guides
 are superseded by the [retirement contract](Contracts/TONGUE_RETIREMENT.md).
 The [detector runbook](Vision/DETECTION_LAB.md) specifies measurements and thresholds.
 Optional camera dependencies/model setup are in [Vision setup](Vision/README.md).
@@ -44,16 +46,18 @@ From this repository root, with Python 3.10+ and Tk:
 python3 -m App
 ```
 
-The default is a labeled synthetic Vision demo. Click **Start preview**, then
-**Live lab** to watch independent left/right clicks, pointer motion, scrolling,
-and input/output scopes. **Vision source & raw signals** shows measurements,
+The default is a labeled synthetic Vision gaming demo. Click **Start preview**,
+then **Signal mapping** to watch independent left/right mouse commands, pointer
+motion and W/Space/Shift/S. Use `--mapping mouse` for the previous scroll mode.
+**Vision source & raw signals** shows measurements,
 validity, actual source timing, and optional camera diagnostics. There is no
 browser, JavaScript, network service, or real OS mouse injection.
 
 Read [the complete MVP runbook](App/README.md),
 [Processing tuning instructions](Processing/README.md),
 [Vision camera setup](Vision/README.md), and
-[the adopted native handoff](Contracts/MOUSE_MVP.md).
+[the gaming Processing runbook](Processing/mappings/README.md), and
+[the adopted command handoff](Contracts/GAMING_MAPPING.md).
 
 ## Read while testing and developing
 
