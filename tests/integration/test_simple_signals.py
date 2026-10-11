@@ -335,6 +335,15 @@ class SimpleSignalsWindowTests(unittest.TestCase):
         self.ui.setup_dictation()
         provider.start.assert_called_once_with(check=True)
         self.assertFalse(self.session.lab.processor.armed)
+        index=next(i for i,(key,_) in enumerate(editor.channel_choices) if key=='gestures')
+        editor.selector.current(index);editor.select_channel();self.root.update()
+        self.assertEqual(set(editor.widgets),{'chord_ms'})
+        state=self.session.lab.state()
+        state['output'].update(mode='dry-run',event_counts={10:4,11:3,9:2,1:30})
+        panel.refresh(state,[])
+        self.assertIn('4 left downs',panel.events.get())
+        self.assertIn('3 left ups',panel.events.get())
+        self.assertNotIn('left clicks',panel.events.get())
 
     def test_screen_destination_settings_show_only_relevant_response_controls(self):
         self.ui.refresh();self.root.update()

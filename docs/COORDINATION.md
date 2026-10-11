@@ -1,5 +1,44 @@
 # Main chat and agent coordination hub
 
+## Held-left mouse correction handoff
+
+- Lane/task: Reuvi integration, continuing the owned isolated
+  `codex/integration/presentation-wink-fix` checkout from `8448385`. The user
+  corrected the behavior to mouse down while closed and mouse up when reopening.
+  Contract commit `a8b7ac4` precedes this App/Processing/Drivers adapter integration.
+  Main merge/push remains explicitly authorized in this conversation.
+- Evidence: current logs showed recognized left winks but no click requests;
+  the global other-eye validity gate and release-click arbitration cancelled them
+  before Drivers. Mapping still selected left mouse; native output had no error.
+- Behavior: Presentation now emits held-left down/up on the first valid selected
+  action and its release, allowing immediate dragging. Opposite-eye uncertainty
+  cannot veto a known left action. A previous actual-open baseline survives
+  uncertain pre-press closing frames; unknown never presses. After any press,
+  invalid/nonmatching left evidence releases and only actual reopening rearms.
+  Both closed suppresses/release left for dictation; a prior immediate press cannot
+  be undone if the second eye closes later. Right Enter retains release timing.
+- Changed paths: Processing presentation/tuning/UI, `Drivers/output.py`, regression
+  and native Tk integration tests, presentation contract/runbook and this handoff.
+  Additive paired per-eye validity flags let the adapter validate held-left
+  independently. Legacy payloads retain both-eye validity. ABI v3/native binaries,
+  profiles, Vision classifiers, head response and mouth brake are unchanged.
+  The UI now reports actual driver left down/up counts instead of zero click pulses;
+  the obsolete drag-delay slider is removed while saved values remain readable.
+- Verification: Processing **222 passed**, final presentation subset **18 passed**;
+  compiled-driver presentation **18 passed**; driver connection **22 passed / 1
+  optional skip**; native Tk Signals/curves **19 passed**; **5/5 CTest groups passed**.
+  New scenarios cover observed unknown/wink transitions, opposite-eye independence,
+  single down/up without repeats, stop/loss/watchdog release, malformed/unknown
+  per-eye commands, and no deferred press after dictation sending. Ruff F, diff
+  and integration scope checks passed.
+- Mock pipeline: **490/490 accepted**, 667 relative moves, one left down/up pair,
+  one Enter, no driver error, ending disabled with held keys zero. Tests use the
+  compiled dry-run driver, not live camera/microphone or OS input.
+- Run: restart App from updated main, load existing profiles, keep the desired
+  wink/plain setting, then Center head & start. Close left eye to press, hold to
+  drag and reopen to release. [Controls](PRESENTATION_GUIDE.md). Human trial is the
+  remaining evidence; no private recordings or profiles were changed/committed.
+
 ## Presentation wink-click recovery handoff
 
 - Lane/task: Reuvi integration, `codex/integration/presentation-wink-fix`, isolated

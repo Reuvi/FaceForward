@@ -24,12 +24,12 @@ class PresentationTests(unittest.TestCase):
     def hold(self, count=30, **values):
         return [self.feed(**values) for _ in range(count)]
 
-    def test_solo_click_enter_once_after_reopen_no_space_w_right_click(self):
+    def test_left_down_on_closure_up_on_open_enter_on_reopen(self):
         self.assertTrue(self.core.enabled)
         snaps=self.hold(10,left='closed')
+        self.assertTrue(all(s['presentation']['drag_left'] for s in snaps))
         self.assertFalse(any(s['left_click'] for s in snaps))
-        self.assertEqual(self.feed()['left_click'],1)
-        self.assertEqual(self.feed()['left_click'],0)
+        self.assertFalse(self.feed()['presentation']['drag_left'])
         self.hold(10,right='closed')
         self.assertTrue(self.feed()['presentation']['enter'])
         self.assertFalse(self.feed()['presentation']['enter'])
@@ -56,7 +56,8 @@ class PresentationTests(unittest.TestCase):
         self.assertTrue(self.hold(35,left='closed')[-1]['presentation']['drag_left'])
         snap=self.feed();self.assertFalse(snap['presentation']['drag_left']);self.assertFalse(snap['left_click'])
         self.hold(35,left='closed')
-        self.assertFalse(self.feed(right='unknown',left='closed')['presentation']['drag_left'])
+        self.assertTrue(self.feed(right='unknown',left='closed')['presentation']['drag_left'])
+        self.assertFalse(self.feed(left='unknown')['presentation']['drag_left'])
         self.assertFalse(self.hold(35,left='closed')[-1]['presentation']['drag_left'])
         self.feed();self.hold(35,left='closed');self.core.disarm()
         self.assertFalse(self.core.tick(self.now)['presentation']['drag_left'])
@@ -65,16 +66,17 @@ class PresentationTests(unittest.TestCase):
         self.assertFalse(snap['enabled']);self.assertFalse(snap['presentation']['drag_left'])
         self.assertFalse(self.feed()['enabled'])
 
-    def test_unknown_eye_cancels_pending_click_requires_both_open(self):
+    def test_unknown_left_releases_and_requires_reopen_before_another_press(self):
         self.hold(12,left='closed');self.feed(left='unknown')
-        self.hold(12,left='closed');self.assertFalse(self.feed()['left_click'])
-        self.hold(12,left='closed');self.assertTrue(self.feed()['left_click'])
+        self.assertFalse(self.hold(12,left='closed')[-1]['presentation']['drag_left'])
+        self.feed()
+        self.assertTrue(self.feed(left='closed')['presentation']['drag_left'])
 
-    def test_wink_flag_gates_solo_but_both_eyes_use_anatomical_closure(self):
-        self.core=PresentationProcessor(replace(presentation_mapping(),require_wink=True),'person')
-        self.core.arm();self.feed()
-        self.hold(10,left='closed');self.assertFalse(self.feed()['left_click'])
-        self.hold(10,left='wink');self.assertTrue(self.feed()['left_click'])
+    def test_wink_flag_gates_left_but_both_eyes_use_anatomical_closure(self):
+        self.wink_mode()
+        self.assertFalse(self.feed(left='closed')['presentation']['drag_left'])
+        self.assertTrue(self.feed(left='wink')['presentation']['drag_left'])
+        self.assertFalse(self.feed()['presentation']['drag_left'])
         self.hold(30,left='closed',right='closed')
         self.assertTrue(self.core.dictating)
 
@@ -89,54 +91,56 @@ class PresentationTests(unittest.TestCase):
         self.assertTrue(self.core.accept(sample,self.now)['accepted'])
         return self.core.tick(self.now)
 
-    def test_initial_closed_nonwink_must_not_veto_later_recognition(self):
+    def test_logged_pattern_valid_left_wink_survives_right_unknown(self):
         self.wink_mode()
-        self.hold(3,left='closed')
-        self.hold(10,left='wink')
-        self.assertTrue(self.feed()['left_click'])
-        self.assertFalse(self.feed()['left_click'])
-        self.hold(3,right='closed')
-        self.hold(10,right='wink')
-        self.assertTrue(self.feed()['presentation']['enter'])
+        # Closing can pass through unknown geometry before recognition. The
+        # opposite eye also flickers unknown in the user's diagnostic samples.
+        self.feed(left='unknown',right='unknown')
+        self.hold(3,left='closed',right='unknown')
+        snap=self.feed(left='wink',right='unknown')
+        self.assertTrue(snap['presentation']['drag_left'])
+        self.assertTrue(snap['presentation']['left_known'])
+        self.assertFalse(snap['presentation']['eyes_known'])
+        self.assertTrue(snap['diagnostics']['eyes']['left']['down'])
+        self.assertTrue(snap['diagnostics']['button_actions']['left_eye']['down'])
+        self.assertTrue(self.feed(left='wink',right='unknown')['presentation']['drag_left'])
+        self.assertFalse(self.feed(left='unknown',right='unknown')['presentation']['drag_left'])
+        self.assertFalse(self.feed(left='wink',right='unknown')['presentation']['drag_left'])
+        self.feed(right='unknown')  # Only the left eye has to reopen.
+        self.assertTrue(self.feed(left='wink',right='unknown')['presentation']['drag_left'])
 
-    def test_brief_recognized_wink_needs_no_extra_solo_hold(self):
+    def test_brief_recognized_wink_presses_in_same_capture_and_release_is_not_click_pulse(self):
         self.wink_mode()
-        self.feed(left='closed');self.feed(left='wink')
-        self.assertTrue(self.feed()['left_click'])
+        self.feed(left='closed')
+        self.assertTrue(self.feed(left='wink')['presentation']['drag_left'])
+        snap=self.feed()
+        self.assertFalse(snap['presentation']['drag_left'])
+        self.assertFalse(snap['left_click'])
         self.feed(right='wink')
         self.assertTrue(self.feed()['presentation']['enter'])
-        self.feed(left='closed')
-        self.assertFalse(self.feed()['left_click'])
-        self.core=PresentationProcessor(subject_id='person');self.core.arm();self.feed()
-        self.feed(left='closed')
-        self.assertFalse(self.feed()['left_click'])
 
-    def test_unknown_wink_with_known_geometry_cancels_click_and_drag(self):
+    def test_unknown_wink_with_known_geometry_releases_without_repress(self):
         self.wink_mode()
-        self.hold(10,left='wink');self.intent_unknown()
         self.hold(10,left='wink')
-        self.assertFalse(self.feed()['left_click'])
-        self.assertTrue(self.hold(35,left='wink')[-1]['presentation']['drag_left'])
         self.assertFalse(self.intent_unknown()['presentation']['drag_left'])
-        self.assertFalse(self.hold(35,left='wink')[-1]['presentation']['drag_left'])
-        self.assertFalse(self.feed()['left_click'])
-        self.feed(left='wink');self.assertTrue(self.feed()['left_click'])
+        self.assertFalse(self.hold(10,left='wink')[-1]['presentation']['drag_left'])
+        self.feed()
+        self.assertTrue(self.feed(left='wink')['presentation']['drag_left'])
 
-    def test_closed_nonwink_releases_drag_without_repressing_or_release_click(self):
+    def test_closed_nonwink_releases_without_repressing_until_open(self):
         self.wink_mode()
-        self.hold(35,left='wink')
+        self.feed(left='wink')
         self.assertFalse(self.feed(left='closed')['presentation']['drag_left'])
         self.assertFalse(self.hold(35,left='wink')[-1]['presentation']['drag_left'])
-        self.assertFalse(self.feed()['left_click'])
+        self.feed()
+        self.assertTrue(self.feed(left='wink')['presentation']['drag_left'])
 
-    def test_supported_nonwink_clears_pending_click_but_later_match_can_qualify(self):
-        self.wink_mode()
-        self.feed(left='wink');self.feed(left='closed')
-        self.assertFalse(self.feed()['left_click'])
-        self.feed(left='wink');self.feed(left='closed');self.feed(left='wink')
-        self.assertTrue(self.feed()['left_click'])
-        self.feed(left='closed');self.feed(right='wink')
-        self.assertFalse(self.feed()['presentation']['enter'])
+    def test_no_press_without_observed_open_and_presentation_cannot_disable_eyes(self):
+        self.wink_mode();self.core.disarm();self.core.arm()
+        self.assertFalse(self.feed(left='wink',right='unknown')['presentation']['drag_left'])
+        self.assertFalse(self.core.gestures.left_button.ready)
+        with self.assertRaises(ValueError):
+            replace(presentation_mapping(),head_wink_clicks=False)
 
     def test_short_wink_then_both_eyes_still_suppresses_solo(self):
         self.wink_mode()
@@ -154,19 +158,21 @@ class PresentationTests(unittest.TestCase):
         snap=self.feed()
         counts=snap['diagnostics']['eye_gesture']['counts']
         self.assertEqual(counts['left_action_frames'],1)
-        self.assertEqual(counts['clicks'],1)
+        self.assertEqual(counts['left_presses'],1)
+        self.assertEqual(counts['left_releases'],1)
+        self.assertEqual(counts['clicks'],0)
         for _ in range(5):
             self.assertEqual(self.core.tick(self.now)['diagnostics']['eye_gesture']['counts'],counts)
         snap=self.intent_unknown()
-        self.assertIn('wink unknown',snap['diagnostics']['eye_gesture']['status'])
+        self.assertIn('Left eye unknown',snap['diagnostics']['eye_gesture']['status'])
         self.assertEqual(snap['diagnostics']['eye_gesture']['counts']['left_unknown_frames'],1)
-        self.assertIn('wink unknown',snap['instructions'][0]['instruction'])
+        self.assertIn('Left eye unknown',snap['instructions'][0]['instruction'])
 
     def test_wink_gesture_sliders_omit_inapplicable_solo_delay(self):
         lab=Lab(clock=lambda:self.now);self.addCleanup(lab.close)
         lab.select_mapping('presentation')
         mapping=lab.state()['mapping'];mapping['require_wink']=True;lab.update_mapping(mapping)
-        self.assertEqual([s.key for s in sliders(lab.state(),'gestures')],['chord_ms','drag_ms'])
+        self.assertEqual([s.key for s in sliders(lab.state(),'gestures')],['chord_ms'])
 
     def test_progressive_brake_zero_at_full_no_reverse_or_frame_rate_damping(self):
         velocities=[]
@@ -198,7 +204,7 @@ class PresentationTests(unittest.TestCase):
         self.assertFalse(self.core.accept(duplicate,self.now)['accepted'])
         self.assertIs(self.core.sample,before)
         self.assertTrue(self.core.tick(self.now)['presentation']['eyes_known'])
-        self.assertTrue(self.feed()['left_click'])
+        self.assertFalse(self.feed()['presentation']['drag_left'])
 
     def test_startup_reuses_personal_response_without_modifying_saved_profile(self):
         from pathlib import Path

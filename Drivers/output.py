@@ -179,14 +179,17 @@ class DriverOutput:
                 raise DriverError("Unknown pointer input cannot move the pointer")
         presentation = message.get("presentation")
         if presentation is not None:
+            presentation_fields = {"enter", "drag_left", "eyes_known"}
             if (not gaming or not isinstance(presentation, dict) or
-                    set(presentation) != {"enter", "drag_left", "eyes_known"} or
+                    set(presentation) not in (presentation_fields, presentation_fields | {"left_known", "right_known"}) or
                     any(type(v) is not bool for v in presentation.values())):
                 raise DriverError("Expected complete presentation state")
             if target:
                 raise DriverError("Presentation requires relative pointer movement")
             enter, drag = presentation["enter"], presentation["drag_left"]
-            if ((enter or drag) and not presentation["eyes_known"] or (enter and drag) or
+            left_known = presentation.get("left_known", presentation["eyes_known"])
+            right_known = presentation.get("right_known", presentation["eyes_known"])
+            if ((enter and not right_known) or (drag and not left_known) or (enter and drag) or
                     ((enter or drag) and (any(buttons.values()) or frame.keys_down))):
                 raise DriverError("Invalid or unknown presentation gesture")
             if not hasattr(self.lib, "fid_set_presentation") or not (self.status().capabilities & 256):

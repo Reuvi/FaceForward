@@ -61,40 +61,54 @@ class PresentationConnectionTests(unittest.TestCase):
         self.speech.emit('final',text)
         return self.feed()
 
-    def test_compiled_click_enter_drag_and_relative_movement(self):
+    def test_compiled_left_down_hold_up_enter_and_relative_movement(self):
+        state=self.feed(left='closed')
+        self.assertEqual(state['output']['event_counts'].get(10),1)
+        self.assertEqual(state['output']['event_counts'].get(11,0),0)
         self.hold(10,left='closed');state=self.feed()
-        self.assertEqual(state['output']['event_counts'].get(3),1)
+        self.assertEqual(state['output']['event_counts'].get(11),1)
+        self.assertEqual(state['output']['event_counts'].get(3,0),0)
         self.hold(10,right='closed');state=self.feed()
         self.assertEqual(state['output']['event_counts'].get(9),1)
-        state=self.hold(35,left='closed')[-1]
-        self.assertEqual(state['output']['event_counts'].get(10),1)
+        state=self.feed(left='closed')
+        self.assertEqual(state['output']['event_counts'].get(10),2)
         for _ in range(8):
             time.sleep(.01)
             state=self.feed(left='closed',head_x=.7)
         self.assertGreater(state['output']['event_counts'].get(1,0),0)
         self.assertEqual(state['message']['pointer']['mode'],'velocity')
         state=self.feed()
-        self.assertEqual(state['output']['event_counts'].get(11),1)
-        self.assertEqual(state['output']['event_counts'].get(3),1)
+        self.assertEqual(state['output']['event_counts'].get(11),2)
+        self.assertEqual(state['output']['event_counts'].get(3,0),0)
         self.assertEqual(state['output']['held_keys'],0)
 
-    def test_wink_after_initial_nonmatch_and_brief_wink_reach_compiled_driver_once(self):
+    def test_logged_wink_and_unknown_pattern_reaches_compiled_down_up_once(self):
         mapping=self.lab.state()['mapping'];mapping['require_wink']=True
         self.lab.update_mapping(mapping)
         self.lab.action({'action':'arm'});self.feed()
-        self.hold(3,left='closed')
-        self.feed(left='wink')
-        state=self.feed()
-        self.assertEqual(state['output']['event_counts'].get(3),1)
+        self.feed(left='unknown',right='unknown')
+        self.hold(3,left='closed',right='unknown')
+        state=self.feed(left='wink',right='unknown')
+        self.assertEqual(state['output']['event_counts'].get(10),1)
+        self.assertEqual(state['output']['event_counts'].get(11,0),0)
+        self.assertTrue(state['message']['presentation']['left_known'])
+        self.assertFalse(state['message']['presentation']['eyes_known'])
         for _ in range(8):self.lab.step(self.now)
-        self.assertEqual(self.lab.state()['output']['event_counts'].get(3),1)
-        self.hold(3,right='closed');self.feed(right='wink')
-        self.assertEqual(self.feed()['output']['event_counts'].get(9),1)
-        self.feed(left='wink')
+        self.hold(10,left='wink',right='unknown')
+        self.assertEqual(self.lab.state()['output']['event_counts'].get(10),1)
+        state=self.feed(right='unknown')
+        self.assertEqual(state['output']['event_counts'].get(11),1)
+        self.assertEqual(state['output']['event_counts'].get(3,0),0)
+        self.feed(left='wink',right='unknown')
+        state=self.feed(left='unknown',right='unknown')
+        self.assertEqual(state['output']['event_counts'].get(11),2)
+        self.hold(10,left='wink',right='unknown')
+        self.assertEqual(self.lab.state()['output']['event_counts'].get(10),2)
+        self.feed();self.feed(left='wink')
         self.hold(30,left='closed',right='closed')
         state=self.feed()
-        self.assertEqual(state['output']['event_counts'].get(3),1)
-        self.assertEqual(state['output']['event_counts'].get(9),1)
+        self.assertEqual(state['output']['event_counts'].get(10),3)
+        self.assertEqual(state['output']['event_counts'].get(11),3)
         self.assertEqual(self.speech.starts,1)
 
     def test_unknown_wink_releases_compiled_drag_without_click(self):
@@ -216,7 +230,8 @@ class PresentationConnectionTests(unittest.TestCase):
     def test_unknown_mouth_stops_pointer_but_click_remains_available(self):
         self.hold(10,left='closed',openness=None,head_x=.7)
         state=self.feed(openness=None,head_x=.7)
-        self.assertEqual(state['output']['event_counts'].get(3),1)
+        self.assertEqual(state['output']['event_counts'].get(10),1)
+        self.assertEqual(state['output']['event_counts'].get(11),1)
         self.assertEqual(state['message']['pointer']['x'],.5)
 
     def test_bad_presentation_payload_is_rejected_before_button_can_press(self):
@@ -226,3 +241,35 @@ class PresentationConnectionTests(unittest.TestCase):
         message['presentation']=dict(enter=True,drag_left=False,eyes_known=False)
         with self.assertRaises(DriverError):self.lab.output.submit(message,self.lab.runtime)
         self.assertFalse(self.lab.output.status().enabled)
+
+    def test_per_eye_validity_does_not_allow_unknown_held_actions(self):
+        from Processing.mouse.output import control_message
+        for fields in (
+                dict(enter=False,drag_left=True,eyes_known=True,left_known=False,right_known=True),
+                dict(enter=True,drag_left=False,eyes_known=True,left_known=True,right_known=False),
+                dict(enter=False,drag_left=True,eyes_known=False,left_known=True),
+                dict(enter=False,drag_left=True,eyes_known=False,left_known=1,right_known=False)):
+            with self.subTest(fields=fields):
+                message=control_message(self.lab.processor.tick(self.now))
+                message['presentation']=fields
+                with self.assertRaises(DriverError):self.lab.output.submit(message,self.lab.runtime)
+                self.assertFalse(self.lab.output.status().enabled)
+
+    def test_stop_and_face_loss_release_held_left_and_never_rearm(self):
+        self.feed(left='closed')
+        self.lab.action({'action':'stop'})
+        self.assertEqual(self.lab.output.snapshot()['event_counts'].get(11),1)
+        self.hold(3,left='closed')
+        self.assertEqual(self.lab.output.snapshot()['event_counts'].get(10),1)
+        self.lab.action({'action':'arm'});self.feed();self.feed(left='closed')
+        self.now+=20;self.seq+=1;lost=frame(self.seq,self.now);lost['faces']=[]
+        self.session.deliver(lost)
+        self.assertEqual(self.lab.output.snapshot()['event_counts'].get(11),2)
+        self.assertFalse(self.feed()['snapshot']['armed'])
+
+    def test_left_attempt_during_sending_does_not_press_after_completion(self):
+        self.start_speech();self.finish_speech('abcdefghijklmnop')
+        self.hold(35,left='closed')
+        self.assertEqual(self.lab.output.snapshot()['event_counts'].get(10,0),0)
+        self.feed()
+        self.assertEqual(self.feed(left='closed')['output']['event_counts'].get(10),1)

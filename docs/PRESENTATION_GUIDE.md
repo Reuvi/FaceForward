@@ -9,23 +9,26 @@ Eye open/closed geometry and both head axes. Mouth opening needs no calibration.
 | --- | --- |
 | Head X / Y | Direction and speed of relative mouse movement |
 | Open mouth wider | More resistance; wide opening stops the pointer |
-| Close/reopen left eye | Left click (default minimum closure 120 ms) |
-| Hold left eye | Mouse down after 650 ms; move head to drag; reopen to release |
+| Close left eye / reopen | Mouse button down immediately / mouse button up |
+| Keep left eye closed | Keep mouse button held; move head to drag |
 | Close/reopen right eye | One Enter press (default minimum closure 120 ms) |
 | Hold both eyes closed | Toggle dictation after 450 ms; reopen between toggles |
 
-Both-eye gestures suppress click/Enter. Short simultaneous blinks do not toggle
-anything. Unknown eye evidence cancels a pending gesture and releases dragging;
-reopen both eyes to resume. Stop, tracking loss and stale input release everything
+Both-eye gestures release the mouse and suppress solo actions until both reopen.
+Short simultaneous blinks do not toggle dictation. If the left eye closes first,
+its button can already be down before the second eye closes; the both-eye gesture
+then releases it. Unknown left evidence releases the button; an uncertain right
+eye does not cancel a valid left press. Stop, tracking loss and stale input release everything
 and require Start again. Missing mouth evidence stops pointer movement in this
 mapping; it does not invent a closed-mouth value.
 
-With **Require calibrated wink for eye actions** enabled, a recognized wink clicks
-on reopening without an extra minimum hold. The first closed frame can precede
-wink recognition; it no longer rejects the entire gesture. Hold a recognized
-left wink for dragging. Known closed non-wink readings release pending recognition;
-unknown readings cancel the gesture until you reopen both eyes. Both-eye dictation
-continues to use anatomical closure, independent of wink recognition.
+With **Require calibrated wink for eye actions** enabled, the left button presses
+as soon as a valid wink is recognized. With it unchecked, a valid anatomical left
+closure presses instead. Open the left eye once to prepare each press. Uncertain
+closing frames before the press do not erase that baseline or fabricate a press;
+a later valid match can still press. Once pressed, unknown/nonmatching left
+evidence releases it and requires an actual reopen before another press. There
+is no left-click or drag delay. Right-eye Enter still occurs on reopening.
 
 ## Build and run
 
@@ -84,25 +87,28 @@ removes existing momentum and reduces requested velocity. It never reverses the
 pointer. Closing releases the brake and restores speed through the existing head
 acceleration/filter. Head response settings remain separate.
 
-**Live curves → Eye gesture timing** adjusts the plain-mode solo closure minimum,
-both-eye hold and drag hold. The solo minimum is hidden in wink mode because wink
-recognition already qualifies the action. **Require calibrated wink for eye actions** selects wink vs
+**Live curves → Eye gesture timing** adjusts the plain-mode right-eye Enter minimum
+and both-eye hold. The Enter minimum is hidden in wink mode because wink recognition
+already qualifies the action. Old saved drag delay values remain compatible but
+are no longer applied or shown. **Require calibrated wink for eye actions** selects wink vs
 plain anatomical input for solo actions; both-eye dictation always uses anatomical
 closure. Save/load a named tuning profile to keep these choices. Loading profiles
 or changing eye mode stops output; live response sliders do not arm it.
 
-For scrollbars: position over the scrollbar thumb, hold the left eye until the
-Signals row says Dragging, move your head, then reopen. Mouth resistance also
+For scrollbars: position over the scrollbar thumb, close the left eye until the
+Signals row says **Left button down**, move your head, then reopen. Mouth resistance also
 works while dragging.
 
 If a wink does not click, the left-eye Signals row distinguishes **waiting for
-calibrated wink**, **wink unknown**, **wink recognized — reopen for click**, and
-**Eye open/closed unknown**. Wink mode needs a camera profile with completed Wink
+calibrated wink**, **Left eye unknown — button released**, and **Left button down**.
+The Driver events line counts **left downs** and **left ups**; Presentation does
+not use the separate complete-click event. Wink mode needs a camera profile with completed Wink
 action calibration, not just a saved response/curve profile. Retry only the Wink
 action guide if recognition remains unavailable; existing head and eye geometry
 are retained. The local diagnostic log includes scalar recognition state and
 capture-level action/unknown counts, so brief winks are visible between 5 Hz log
-observations. Counts are gesture requests; `driver_events` confirms delivery.
+observations. `left_presses`/`left_releases` count gesture requests;
+`driver_events` types 10/11 confirm delivery to the driver.
 
 ## Software checks
 
