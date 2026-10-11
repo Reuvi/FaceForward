@@ -27,6 +27,13 @@ def synthetic_landmarks():
 
 
 class LandmarkTests(unittest.TestCase):
+    def test_tracking_confidence_is_opt_in_and_rejects_invalid_settings(self):
+        self.assertEqual(MediaPipeDetector(__file__).confidence_options,
+                         dict(min_face_presence_confidence=.5, min_tracking_confidence=.5))
+        for value in (float("nan"), -1, 2, True, None):
+            with self.assertRaises(ValueError):
+                MediaPipeDetector(__file__, min_tracking_confidence=value)
+
     def test_anatomical_eyes_remain_independent_and_use_pixel_aspect_ratio(self):
         observation = observation_from_landmarks(synthetic_landmarks(), 640, 480)
         self.assertAlmostEqual(observation.eyes["left"].openness, 0.2)

@@ -1,6 +1,6 @@
 # Test horizontal head detection
 
-Current profile/UI update: [direct pupil testing](DIRECT_PUPIL_TESTING.md) uses detector v8 and the scope label **Normalized positions**. Head calibration is unchanged.
+Current recovery update: [Head X + lip-boundary testing](LIP_BOUNDARY_HEAD_TESTING.md) uses detector v9, retains completed fits through failed retries and adds per-pose retry.
 
 Restart the native app from the repository root:
 
@@ -18,8 +18,8 @@ Vision/.venv/bin/python -m App --source camera --model Vision/.local/face_landma
    countdown, hold the pose during capture tones, and relax during rest tones.
    Rest screens include the countdown and next instruction.
 3. For **neutral**, face the camera in your comfortable resting position.
-   For **left/right**, turn your nose toward your own corresponding shoulder
-   only as far as comfortable while keeping your face visible. Avoid sideways
+   For **left/right**, turn slightly toward your own corresponding side
+   (roughly 10–20 degrees), comfortably with both eyes visible. Avoid sideways
    tilt. Directions refer to your body, regardless of the unmirrored preview.
 4. After the guide passes, check the green horizontal indicator:
    your learned left limit = **0**, neutral = **0.5**, right limit = **1**.
@@ -38,8 +38,8 @@ Vision/.venv/bin/python -m App --source camera --model Vision/.local/face_landma
 To redo horizontal calibration, press **Start head yaw guide** again. To clear it,
 press **Reset Head X only**. Both preserve completed vertical/eye/pupil/tongue fits.
 Cancelling, leaving the Head X tab or losing the face discards unfinished
-horizontal training. A completed fit survives ordinary face loss and same-source
-restart. Calibration commands stop the mouse preview; they never auto-arm it.
+horizontal training. The previous completed fit also survives retry, cancel, failure, face loss and same-source
+restart; a successful guide replaces it. Retry this pose repeats a failed capture. Calibration commands stop the mouse preview; they never auto-arm it.
 
 The default guide uses 1 second of preparation, 1.8 seconds of capture per pose,
 and 1.5 seconds of rest between poses. Each capture requires at least 12 usable
@@ -71,9 +71,9 @@ left half:   x = 0.5 * (u - L) / (C - L)
 right half:  x = 0.5 + 0.5 * (u - C) / (R - C)
 ```
 
-This works for either raw sign. Existing endpoint tolerance permits small
-overshoot (default .05 normalized), clamped to 0 or 1. Larger excursions,
-uncalibrated yaw, failed face-image quality, missing transformations,
+This works for either raw sign. Valid yaw outside the learned endpoints is
+saturated to 0 or 1; trace field `head_x_saturated` identifies that case.
+Uncalibrated yaw, failed face-image quality, missing transformations,
 degenerate forward direction and unsupported rear-facing poses remain invalid.
 Unknown graph segments hold the last plotted height in a darker color; that
 display hold never replaces unavailable detector measurements.
@@ -83,9 +83,9 @@ every processed capture. CSV adds `head_x_raw` (degrees), `head_x_quality`,
 `head_x_reason`, `head_x_raw_units`, and normalized `head_x` with its validity
 and confidence. All use the frame's original sequence/timestamp.
 
-New detector presets are **v7**, algorithm `independent-head-axes-v7`.
+New detector presets are **v9**, algorithm `lip-boundary-head-reliability-v9`.
 `head` still stores vertical pitch; nullable `head_x` stores horizontal yaw.
-Versions 1–6 remain readable and are fully validated before changing state.
+Versions 1–8 remain readable and are fully validated before changing state.
 Combined files remain `face_mouse_profile_v3`; loading can occur without a face.
 Invalid preset data does not partially overwrite the active calibration.
 

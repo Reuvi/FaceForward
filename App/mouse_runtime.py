@@ -70,7 +70,7 @@ class MouseSession:
 
     def detector_command(self, name, *args):
         allowed = {"start_eye_guide", "start_wink_guide", "present_eye_step", "start_movement_guide", "present_movement_step",
-                   "load_tongue_model", "reset_head_x", "set_pupil_sensitivity", "collect", "cancel", "freeze_mouth", "mark_tongue", "clear_tongue_marks", "fit_tongue", "reset_tongue", "retry_tongue_step", "configure", "reset_calibration"}
+                   "load_tongue_model", "use_lip_boundary", "reset_head_x", "set_pupil_sensitivity", "collect", "cancel", "freeze_mouth", "mark_tongue", "clear_tongue_marks", "fit_tongue", "reset_tongue", "retry_tongue_step", "configure", "reset_calibration"}
         if name not in allowed:
             raise ValueError("Unsupported calibration command")
         with self.lock:
@@ -339,17 +339,23 @@ class MouseSession:
 
     def _camera(self, camera_id, model, fps, preview, count):
         from Vision.capture import OpenCVCamera
-        from Vision.landmarks import MediaPipeDetector
+        from Vision.landmarks import LAB_TRACKING_CONFIDENCE, MediaPipeDetector
         self.ensure_detector_runtime()
-        from Vision.tongue_segment import SegmentedTongueModel
+        from Vision.lip_boundary import LipBoundaryModel
         with self.lock:
             core = self.detector_runtime.workbench
-            if not isinstance(core.tongue_model, SegmentedTongueModel):
-                core.tongue_model = SegmentedTongueModel()
+            if not core.independent_tongue:
+                core.tongue_model = LipBoundaryModel()
                 core.tongue_range = None
                 core.validation.clear()
         index = 0
-        with MediaPipeDetector(model, include_pose=True, include_expressions=True) as detector, OpenCVCamera(camera_id, fps=fps, clock=self.clock) as camera:
+        self.detector_runtime.tracker_floors = dict(face_presence_floor=LAB_TRACKING_CONFIDENCE,
+                                                   face_tracking_floor=LAB_TRACKING_CONFIDENCE)
+        with MediaPipeDetector(
+                model, include_pose=True, include_expressions=True,
+                min_face_presence_confidence=LAB_TRACKING_CONFIDENCE,
+                min_tracking_confidence=LAB_TRACKING_CONFIDENCE
+        ) as detector, OpenCVCamera(camera_id, fps=fps, clock=self.clock) as camera:
             while not self.stop_event.is_set() and (count is None or index < count):
                 captured = camera.read()
                 started = time.perf_counter()
@@ -366,6 +372,7 @@ class MouseSession:
         from Vision.demo_detection import demo_image
         from Vision.signals import CaptureSession
         runtime = self.ensure_detector_runtime()
+        runtime.tracker_floors = {}
         session = CaptureSession(self.clock)
         index = 0
         while not self.stop_event.is_set() and (count is None or index < count):

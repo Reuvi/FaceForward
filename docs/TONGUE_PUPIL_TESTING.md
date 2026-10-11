@@ -1,5 +1,9 @@
 # Test the new tongue and pupil joysticks
 
+**Current tongue workflow:** use [lip-boundary testing](LIP_BOUNDARY_HEAD_TESTING.md).
+It supersedes the default neural backend described below. ONNX remains an explicit
+comparison option; direct pupils remain current. New detector saves use v9.
+
 The new [horizontal head guide](HEAD_HORIZONTAL_TESTING.md) is tab **3 Head X**;
 Tongue is now **4 Tongue**, Pupils **5 Pupils**. New detector saves use v8 with direct pupil settings and independent yaw. Combined profiles remain v3.
 
@@ -18,7 +22,7 @@ All video stays local and in memory; no real mouse driver is enabled.
 
 ## Tongue: inspect before calibrating
 
-1. Open **Detection calibration → 3 Tongue**. Camera mode now uses local tongue
+1. Open **Detection calibration → 4 Tongue**. Camera mode now uses local tongue
    segmentation. It does not ask you to capture a background, mark color patches,
    or pass pixel recall. The old workflow remains only for developer color fixtures.
 2. Open your mouth and expose the tongue's front edge past the lip. **Green** is

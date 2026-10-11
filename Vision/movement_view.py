@@ -458,8 +458,10 @@ class MovementPanel:
         if kind == "tongue":
             self.ready = ttk.Button(self.frame, text="I'm in position — capture", command=self.capture_pose)
             self.ready.pack(fill="x", pady=3)
+        if kind in ("tongue", "head_x"):
             self.retry = ttk.Button(self.frame, text="Retry this pose", command=lambda: call("retry_tongue_step"))
             self.retry.pack(fill="x", pady=3)
+        if kind == "tongue":
             self.recheck = ttk.Button(
                 self.frame,
                 text=f"Recheck saved {kind} range",
@@ -474,10 +476,11 @@ class MovementPanel:
             if state["calibrating"] or self.kind == "tongue" and not state["tongue_fit"]
             else "normal"
         )
-        if self.kind == "tongue":
+        if self.kind in ("tongue", "head_x"):
             ours = guide and guide["kind"] == self.kind
-            self.ready.configure(state="normal" if ours and guide["active"] and guide["waiting"] and guide["phase"] == "prepare" else "disabled")
             self.retry.configure(state="normal" if ours and not guide["active"] and not guide["passed"] and not state["calibrating"] else "disabled")
+        if self.kind == "tongue":
+            self.ready.configure(state="normal" if ours and guide["active"] and guide["waiting"] and guide["phase"] == "prepare" else "disabled")
             self.recheck.configure(
                 state="normal"
                 if state.get(self.kind+"_range") and not state["calibrating"]
@@ -488,8 +491,9 @@ class MovementPanel:
             self.instruction.set(
                 "Neutral → up → down, followed by new checks."
                 if self.kind == "head"
-                else "Neutral → your left → your right, followed by new checks. Turn your head; keep your face visible."
+                else "Neutral → your left → your right, followed by new checks. Small comfortable turns (about 10–20°); keep both eyes visible. A failed pose can be retried alone."
                 if self.kind == "head_x"
+                else "Inspect the live boundary and color extension below, then start this guide. Each pose waits for capture." if state.get("tongue_backend")=="lip-boundary"
                 else "Inspect the live segmentation mask below, then start this guide. Each pose waits for capture." if state.get("tongue_backend")=="segmentation"
                 else "First complete the numbered appearance steps below. Then start this guide. Each pose waits for I'm in position — capture."
             )

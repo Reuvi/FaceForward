@@ -17,16 +17,17 @@ TIP_ALGORITHM = "color-tongue-tip-v5"
 JOYSTICK_ALGORITHM = "tongue-segmentation-pupil-joystick-v6"
 HEAD_AXES_ALGORITHM = "independent-head-axes-v7"
 DIRECT_PUPIL_ALGORITHM = "direct-mediapipe-pupils-v8"
+LIP_BOUNDARY_ALGORITHM = "lip-boundary-head-reliability-v9"
 
 
 def decode_winks(data):
     from .wink_model import validate_models
-    return validate_models(data["winks"]) if data.get("version") in (3,4,5,6,7,8) else {}
+    return validate_models(data["winks"]) if data.get("version") in (3,4,5,6,7,8,9) else {}
 
 
 def decode_tongue_range(data, config):
     from .movement_guide import validate_range
-    return validate_range(data["tongue_range"],config) if data.get("version") in (5,6,7,8) else None
+    return validate_range(data["tongue_range"],config) if data.get("version") in (5,6,7,8,9) else None
 
 
 def _keys(value, expected, name):
@@ -37,14 +38,14 @@ def _keys(value, expected, name):
 def decode_preset(data):
     """Validate completely before the workbench changes any active state."""
     fields=("version", "algorithm", "settings", "eyes", "head", "tongue")
-    if isinstance(data,dict) and data.get("version") in (3,4,5,6,7,8):fields+=("winks",)
-    if isinstance(data,dict) and data.get("version") in (4,5,6,7,8):fields+=("tongue_range",)
-    if isinstance(data,dict) and data.get("version") in (5,6,7,8):fields+=("tongue_measurement",)
-    if isinstance(data,dict) and data.get("version") in (6,7,8): fields+=("pupil",)
-    if isinstance(data,dict) and data.get("version") in (7,8): fields+=("head_x",)
+    if isinstance(data,dict) and data.get("version") in (3,4,5,6,7,8,9):fields+=("winks",)
+    if isinstance(data,dict) and data.get("version") in (4,5,6,7,8,9):fields+=("tongue_range",)
+    if isinstance(data,dict) and data.get("version") in (5,6,7,8,9):fields+=("tongue_measurement",)
+    if isinstance(data,dict) and data.get("version") in (6,7,8,9): fields+=("pupil",)
+    if isinstance(data,dict) and data.get("version") in (7,8,9): fields+=("head_x",)
     _keys(data, fields, "Detector preset")
     if (type(data["version"]) is not int
-            or (data["version"], data["algorithm"]) not in ((1, LEGACY_ALGORITHM), (2, ALGORITHM), (3,WINK_ALGORITHM), (4,MOVEMENT_ALGORITHM), (5,TIP_ALGORITHM), (6,JOYSTICK_ALGORITHM), (7,HEAD_AXES_ALGORITHM), (8,DIRECT_PUPIL_ALGORITHM))):
+            or (data["version"], data["algorithm"]) not in ((1, LEGACY_ALGORITHM), (2, ALGORITHM), (3,WINK_ALGORITHM), (4,MOVEMENT_ALGORITHM), (5,TIP_ALGORITHM), (6,JOYSTICK_ALGORITHM), (7,HEAD_AXES_ALGORITHM), (8,DIRECT_PUPIL_ALGORITHM), (9,LIP_BOUNDARY_ALGORITHM))):
         raise ValueError("Unsupported detector preset version or algorithm")
     settings = data["settings"]
     if isinstance(settings, dict):
@@ -53,8 +54,10 @@ def decode_preset(data):
         settings.setdefault("head_mode", "position")
     config = DetectionConfig.from_dict(settings)
     from .tongue_segment import MEASUREMENT, MODEL_SHA256, SegmentedTongueModel
-    allowed_measurements = (TONGUE_MEASUREMENT, MEASUREMENT) if data["version"] in (6,7,8) else (TONGUE_MEASUREMENT,)
-    if data["version"] in (5,6,7,8) and data["tongue_measurement"] not in allowed_measurements:
+    from .lip_boundary import MEASUREMENT as LIP_MEASUREMENT, ALGORITHM as LIP_ALGORITHM, LipBoundaryModel
+    allowed_measurements = (TONGUE_MEASUREMENT, MEASUREMENT) if data["version"] in (6,7,8,9) else (TONGUE_MEASUREMENT,)
+    if data["version"] == 9: allowed_measurements += (LIP_MEASUREMENT,)
+    if data["version"] in (5,6,7,8,9) and data["tongue_measurement"] not in allowed_measurements:
         raise ValueError("Unsupported tongue measurement coordinate space")
     if not isinstance(data["eyes"], dict) or set(data["eyes"]) - {"left", "right"}:
         raise ValueError("Unknown eye preset")
@@ -80,7 +83,11 @@ def decode_preset(data):
     pupil, _ = decode_pupil(data, config)
     decode_pupil_settings(data)
     neural = data.get("tongue_measurement") == MEASUREMENT
-    if neural:
+    if data.get("tongue_measurement") == LIP_MEASUREMENT:
+        if data["tongue"] != {"backend":"lip-boundary", "algorithm":LIP_ALGORITHM}:
+            raise ValueError("Unsupported lip-boundary detector identity")
+        tongue = LipBoundaryModel()
+    elif neural:
         _keys(data["tongue"], ("backend", "sha256"), "Tongue neural model")
         if data["tongue"] != {"backend": "yolov8n-seg", "sha256": MODEL_SHA256}:
             raise ValueError("Unsupported tongue model identity")
@@ -117,11 +124,11 @@ def decode_preset(data):
     if config.head_mode == "position":
         config, head = replace(config, head_mode="pitch"), None
     # Expanded negatives and front-edge coordinates cannot reuse an inner-mouth fit.
-    return config, eyes, head, tongue if data["version"] in (5,6,7,8) else None
+    return config, eyes, head, tongue if data["version"] in (5,6,7,8,9) else None
 
 
 def decode_head_x(data, config):
-    if data.get("version") not in (7,8):
+    if data.get("version") not in (7,8,9):
         return None
     if config.head_mode != "pitch":
         raise ValueError("Head-axis presets require pitch-mode vertical calibration")
@@ -151,7 +158,7 @@ def decode_pupil(data, config):
 
 def decode_pupil_settings(data):
     from .pupil import settings
-    if data.get("version") == 8:
+    if data.get("version") in (8,9):
         if data["pupil"] is None:
             raise ValueError("Direct pupil settings are required")
         return settings(data["pupil"])
@@ -159,7 +166,7 @@ def decode_pupil_settings(data):
 
 
 def encode_preset(core):
-    result = {"version": 8, "algorithm": DIRECT_PUPIL_ALGORITHM, "tongue_measurement": TONGUE_MEASUREMENT, "settings": core.config.to_dict(),
+    result = {"version": 9, "algorithm": LIP_BOUNDARY_ALGORITHM, "tongue_measurement": TONGUE_MEASUREMENT, "settings": core.config.to_dict(),
               "winks": core.winks,
               "head_x": asdict(core.head_x) if core.head_x else None,
               "pupil": dict(core.pupil_settings),
@@ -174,6 +181,10 @@ def encode_preset(core):
     if hasattr(core.tongue_model, "measurement"):
         from .tongue_segment import MODEL_SHA256
         result["tongue_measurement"] = core.tongue_model.measurement
-        result["tongue"] = {"backend": "yolov8n-seg", "sha256": MODEL_SHA256}
+        if getattr(core.tongue_model,"backend",None) == "lip-boundary":
+            from .lip_boundary import ALGORITHM as LIP_ALGORITHM
+            result["tongue"] = {"backend":"lip-boundary", "algorithm":LIP_ALGORITHM}
+        else:
+            result["tongue"] = {"backend": "yolov8n-seg", "sha256": MODEL_SHA256}
     decode_preset(result)
     return result

@@ -76,6 +76,7 @@ def mask_result(mask, crop, config, confidence):
 class SegmentedTongueModel(TongueModel):
     """Lazy local inference; the live lab owns this model in a separate process."""
     measurement = MEASUREMENT
+    backend = "segmentation"
 
     def __init__(self, path=None, *, threads=1):
         self.path = Path(path or DEFAULT_MODEL).expanduser().resolve()

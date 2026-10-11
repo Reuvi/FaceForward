@@ -20,6 +20,7 @@ class TongueJob:
     crop: object
     config: object
     face_quality: float
+    backend: str = "segmentation"
 
 
 @dataclass
@@ -33,6 +34,7 @@ def tongue_process(connection):
     """Spawn entry point; never import App, Tk or Processing."""
     import cv2
     from .tongue_segment import SegmentedTongueModel
+    from .lip_boundary import LipBoundaryModel
     cv2.setNumThreads(1)
     model = key = model_key = None
     try:
@@ -40,10 +42,15 @@ def tongue_process(connection):
         while True:
             epoch, job = connection.recv()
             identity = (epoch, job.key, job.path)
-            descriptor = (job.path, job.key[-1])
+            descriptor = (job.path, job.key[-1], job.backend)
             if (model is None or model_key != descriptor
                     or key != identity and model.load_error is not None):
-                model = SegmentedTongueModel(job.path, threads=1)
+                if job.backend == "lip-boundary":
+                    model = LipBoundaryModel()
+                elif job.backend == "segmentation":
+                    model = SegmentedTongueModel(job.path, threads=1)
+                else:
+                    raise ValueError("Unsupported tongue worker backend")
                 model_key = descriptor
             if key != identity:
                 model.reset_tracking()

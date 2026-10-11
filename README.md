@@ -1,5 +1,12 @@
 # Face-controlled accessibility interface
 
+Current update: [lip-boundary tongue + calibrated Head X recovery](docs/LIP_BOUNDARY_HEAD_TESTING.md).
+Camera tongue now defaults to a built-in local color extension beyond the lips;
+Head X keeps calibration, supports failed-pose retry and saturates at learned
+limits while raw tracking is valid. Detector presets are v9; direct pupils stay
+unchanged and tongue still runs independently. This supersedes older backend
+and profile-version instructions below.
+
 Pupils now use [direct MediaPipe direction](docs/DIRECT_PUPIL_TESTING.md) without a pupil calibration guide.
 
 A hackathon prototype for controlling a computer through a consumer webcam and

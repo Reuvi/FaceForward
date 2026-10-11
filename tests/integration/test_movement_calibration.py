@@ -261,7 +261,7 @@ class MovementIntegrationTests(unittest.TestCase):
             path = Path(directory) / "movement.json"
             self.session.save_profile(path)
             data = read_profile(path)
-            self.assertEqual(data["detector"]["version"], 8)
+            self.assertEqual(data["detector"]["version"], 9)
             self.session.load_profile(path)
             self.assertEqual(self.core.tongue_range, original)
             self.assertFalse(

@@ -1,5 +1,12 @@
 # One native lab: detection calibration + mouse processing
 
+Current update: [lip-boundary tongue + calibrated Head X recovery](../docs/LIP_BOUNDARY_HEAD_TESTING.md).
+Camera tongue now defaults to a built-in local color extension beyond the lips;
+Head X keeps calibration, supports failed-pose retry and saturates at learned
+limits while raw tracking is valid. Detector presets are v9; direct pupils stay
+unchanged and tongue still runs independently. This supersedes older backend
+and profile-version instructions below.
+
 Pupils now use [direct MediaPipe direction](../docs/DIRECT_PUPIL_TESTING.md), with no guide/recheck and two optional sensitivity controls. Detector saves are v8; v1–v7 remain readable.
 
 New: [horizontal head calibration](../docs/HEAD_HORIZONTAL_TESTING.md) adds a

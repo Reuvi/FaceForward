@@ -70,16 +70,26 @@ def observation_from_landmarks(landmarks, width, height):
     return result
 
 
+LAB_TRACKING_CONFIDENCE = .35
+
+
 class MediaPipeDetector:
     """Synchronous VIDEO mode: one inference in flight, one person's face."""
 
-    def __init__(self, model_path, *, include_pose=False, include_expressions=False):
+    def __init__(self, model_path, *, include_pose=False, include_expressions=False,
+                 min_face_presence_confidence=.5, min_tracking_confidence=.5):
         self.model_path = Path(model_path).expanduser()
         if not self.model_path.is_file():
             raise FileNotFoundError(f"Face Landmarker model not found: {self.model_path}")
         self.landmarker = None
         self.include_pose = include_pose
         self.include_expressions = include_expressions
+        self.confidence_options = dict(
+            min_face_presence_confidence=min_face_presence_confidence,
+            min_tracking_confidence=min_tracking_confidence,
+        )
+        if any(not finite_number(v) or not 0 <= v <= 1 for v in self.confidence_options.values()):
+            raise ValueError("Face confidence floors must be finite values in [0, 1]")
         self._session = self._sequence = self._capture_time = self._inference_time = None
 
     def __enter__(self):
@@ -95,6 +105,7 @@ class MediaPipeDetector:
             num_faces=1,
             output_facial_transformation_matrixes=self.include_pose,
             output_face_blendshapes=self.include_expressions,
+            **self.confidence_options,
         )
         self.landmarker = mp.tasks.vision.FaceLandmarker.create_from_options(self.options)
         return self

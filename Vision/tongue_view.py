@@ -7,14 +7,18 @@ from tkinter import filedialog, ttk
 class TongueSetupPanel:
     def __init__(self, parent, call):
         self.neural = ttk.Frame(parent)
-        ttk.Label(self.neural, text="Local tongue segmentation — no color sampling", font=("Arial",12,"bold"), wraplength=420).pack(anchor="w")
-        ttk.Label(self.neural, text="1  Open your mouth and show the front of your tongue past the lip.\n2  Check green follows tongue tissue and cyan follows the front-edge midpoint.\n3  Start the position guide above: hide tongue first, then center / left / right / up / down.\nNo background capture or clicking is needed.", wraplength=420, justify="left").pack(anchor="w", pady=5)
+        self.backend_title = tk.StringVar()
+        self.backend_help = tk.StringVar()
+        ttk.Label(self.neural, textvariable=self.backend_title, font=("Arial",12,"bold"), wraplength=420).pack(anchor="w")
+        ttk.Label(self.neural, textvariable=self.backend_help, wraplength=420, justify="left").pack(anchor="w", pady=5)
         self.backend_status = tk.StringVar()
         ttk.Label(self.neural, textvariable=self.backend_status, wraplength=420).pack(anchor="w")
         def choose():
             path = filedialog.askopenfilename(parent=parent, title="Choose tongue_seg.onnx", filetypes=[("ONNX model", "*.onnx")])
             if path: call("load_tongue_model", path)
-        self.load_model = ttk.Button(parent, text="Load local tongue segmentation model…", command=choose)
+        self.use_boundary = ttk.Button(parent, text="Use lip-boundary color detection", command=lambda: call("use_lip_boundary"))
+        self.use_boundary.pack(fill="x", pady=4)
+        self.load_model = ttk.Button(parent, text="Compare: load local ONNX tongue model…", command=choose)
         self.load_model.pack(fill="x", pady=4)
         self.legacy_top = ttk.Frame(parent)
         self.legacy_top.pack(fill="x")
@@ -47,9 +51,21 @@ class TongueSetupPanel:
     def update(self, state):
         busy = state["calibrating"]
         self.load_model.configure(state="disabled" if busy else "normal")
-        if state.get("tongue_backend") == "segmentation":
+        self.use_boundary.configure(state="disabled" if busy or state.get("tongue_backend") == "lip-boundary" else "normal")
+        if state.get("tongue_backend") in ("segmentation", "lip-boundary"):
             self.legacy_top.pack_forget(); self.legacy_bottom.pack_forget()
             self.neural.pack(fill="x", before=self.mouth)
+            boundary = state["tongue_backend"] == "lip-boundary"
+            self.backend_title.set("Lip-boundary color extension · experimental" if boundary else "Local ONNX tongue segmentation")
+            self.backend_help.set(
+                ("1  Blue outline should follow your outer lips. Keep your tongue hidden: no green extension should appear.\n"
+                 "2  Show tongue past a lip. Green marks connected color OUTSIDE the outline; cyan marks the center of its outer front. "
+                 "It must follow your movement, not lipstick, skin or an object.\n"
+                 if boundary else
+                 "1  Open your mouth and show the front of your tongue past the lip.\n"
+                 "2  Check green follows tongue tissue and cyan follows the front-edge midpoint.\n") +
+                "3  Start the position guide above: hidden, center, left, right, up, down. Keep color visibly beyond a lip in every visible pose.\n"
+                "No photo, tissue clicking or appearance training. Use Retry this pose after a failed step, or Reset tongue to clear its range.")
             report = state.get("tongue_fit") or {}
             elapsed = report.get("inference_ms")
             confidence = report.get("confidence")

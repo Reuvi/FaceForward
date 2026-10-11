@@ -273,9 +273,9 @@ class MovementGuide:
             instruction = (
                 "Rest in your comfortable NEUTRAL head position, facing the camera"
                 if name == "neutral"
-                else f"Turn your head toward YOUR {name.upper()} to a comfortable limit"
+                else f"Turn your head slightly toward YOUR {name.upper()} (about 10–20°)"
             )
-            instruction += ". Keep your face visible and avoid tilting sideways."
+            instruction += ". Use a comfortable turn, keep both eyes visible, and avoid tilting sideways."
         elif self.kind == "head":
             movement = (
                 "Move your whole head"

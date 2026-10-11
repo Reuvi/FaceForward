@@ -1,5 +1,8 @@
 # Shared contracts — initial v1
 
+[LIP_BOUNDARY_HEAD_RELIABILITY.md](LIP_BOUNDARY_HEAD_RELIABILITY.md) is the current
+tongue backend/Head X recovery contract, with detector presets v9.
+
 [DIRECT_PUPILS.md](DIRECT_PUPILS.md) replaces learned pupil ranges with direct MediaPipe iris normalization and detector presets v8.
 
 [HEAD_HORIZONTAL.md](HEAD_HORIZONTAL.md) activates calibrated head_x from yaw,

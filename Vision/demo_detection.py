@@ -6,7 +6,7 @@ import cv2
 import numpy as np
 
 from .landmarks import EYES, Observation
-from .tongue import INNER_LIP
+from .tongue import INNER_LIP, OUTER_LIP
 from .tracking import Box
 
 
@@ -44,6 +44,9 @@ def demo_image(*, left_closed=False, right_closed=False, head=0.5,
         # Ordered lower arc followed by upper arc; actual anatomical corners below.
         angle = math.pi - index * 2 * math.pi / len(INNER_LIP)
         points[landmark] = (320 + 60*math.cos(angle), cy + 30*math.sin(angle))
+    for index, landmark in enumerate(OUTER_LIP):
+        angle = math.pi - index * 2 * math.pi / len(OUTER_LIP)
+        points[landmark] = (320+65*math.cos(angle), cy+35*math.sin(angle))
     points[13], points[14] = (320., cy-30), (320., cy+30)
     points[291], points[61] = (380., cy), (260., cy)
     polygon = np.round([points[i] for i in INNER_LIP]).astype(np.int32)

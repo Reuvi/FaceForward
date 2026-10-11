@@ -38,7 +38,7 @@ class AsyncTongue:
             self.latest = reply
             self.new = 0 <= now - reply.job.timestamp_ms <= config.stale_ms
         self.worker.submit(TongueJob(frame["session_id"], frame["sequence"], frame["timestamp_ms"],
-                                    key, str(model.path), crop, config, quality))
+                                    key, str(model.path), crop, config, quality, getattr(model,"backend","segmentation")))
         error = self.worker.state()["error"]
         if error:
             model.report.update(error=error)

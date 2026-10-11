@@ -17,6 +17,9 @@ from .tongue_tip import estimate_tip
 
 INNER_LIP = (78, 95, 88, 178, 87, 14, 317, 402, 318, 324,
              308, 415, 310, 311, 312, 13, 82, 81, 80, 191)
+# Ordered outer ring from MediaPipe FaceLandmarksConnections.FACE_LANDMARKS_LIPS.
+OUTER_LIP = (61, 146, 91, 181, 84, 17, 314, 405, 321, 375,
+             291, 409, 270, 269, 267, 0, 37, 39, 40, 185)
 CROP_WIDTH, CROP_HEIGHT = 160, 160
 CROP_SPAN = 1.6
 TONGUE_MEASUREMENT = "color_tip_mouth_width_v1"
@@ -30,6 +33,7 @@ class MouthCrop:
     opening_ratio: float
     width_px: float
     inner_mask: object
+    outer_mask: object = None
 
     @property
     def mouth_pixels(self):
@@ -46,24 +50,26 @@ class MouthCrop:
         return tuple(float(v) for v in point)
 
 
-def mouth_crop(bgr, observation, config):
+def mouth_crop(bgr, observation, config, *, lip_boundary=False):
     points = observation.points
     if len(points) < 468:
         return None, "Mouth landmarks unavailable"
     left, right, upper, lower = (points[i] for i in (291, 61, 13, 14))
     try:
-        frame = reference(left, right, sub(lower, upper))
+        down_hint = sub(points[17], points[0]) if lip_boundary else sub(lower, upper)
+        frame = reference(left, right, down_hint)
     except ValueError:
         return None, "Mouth reference is degenerate"
     down, across = np.array(frame.down), np.array(frame.right)
     mouth_height = float(np.dot(np.array(lower) - upper, down))
     ratio = mouth_height / frame.width
-    if frame.width < config.min_mouth_px or mouth_height < 5 or ratio < config.min_mouth_opening:
+    if frame.width < config.min_mouth_px or (not lip_boundary and (mouth_height < 5 or ratio < config.min_mouth_opening)):
         return None, "Open mouth more, or move closer"
     if ratio > 1.2:
         return None, "Implausible mouth geometry"
     height, width = bgr.shape[:2]
-    if not all(0 <= points[i][0] < width and 0 <= points[i][1] < height for i in INNER_LIP):
+    indices = INNER_LIP + OUTER_LIP if lip_boundary else INNER_LIP
+    if not all(0 <= points[i][0] < width and 0 <= points[i][1] < height for i in indices):
         return None, "Mouth is outside the image"
     origin = np.array(frame.origin) - (across+down)*frame.width*CROP_SPAN/2
     span = frame.width*CROP_SPAN
@@ -78,10 +84,15 @@ def mouth_crop(bgr, observation, config):
     inner = np.zeros((CROP_HEIGHT, CROP_WIDTH), dtype=np.uint8)
     cv2.fillPoly(inner, [polygon], 255)
     inner = cv2.erode(inner, np.ones((3, 3), np.uint8), iterations=1)
-    if np.count_nonzero(inner) < 200:
+    if not lip_boundary and np.count_nonzero(inner) < 200:
         return None, "Insufficient visible inner mouth"
+    outer = np.zeros_like(inner)
+    polygon = np.array([transform @ np.array([*points[i], 1.0]) for i in OUTER_LIP], dtype=np.int32)
+    cv2.fillPoly(outer, [polygon], 255)
+    if lip_boundary and np.count_nonzero(outer) < 200:
+        return None, "Outer lip outline is too small or unreliable"
     mask = np.full_like(inner, 255)
-    return MouthCrop(crop, mask, cv2.invertAffineTransform(transform), ratio, frame.width, inner), "Expanded mouth region available"
+    return MouthCrop(crop, mask, cv2.invertAffineTransform(transform), ratio, frame.width, inner, outer), "Expanded mouth region available"
 
 
 def color_features(bgr):

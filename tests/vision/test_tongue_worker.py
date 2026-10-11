@@ -119,3 +119,22 @@ class WorkerTests(unittest.TestCase):
         self.assertEqual((reply.job.sequence, reply.job.timestamp_ms), (17, 1234))
         self.assertIsNone(reply.report["error"])
         self.assertGreater(reply.report["inference_ms"], 0)
+
+    def test_builtin_boundary_worker_needs_no_model_file_and_keeps_original_crop(self):
+        from Vision.demo_detection import demo_image
+        from Vision.features import DetectionConfig
+        from Vision.lip_boundary import LipBoundaryModel
+        from Vision.tongue import mouth_crop
+        bgr, observations = demo_image(tongue=True)
+        config = DetectionConfig()
+        crop, _ = mouth_crop(bgr, observations[0], config, lip_boundary=True)
+        worker = TongueWorker()
+        self.addCleanup(worker.close)
+        job = TongueJob("color", 23, 1234., ("color",), LipBoundaryModel.path, crop, config, .9, "lip-boundary")
+        worker.submit(job)
+        reply = wait_for(worker.take, timeout=12)
+        self.assertIs(reply.job.crop, crop)
+        self.assertEqual((reply.job.sequence, reply.job.timestamp_ms), (23, 1234))
+        self.assertIsNone(reply.report["error"])
+        self.assertIsNotNone(reply.result.xy, reply.result.reason)
+        self.assertIn("Lip-boundary", reply.report["backend"])

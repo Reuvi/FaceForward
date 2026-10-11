@@ -260,7 +260,7 @@ class DetectionLab:
         frame=state["frame"] or {"faces":[]}
         timing=state["timing"]
         self.source_status.set(f"{state['source']}   |   capture #{(state['frame'] or {}).get('sequence','—')}   |   single user: {'detected' if state['selected'] else 'waiting for face'}   |   " +
-            "   ".join(f"{k}: {v:.1f}" for k,v in timing.items()))
+            "   ".join(f"{k}: {v:.2f}" if k.endswith("_floor") else f"{k}: {v:.1f}" for k,v in timing.items()))
         self.show_image(self.preview,"preview",state["preview"],(320,240))
         self.show_image(self.mouth,"mouth",state["mouth"],(256,256),frozen=state["frozen"],marks=state.get("tongue_marks",()))
         signals=next((f["signals"] for f in frame["faces"] if f["subject_id"]==state["selected"]),{})

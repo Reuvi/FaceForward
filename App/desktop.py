@@ -131,7 +131,7 @@ class IntegratedDesktop(DesktopLab):
         self.raw_ratios = tk.StringVar(value="No camera landmarks received")
         label(raw_page, "Raw camera measurements / single user", style="Heading.TLabel").pack(anchor="w",pady=(0,8))
         label(raw_page, textvariable=self.raw_ratios, style="Panel.TLabel", font=("Menlo", 10), justify="left", wraplength=480).pack(anchor="w")
-        label(raw_page, "Raw graphs below use every captured sample. Calibrate in Detection calibration; device mappings come afterward.\nTongue uses a local segmentation mask; pupils use eye-relative iris position. Calibrate their ranges before preview.",
+        label(raw_page, "Raw graphs below use every captured sample. Calibrate in Detection calibration; device mappings come afterward.\nTongue uses color beyond the lip boundary and needs a position guide. Pupils use direct MediaPipe direction without calibration.",
               style="Small.TLabel", wraplength=470).pack(anchor="w", pady=12)
         self.input_result = tk.StringVar()
         label(raw_page, textvariable=self.input_result, style="Small.TLabel", wraplength=470).pack(anchor="w")
@@ -306,7 +306,8 @@ class IntegratedDesktop(DesktopLab):
                     value = feature["value"]
                     reading = "—" if value is None else f"{value:.4f}"
                     lines.append(f"{key:5s} raw {reading}   quality {feature['quality']:.2f}")
-            lines.append("Head units: " + ("image-height fraction" if detector_state["config"]["head_mode"] == "position" else "pitch degrees"))
+            lines.append("Head units: pitch/yaw degrees")
+            lines.append("Head X: " + detector_state["reasons"].get("head_x", "Waiting for face"))
             candidate=detector_state.get("candidate")
             lines.append("Tongue raw tip X/Y (mouth widths): "+(f"{candidate[0]:.3f}, {candidate[1]:.3f}" if candidate else "unavailable; inspect Tongue calibration"))
             lines.append(detector_state["notice"])

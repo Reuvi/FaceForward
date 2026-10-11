@@ -11,7 +11,7 @@ import cv2
 
 from .capture import CapturedImage, OpenCVCamera
 from .demo_detection import demo_image
-from .landmarks import MediaPipeDetector
+from .landmarks import LAB_TRACKING_CONFIDENCE, MediaPipeDetector
 from .signals import CaptureSession, monotonic_ms
 from .workbench import DetectorWorkbench
 
@@ -30,6 +30,7 @@ class LabRuntime:
         self.timing = {}
         self.preview_due = 0
         self.source_kind = None
+        self.tracker_floors = {}
 
     def start(self, *, demo=False, model=None, camera_id=0, fps=30):
         with self.lock:
@@ -44,6 +45,7 @@ class LabRuntime:
             self.workbench.validation.clear()
             self.preview = None
             self.timing = {}
+            self.tracker_floors = {}
             self.preview_due = 0
             self.stop_event.clear()
             self.source = "SYNTHETIC pixels + landmarks (no ML)" if demo else "Local camera / MediaPipe CPU"
@@ -56,11 +58,16 @@ class LabRuntime:
                 if demo:
                     session = CaptureSession()
                 else:
-                    from .tongue_segment import SegmentedTongueModel
-                    if not isinstance(self.workbench.tongue_model, SegmentedTongueModel):
-                        self.workbench.tongue_model = SegmentedTongueModel()
+                    from .lip_boundary import LipBoundaryModel
+                    if not self.workbench.independent_tongue:
+                        self.workbench.tongue_model = LipBoundaryModel()
                         self.workbench.tongue_range = None
-                    detector = stack.enter_context(MediaPipeDetector(model, include_pose=True, include_expressions=True))
+                    self.tracker_floors = dict(face_presence_floor=LAB_TRACKING_CONFIDENCE,
+                                               face_tracking_floor=LAB_TRACKING_CONFIDENCE)
+                    detector = stack.enter_context(MediaPipeDetector(
+                        model, include_pose=True, include_expressions=True,
+                        min_face_presence_confidence=LAB_TRACKING_CONFIDENCE,
+                        min_tracking_confidence=LAB_TRACKING_CONFIDENCE))
                     camera = stack.enter_context(OpenCVCamera(camera_id, fps=fps))
                 self.previous_timestamp = None
                 while not self.stop_event.is_set():
@@ -145,8 +152,9 @@ class LabRuntime:
                 "inference_ms": inference_ms,
                 "features_ms": (perf_counter()-started)*1000,
                 "age_ms": self.clock()-timestamp,
+                **self.tracker_floors,
             }
-            if self.workbench.neural_tongue:
+            if self.workbench.independent_tongue:
                 tongue = self.workbench.async_tongue.state(self.clock())
                 age = tongue["age_ms"]
                 self.timing.update(tongue_hz=tongue["hz"],
@@ -174,7 +182,7 @@ class LabRuntime:
                     cv2.circle(image, tuple(round(v) for v in obs.points[index]), 2, color, -1)
         core = self.workbench
         # Delayed results belong only on their captured mouth crop, below.
-        if core.crop is not None and not core.neural_tongue:
+        if core.crop is not None and not core.independent_tongue:
             if core.tongue.edge is not None:
                 for pixel in core.tongue.edge:
                     cv2.circle(image,tuple(round(v) for v in core.crop.image_point(core.crop.raw_point(pixel))),1,(0,180,255),-1)
@@ -232,13 +240,16 @@ class LabRuntime:
             state.update(source=self.source, timing=dict(self.timing), preview=self.preview,
                          trace=list(reversed(rows)))
             core = self.workbench
-            crop = core.frozen_crop or (core.async_tongue.crop if core.neural_tongue else None) or core.crop
+            crop = core.frozen_crop or (core.async_tongue.crop if core.independent_tongue else None) or core.crop
             state["mouth"] = crop.bgr.copy() if crop else None
             state["frozen"] = self.workbench.frozen_crop is not None
             if crop and not state["frozen"] and self.workbench.tongue.mask is not None:
                 mask = self.workbench.tongue.mask > 0
                 state["mouth"][mask] = (state["mouth"][mask]*.4 + (0,150,0)).astype("uint8")
             if crop and not state["frozen"]:
+                if state["tongue_backend"] == "lip-boundary" and crop.outer_mask is not None:
+                    contours,_=cv2.findContours(crop.outer_mask,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
+                    cv2.drawContours(state["mouth"],contours,-1,(255,200,0),1)
                 tip=self.workbench.tongue
                 if tip.edge is not None:
                     for pixel in tip.edge:cv2.circle(state["mouth"],tuple(round(v) for v in pixel),1,(0,180,255),-1)

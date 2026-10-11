@@ -4,7 +4,7 @@ import os
 import unittest
 
 from Vision.capture import CapturedImage
-from Vision.landmarks import MediaPipeDetector
+from Vision.landmarks import LAB_TRACKING_CONFIDENCE, MediaPipeDetector
 from Vision.pipeline import VisionPipeline
 from Vision.signals import Envelope
 
@@ -15,8 +15,13 @@ class ModelSmokeTests(unittest.TestCase):
         import numpy as np
         image = np.zeros((480, 640, 3), dtype=np.uint8)
         pipeline = VisionPipeline()
-        with MediaPipeDetector(os.environ["VISION_MODEL_PATH"], include_pose=True, include_expressions=True) as detector:
+        with MediaPipeDetector(os.environ["VISION_MODEL_PATH"], include_pose=True, include_expressions=True,
+                               min_face_presence_confidence=LAB_TRACKING_CONFIDENCE,
+                               min_tracking_confidence=LAB_TRACKING_CONFIDENCE) as detector:
             self.assertEqual(detector.options.num_faces, 1)
+            self.assertEqual(detector.options.min_face_detection_confidence, .5)
+            self.assertEqual(detector.options.min_face_presence_confidence, .35)
+            self.assertEqual(detector.options.min_tracking_confidence, .35)
             for envelope in (Envelope("one", 0, 1000.2), Envelope("one", 3, 1027.8),
                              Envelope("two", 0, 2000.5)):
                 captured = CapturedImage(envelope, image)

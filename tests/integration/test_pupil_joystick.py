@@ -55,7 +55,7 @@ class JoystickIntegration(unittest.TestCase):
 
     def test_profile_roundtrip_without_training_and_atomic_validation(self):
         self.session.detector_command('set_pupil_sensitivity',2,.5)
-        data=self.core.export_calibration();self.assertEqual(data['version'],8)
+        data=self.core.export_calibration();self.assertEqual(data['version'],9)
         self.assertEqual(data['eyes'],{});self.assertIsNone(data['head'])
         self.core.disconnect();self.core.load_calibration(data)
         values=self.feed(pupil_x=.75,pupil_y=1)['faces'][0]['signals']
@@ -122,7 +122,7 @@ class JoystickIntegration(unittest.TestCase):
         self.core.tongue_model=SegmentedTongueModel('/not/installed.onnx')
         self.core.head=AxisCalibration(-12,0,12,endpoint_tolerance=.05)
         model=self.core.tongue_model
-        data=self.core.export_calibration();self.assertEqual(data['version'],8)
+        data=self.core.export_calibration();self.assertEqual(data['version'],9)
         bad=deepcopy(data);bad['tongue']['sha256']='0'*64
         with self.assertRaises(ValueError):self.core.load_calibration(bad)
         self.core.reset_tongue();self.assertIs(self.core.tongue_model,model)
@@ -164,7 +164,7 @@ class JoystickIntegration(unittest.TestCase):
         self.assertIs(self.core.tongue_model,model)
         self.assertIsNone(self.core.tongue_range)
         self.assertEqual(self.core.head.center,0)
-        self.assertIn("Color tongue range removed",self.core.notice)
+        self.assertIn("Incompatible tongue range removed",self.core.notice)
 
     def test_long_unknown_pupil_trace_keeps_display_seed_only(self):
         frame=self.feed(pupil_x=1)

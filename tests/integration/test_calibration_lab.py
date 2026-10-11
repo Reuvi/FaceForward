@@ -90,7 +90,7 @@ class UnifiedCalibrationTests(unittest.TestCase):
         migrated = self.core.export_calibration()
         for key in ("eyes", "winks", "head"):
             self.assertEqual(migrated[key], original[key])
-        self.assertEqual(migrated["version"], 8)
+        self.assertEqual(migrated["version"], 9)
         self.assertIsNone(migrated["tongue"])
         self.assertIsNone(migrated["tongue_range"])
         self.assertIn("repeat appearance and tip range", self.core.notice)
@@ -315,7 +315,7 @@ class UnifiedCalibrationTests(unittest.TestCase):
             write_profile(broken,corrupted)
             with self.assertRaises(ValueError):self.session.load_profile(broken)
             self.assertEqual(self.core.export_calibration(),detector)
-            self.assertEqual(detector["version"],8)
+            self.assertEqual(detector["version"],9)
             self.assertEqual(read_profile(path)["format"],"face_mouse_profile_v3")
             self.assertEqual(detector['settings']['eye_rest_ms'],100)
             self.session.load_profile(path)

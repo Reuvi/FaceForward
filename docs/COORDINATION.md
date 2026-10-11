@@ -736,7 +736,7 @@ compatibility, matching views, invalid input, independent fits and native tests.
   Changed Python passes Ruff F; whitespace and integration scope checks pass.
   Synthetic fixtures verify software behavior, not human detection accuracy.
 
-## Direct pupil direction — active
+## Direct pupil direction — complete
 
 Reuvi integration, branch `work/reuvi/integration/direct-pupils`, base `fe95527`.
 User requests MediaPipe-only pupil directions without the failing range guide.
@@ -763,7 +763,7 @@ before implementation. Keep other detectors and independent tongue scheduling.
   accepted all frames, observed all four actions and finished disabled/released.
   Changed Python passes Ruff F; whitespace and integration scope checks pass.
 
-## Lip-boundary tongue + Head X reliability — active
+## Lip-boundary tongue + Head X reliability — complete
 
 Reuvi integration, branch `work/reuvi/integration/lip-boundary-head-reliability`, base
 `06a9e80`. User requests color extension beyond tracked lips and better Head X reliability. Latest
@@ -771,3 +771,35 @@ clarification keeps Head X calibration; the proposed direct-yaw change is cancel
 calibration UI/profile/lifecycle; App wiring; relevant tests, contracts and docs.
 Contract: LIP_BOUNDARY_HEAD_RELIABILITY.md, committed before implementation. Preserve
 working head Y, eye/wink behavior, direct pupils and independent tongue scheduling.
+
+### Lip-boundary / Head X handoff
+
+- Contracts landed first (`8d7848e`, corrected by `644b328` and `efdfcb5`). Final
+  behavior keeps Head X calibration: a valid yaw outside learned endpoints saturates
+  at 0/1; genuinely missing yaw stays invalid. Completed fits survive retry/cancel/
+  failure/loss. A failed horizontal pose can retry independently. Live lab presence/
+  tracking floors are .35, initial face detection .5; image-quality gates remain.
+- Added `Vision/lip_boundary.py`: local LAB color extension outside MediaPipe's
+  outer lips, with attachment/ambiguity/clipping/contrast checks and an outer-front
+  boundary midpoint. No appearance clicks or tongue weights for the default camera
+  backend. This is an experimental proxy, not anatomical tongue recognition.
+- Reused the bounded independent tongue process with an explicit backend field.
+  Fast eye/head/pupil captures never wait for tongue; delayed overlays retain their
+  original crop/time/sequence. UI shows outer-lip outline, accepted exterior mask,
+  front boundary and point. The existing personal tongue guide/fresh checks remain.
+- ONNX stays an explicit local comparison, with its own incompatible range. v9
+  presets restore explicit backend identity; validated v1–v8 neural files migrate
+  to the built-in backend with their old tongue range removed. Compatible eye,
+  wink, head and pupil settings survive. Combined profile v3/mouse mappings unchanged.
+- Testing guide: `docs/LIP_BOUNDARY_HEAD_TESTING.md`; linked from App, Vision and
+  root docs. Direct pupil instructions stay in `docs/DIRECT_PUPIL_TESTING.md`.
+- Verification: 139 Vision cases (138-case full run plus new color-guide case),
+  104 integration cases including native Tk (103 passed in the full run; corrected
+  a Tcl-state comparison in the new test, then all five cases in that module passed),
+  and 75 Processing cases. The 490-frame mouse demo accepted every frame, observed
+  all four actions, and ended stopped/released. Changed Python passes Ruff F;
+  whitespace and integration-lane scope checks pass.
+- Remaining live validation: actual yaw loss/reacquisition under motion and blur,
+  lip-outline accuracy/contrast, false tongue candidates while smiling/talking,
+  comfortable repeatable tongue ranges, and measured concurrent camera/model rates.
+  No camera was opened and no personal samples/profile data were committed.

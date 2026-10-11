@@ -31,8 +31,8 @@ Vision/.venv/bin/python -m App --source camera --model Vision/.local/face_landma
    pupil detection. Click/wink and head-scroll calibrations remain independent.
 
 Save active profile to retain pupil sensitivities and other settings. Detector
-preset v8 stores direct settings instead of pupil fits; combined profiles stay
-v3. v1–v7 are validated before loading; old pupil ranges/head references are then
+preset v9 retains the v8 direct settings instead of pupil fits; combined profiles stay
+v3. v1–v8 are validated before loading; old pupil ranges/head references are then
 ignored, with direct sensitivity defaulting to 1. Other compatible fits survive.
 A profile can now be saved even when only direct pupils are in use.
 

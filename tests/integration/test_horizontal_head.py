@@ -75,7 +75,7 @@ class HorizontalHeadTests(unittest.TestCase):
         self.assertTrue(self.guide("head").passed)
         self.assertTrue(self.guide("head_x").passed)
         saved=self.core.head_x
-        for controls in (dict(no_pose=True), dict(head_x=1)):
+        for controls in (dict(no_pose=True),):
             values=self.feed(**controls)["faces"][0]["signals"]
             self.assertFalse(values["head_x"]["valid"])
             self.assertIsNone(values["head_x"]["value"])
@@ -108,14 +108,52 @@ class HorizontalHeadTests(unittest.TestCase):
         self.assertIsNone(self.core.trace[-1]["head_x_raw"])
         self.assertFalse(self.core.trace[-1]["head_x_valid"])
 
-    def test_reset_cancel_and_failed_guide_only_clear_horizontal(self):
-        self.assertTrue(self.guide("head").passed); pitch=self.core.head
+    def test_endpoint_saturation_in_both_sign_conventions_does_not_hide_raw_loss(self):
+        for poses in (dict(left=.2, neutral=.5, right=.8), dict(left=.8, neutral=.5, right=.2)):
+            self.assertTrue(self.guide("head_x", positions=poses).passed)
+            for raw, want in ((0, int(poses["left"] > .5)), (1, int(poses["right"] > .5))):
+                values = self.feed(head_x=raw)["faces"][0]["signals"]
+                self.assertEqual(values["head_x"]["value"], want)
+                self.assertTrue(values["head_x"]["valid"])
+                self.assertTrue(self.core.trace[-1]["head_x_saturated"])
+                self.assertIn("tracking remains valid", self.core.reasons["head_x"])
+            values = self.feed(head_x=1, no_pose=True)["faces"][0]["signals"]
+            self.assertFalse(values["head_x"]["valid"])
+            self.assertFalse(self.core.trace[-1]["head_x_saturated"])
+
+    def test_retry_failed_head_pose_keeps_successful_groups_and_completed_fit(self):
         self.assertTrue(self.guide("head_x").passed)
+        saved = self.core.head_x
+        self.session.detector_command("start_movement_guide", "head_x")
+        guide = self.core.movement_guide
+        for _ in range(80):
+            if not guide.active: break
+            state = guide.state(self.now)
+            if state["waiting"]:
+                self.session.detector_command("present_movement_step", state["index"], state["phase"], self.core.generation)
+            self.feed(no_pose=state["name"] == "left", **self.runtime.demo_input())
+        self.assertFalse(guide.active)
+        self.assertFalse(guide.passed)
+        self.assertEqual(self.core.head_x, saved)
+        neutral = deepcopy(guide.groups["neutral"])
+        self.session.detector_command("retry_tongue_step")
+        for _ in range(100):
+            if not guide.active: break
+            state = guide.state(self.now)
+            if state["waiting"]:
+                self.session.detector_command("present_movement_step", state["index"], state["phase"], self.core.generation)
+            self.feed(**self.runtime.demo_input())
+        self.assertTrue(guide.passed, guide.report)
+        self.assertEqual(guide.groups["neutral"], neutral)
+
+    def test_cancel_failure_and_loss_preserve_fit_but_explicit_reset_clears_horizontal(self):
+        self.assertTrue(self.guide("head").passed); pitch=self.core.head
+        self.assertTrue(self.guide("head_x").passed); saved=self.core.head_x
         self.session.detector_command("start_movement_guide","head_x")
         self.session.detector_command("cancel")
-        self.assertIsNone(self.core.head_x);self.assertEqual(self.core.head,pitch)
+        self.assertEqual(self.core.head_x,saved);self.assertEqual(self.core.head,pitch)
         result=self.guide("head_x",positions=dict(left=.5,neutral=.5,right=.5))
-        self.assertFalse(result.passed);self.assertIsNone(self.core.head_x)
+        self.assertFalse(result.passed);self.assertEqual(self.core.head_x,saved)
         self.assertEqual(self.core.head,pitch)
         self.assertTrue(self.guide("head_x").passed)
         self.session.detector_command("start_movement_guide","head_x")
@@ -127,7 +165,7 @@ class HorizontalHeadTests(unittest.TestCase):
     def test_saved_yaw_only_profile_can_load_stopped_and_rejects_bad_fit_atomically(self):
         self.assertTrue(self.guide("head_x").passed); saved=self.core.head_x
         data=self.core.export_calibration()
-        self.assertEqual(data["version"],8); self.assertIsNone(data["head"])
+        self.assertEqual(data["version"],9); self.assertIsNone(data["head"])
         with tempfile.TemporaryDirectory() as folder:
             path=folder+"/profile.json";self.session.save_profile(path)
             self.session.stop();self.core.reset_calibration()
