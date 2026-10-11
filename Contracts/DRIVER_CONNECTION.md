@@ -44,3 +44,11 @@ status/errors and events for diagnostics. No output selection/armed state is sav
 in face profiles. Native macOS requires its existing Accessibility permission;
 Linux requires the driver's existing uinput setup. Automated tests use the compiled
 dry-run backend, including events, short pulses, staleness, stop and watchdog release.
+
+Startup correction: once a genuinely fresh neutral input passes Processing's
+arming gates, discard older pre-enable axis interpolation history and reset
+motion before emitting the first enabled command. Do not replace the latest
+observation, relax driver validation or fabricate a neutral arming frame. Active
+eye actions must release before enabling. Steady-state independent eye actions,
+head keys, dead zones, freshness and explicit rearming remain unchanged. App's
+bounded local diagnostic log is an observational side channel, never control input.

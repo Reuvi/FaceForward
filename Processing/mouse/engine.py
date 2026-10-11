@@ -130,6 +130,14 @@ class AxisFilter:
     def neutral(self):
         return not self.valid or length(self.normalize(self.history[-1][1])) <= self.config.deadzone
 
+    def start_from_latest(self):
+        """Do not replay pre-enable movement after a real neutral sample arrives."""
+        if self.history:
+            latest = self.history[-1]
+            self.history.clear()
+            self.history.append(latest)
+        self.reset_motion()
+
     def step(self, now, delay_ms, dt):
         self.position = self.interpolate(now - delay_ms)
         if self.position is None:
@@ -228,7 +236,8 @@ class MouseProcessor:
 
     def can_enable(self):
         has_signal = self.pointer.valid or self.scroll.valid or self.left.ready or self.right.ready
-        return has_signal and self.pointer.neutral() and self.scroll.neutral()
+        return (has_signal and self.pointer.neutral() and self.scroll.neutral()
+                and not self.left.down and not self.right.down)
 
     def accept(self, frame, received_ms):
         if not finite(received_ms):
@@ -308,6 +317,10 @@ class MouseProcessor:
             self.disarm("Input stale; start preview again")
         if self.armed and fresh and not self.enabled:
             if self.can_enable():
+                # The latest actual input is neutral. Older interpolated samples
+                # must not make the driver's first enabled command non-neutral.
+                self.pointer.start_from_latest()
+                self.scroll.start_from_latest()
                 self.enabled = True
                 self.reason = "Running"
         pointer = self.pointer.step(now_ms, self.config.interpolation_ms, dt)
@@ -330,6 +343,8 @@ class MouseProcessor:
             "right_click": int(self.enabled and self.right.down),
             "diagnostics": {
                 "raw_pointer": list(sample.pointer) if sample and fresh and self.pointer.valid and sample.pointer is not None else None,
+                "pointer_radius": length(self.pointer.normalize(sample.pointer)) if sample and fresh and self.pointer.valid and sample.pointer is not None else None,
+                "pointer_active": self.pointer.active,
                 "pointer_timestamp_ms": self.pointer.history[-1][0] if self.pointer.history else None,
                 "raw_scroll": sample.scroll if sample and fresh else None,
                 "left_closed": sample.left_closed if sample and fresh and sample.left_known else None,

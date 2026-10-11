@@ -106,7 +106,8 @@ class GamingProcessor(MouseProcessor):
 
     def can_enable(self):
         usable = self.pointer.valid or self.head_x.ready or self.head_y.ready or self.left.ready or self.right.ready
-        return usable and self.pointer.neutral() and self.head_x.neutral and self.head_y.neutral
+        return (usable and self.pointer.neutral() and self.head_x.neutral and self.head_y.neutral
+                and not self.left.down and not self.right.down)
 
     def tick(self, now_ms):
         snap = super().tick(now_ms)
@@ -134,7 +135,7 @@ class GamingProcessor(MouseProcessor):
     @staticmethod
     def head_diagnostic(gate):
         return {"raw": gate.raw, "filtered": (gate.filtered+1)/2 if gate.filtered is not None else None,
-                "ready": gate.ready, "direction": gate.direction, "candidate": gate.candidate}
+                "ready": gate.ready, "neutral": gate.neutral, "direction": gate.direction, "candidate": gate.candidate}
 
     def instructions(self, snap):
         rows = []

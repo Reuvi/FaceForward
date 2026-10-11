@@ -1031,3 +1031,50 @@ Contract impact: additive idle source selection/lifecycle, unchanged profile and
 command formats, signal values/units/validity and detector/Processing algorithms.
 Remaining: operator comfort and live OS/game behavior; automated output checks
 use the actual driver's dry-run mode. No teammate checkout or personal data changed.
+
+## Live pointer diagnosis and startup correction
+
+Lane / task / branch: Reuvi integration / live-control-diagnostics /
+`codex/integration/live-control-diagnostics`. Base `8199a50`.
+Writable paths: App diagnostics/UI/launch, Processing arming/diagnostic snapshots,
+integration tests and relevant shared docs. Drivers and Vision algorithms unchanged.
+
+Confirmed a reproducible handoff failure: Start off-center, then center within the
+interpolation interval. Processing enabled from the newest neutral sample but
+computed movement from older deflected samples; the driver rejected the first
+non-neutral command. Reset axis interpolation/motion to the latest real neutral
+sample at enable. Also wait for active eye actions to release before enabling.
+Retain strict driver validation and explicit Start after loss/errors.
+
+Signals now preserves stop reasons and distinguishes invalid pupils, confidence,
+staleness, head/pupil neutral waits and actual dead-zone suppression. App logs
+bounded local scalar observations/errors at 5 Hz plus observed state changes,
+outside capture/Processing threads. No images, landmarks or saved models are
+written; files remain ignored and owner-only. No control/profile/driver ABI changes;
+Processing diagnostic snapshots add pointer radius/active and head neutral fields.
+
+User explicitly authorized live driver inputs. Native adapter test measured cursor
++127/-114 pixels without errors; corrected Processing → native driver test measured
++68 pixels, neutral enable, no keys/clicks, and paused output on completion. These
+prove OS cursor movement in the tested Python launch context. Default filter sweep:
+X=.55/.59 stops; X=.60 ≈7 px/s, .65 ≈51 px/s, .75 ≈212 px/s after settling, Y=.5,
+speed 900. Thresholds and saved profiles were not changed. A separate brief camera
+sample produced no valid pupil inputs; detector visibility/support gates blocked
+those observations. This does not establish gesture accuracy or the exact cause
+of every prior user-reported error. Personal scalar evidence stays outside Git.
+
+Validation on the final implementation:
+- `RUN_TK_TESTS=1 FID_LIBRARY=<main>/Drivers/build/libface_input_driver.dylib <Vision-venv-python> -m unittest discover -s tests/integration`: **133 passed**.
+- `<Vision-venv-python> -m unittest discover -s tests/processing`: **98 passed**.
+- 490-frame App dry-run: **490 accepted**, both clicks, pointer and W/S/Space/Shift;
+  865 movement events, 3 clicks per side, 4 key downs/ups; final disabled, held keys 0.
+- Native bounded movement evidence above; no automated test injects OS events.
+- Synthetic Processing benchmark: 10,000 ticks, mean 46.29 μs, p95 66.29 μs;
+  excludes camera/UI/driver time. Current host/runtime measurements only.
+- Ruff F checks, module compilation, whitespace and integration scope check passed.
+- Log rotation, owner-only files, omitted images/profile contents and nonfatal disk
+  errors checked. Headless log contained 82 sample rows, no errors and session end.
+
+Remaining dependency: the user's next live camera trial with the visible per-eye
+pupil rejection reason. No claim that synthetic driver success validates real
+pupil/wink recognition, all launchers' permissions, or game behavior.

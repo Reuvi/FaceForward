@@ -135,6 +135,17 @@ class SimpleSignalsWindowTests(unittest.TestCase):
         with patch('App.desktop.filedialog.askopenfilename',return_value=str(path)):
             self.ui.load_profile()
 
+    def test_stop_reason_and_pointer_blocker_stay_visible(self):
+        self.session.lab.disconnect('Input stale; start preview again')
+        self.ui.refresh()
+        self.ui.refresh_vision()
+        self.root.update()
+        self.assertEqual(self.ui.status.get(),'Input stale; start preview again')
+        self.assertIn('fresh',self.ui.pointer_detail.get())
+        self.session.lab.output_error = 'Synthetic driver permission failure'
+        self.ui.refresh_vision()
+        self.assertIn('Synthetic driver permission failure',self.ui.pointer_detail.get())
+
     def test_two_tabs_mapping_rows_and_pointer_settings_share_signals(self):
         from Vision.mouse_demo import mouse_demo_records
         from Processing.mappings.demo import gaming_demo_frame

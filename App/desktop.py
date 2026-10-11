@@ -9,6 +9,7 @@ from Processing.mappings.view import MappingPanel
 from Vision.movement_view import draw_raw_scopes
 from Vision.eye_scope import draw_feature_scope
 from .paths import DEFAULT_MODEL, PROFILE_DIRECTORY
+from .diagnostics import pointer_status
 
 SOURCES = {"Camera (live calibration)": "camera", "Vision demo (synthetic)": "demo",
            "Detector demo (synthetic pixels)": "detector-demo", "Vision replay (NDJSON)": "replay"}
@@ -73,6 +74,8 @@ class IntegratedDesktop(DesktopLab):
             self.message.set(f"{exc}. Launch with Vision/.venv/bin/python after installing Vision/requirements.txt.")
         except (ValueError, TypeError, OSError, KeyError) as exc:
             self.message.set(str(exc))
+        if self.session.diagnostics:
+            self.session.diagnostics.record_error(self.message.get())
 
     def build_pages(self):
         self.vision_page = ttk.Frame(self.notebook, padding=12)
@@ -142,6 +145,8 @@ class IntegratedDesktop(DesktopLab):
         self.raw_ratios = tk.StringVar()
         self.input_result = tk.StringVar()
         label(camera, textvariable=self.input_result, style="Small.TLabel", wraplength=315).pack(anchor="w", pady=(8,0))
+        self.pointer_detail = tk.StringVar()
+        label(camera, textvariable=self.pointer_detail, wraplength=315).pack(anchor="w", pady=(8,0))
         mapping = ttk.Frame(panels)
         mapping.grid(row=0,column=1,sticky="nsew")
         label(mapping, "Input → filtered signal → command", foreground=GREEN, font=("Helvetica Neue",13,"bold")).pack(anchor="w",pady=(0,8))
@@ -182,7 +187,7 @@ class IntegratedDesktop(DesktopLab):
         self.mapping_page.refresh(state, self.history)
         mode = state["output"]["mode"]
         self.start_button.configure(text="Start live control" if mode == "native" else "Start dry run" if mode == "dry-run" else "Start preview")
-        set_var(self.status, state["snapshot"]["status"] if state["snapshot"]["armed"] else "Output stopped · press Start when ready")
+        set_var(self.status, state["snapshot"]["status"])
         set_var(self.timing, "PROCESSING 100 Hz · DISPLAY 10 Hz")
         self.root.after(50,self.refresh)
 
@@ -298,8 +303,9 @@ class IntegratedDesktop(DesktopLab):
     def refresh_vision(self):
         if self.closed:
             return
-        state = self.session.state(include_detector=True)
-        lab_state = self.lab.state(self.after)
+        with self.session.lock:
+            state = self.session.state(include_detector=True)
+            lab_state = self.lab.state(self.after)
         output = lab_state["output"]
         output_label = {"preview":"Preview","dry-run":"Driver dry run","native":"LIVE mouse + keyboard"}[output["mode"]]
         set_var(self.driver_text,output_label+" · "+(output.get("error") or ("running" if output["enabled"] else "stopped")))
@@ -344,6 +350,11 @@ class IntegratedDesktop(DesktopLab):
         set_var(self.raw_ratios,"\n".join(lines))
         result = lab_state["input_status"]
         set_var(self.input_result,"Input: "+(result["reason"] if result else "waiting"))
+        set_var(self.pointer_detail, pointer_status(state, lab_state))
+        if self.session.diagnostics:
+            self.session.diagnostics.record(state, lab_state)
+            if self.session.diagnostics.error:
+                set_var(self.input_result, self.input_result.get()+" · Diagnostic log unavailable: "+self.session.diagnostics.error)
         if self.notebook.select()==str(self.vision_page):
             self.draw_signal_scopes(detector)
             if state["preview"] is not None and state["preview_id"] != self.preview_seen:

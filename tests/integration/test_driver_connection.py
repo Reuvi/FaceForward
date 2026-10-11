@@ -50,6 +50,36 @@ class DriverConnectionTests(unittest.TestCase):
         self.session.stop()
         self.assertFalse(self.lab.state()["output"]["enabled"])
 
+    def test_centering_after_start_discards_pre_enable_interpolation(self):
+        for mapping in (GAMING_ID, "mouse"):
+            with self.subTest(mapping=mapping):
+                self.lab.select_mapping(mapping)
+                self.lab.action({"action":"arm"})
+                for _ in range(3):
+                    self.assertFalse(self.deliver(gaze_x=.8)["enabled"])
+                output = self.deliver(gaze_x=.5)
+                self.assertIsNone(output["error"])
+                self.assertTrue(output["enabled"])
+                snap = self.lab.state()["snapshot"]
+                self.assertEqual((snap["pointer_x"], snap["pointer_y"]), (.5,.5))
+                for _ in range(6):
+                    self.deliver(gaze_x=.8)
+                self.assertGreater(self.lab.state()["snapshot"]["pointer_x"], .5)
+                self.assertIsNone(self.lab.state()["output"]["error"])
+
+    def test_wink_during_startup_waits_for_release_before_first_command(self):
+        self.lab.action({"action":"arm"})
+        self.deliver(gaze_x=.8)  # Actual reopening readies the eye.
+        self.deliver(gaze_x=.8,left_eye_open=0)
+        output = self.deliver(gaze_x=.5,left_eye_open=0)
+        self.assertFalse(output["enabled"])
+        self.assertIsNone(output["error"])
+        output = self.deliver()
+        self.assertTrue(output["enabled"])
+        self.assertIsNone(output["error"])
+        self.assertEqual(output["event_counts"].get(3,0),0)
+        self.assertEqual(self.deliver(left_eye_open=0)["event_counts"].get(3),1)
+
     def test_key_combo_loss_mapping_change_and_profile_settings_release(self):
         for change in ("source_stop","settings","mapping"):
             self.lab.select_mapping(GAMING_ID)

@@ -50,6 +50,7 @@ class MouseSession:
         self.detector_runtime = None
         self.profile_label = "Unsaved calibration"
         self.profile_binding = None
+        self.diagnostics = None
 
     def configure_output(self, mode="preview", library=None):
         with self.lock:

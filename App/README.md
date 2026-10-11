@@ -187,3 +187,18 @@ Vision/.venv/bin/python -m App --source demo --headless --frames 490
 Synthetic tests check software behavior, not real-person accuracy. No camera is
 opened by the default tests. The real MediaPipe blank-image smoke test is optional
 via `VISION_MODEL_PATH`; no tongue model is needed to use the app.
+
+### Live-control diagnostics
+
+Signals displays the exact pointer blocker beside the camera: unavailable pupils,
+confidence/freshness rejection, axes waiting for neutral, or the dead-zone radius.
+The header preserves the stop/error reason. Starting while looking away, then
+centering, now clears pre-enable interpolation history so the driver's first
+command reflects the actual neutral input. Held eye actions must release first.
+
+App saves bounded scalar/error observations to
+`.local/diagnostics/live-control.jsonl` (three rotating 1 MB files; ignored by Git,
+owner-only permissions). No camera images, landmarks or saved calibration models
+are stored. `--diagnostic-log PATH` changes the path; `--no-diagnostics` disables
+logging. The log samples at 5 Hz plus observed state changes and is not a full
+capture replay. See [diagnosis and filter values](../docs/DRIVER_CONNECTION_GUIDE.md#if-the-pointer-stays-stopped).

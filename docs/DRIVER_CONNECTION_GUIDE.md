@@ -121,3 +121,43 @@ Set `FID_LIBRARY` when tests should load a non-default build. The native backend
 is compiled on this Mac, but automated event evidence uses dry-run. Real-person
 gesture accuracy, game behavior and a live permission-authorized session still
 need testing with the operator.
+
+## If the pointer stays stopped
+
+The Signals camera panel now shows the reason directly. `Pointer unavailable`
+means the calibrated pupil values were rejected (eye visibility, head calibration
+support, confidence or freshness); reducing the pointer dead zone cannot recover
+missing measurements. Raw iris graphs can still change while calibrated pupils
+are unavailable. `Waiting to start` identifies axes that need centering.
+`Pointer inside dead zone` shows the actual signed radial displacement and the
+activation threshold. The header retains the actual stop/error reason.
+
+With default settings and Y centered, pupil X must pass approximately .405 or
+.595 to start. A settled X=.60 requests about 7 pixels/s, X=.65 about 51 pixels/s,
+and X=.75 about 212 pixels/s at pointer speed 900. The 50 ms interpolation buffer
+and 90 ms smoothing add response time; they do not make input unknown. Tune under
+Mapping settings only after valid pupil input and Running are visible.
+
+A startup bug could report `Driver needs a fresh neutral command before output`
+when Start was pressed off-center and pupils were then centered: interpolation
+still contained pre-start movement. Processing now discards older interpolation
+history when a real fresh neutral input enables output. Active eye actions must
+also release before enabling. Subsequent clicks/movement remain independent;
+this does not synthesize a neutral input, weaken the driver check, or auto-rearm.
+
+App writes `.local/diagnostics/live-control.jsonl` by default (ignored by Git).
+It contains sampled scalar pupil validity/reasons, selected eye quality indicators,
+head gate state, filter settings, pointer requests, output errors and event counts.
+No camera images, landmarks or saved calibration models are logged.
+Observations are sampled at up to 5 Hz plus visible state changes, outside the
+capture/Processing threads; this is not a complete frame replay. Logs rotate at
+1 MB, keeping two backups, with owner-only file permissions. Use
+`--diagnostic-log PATH` to choose a local path or `--no-diagnostics` to disable.
+A logging failure is displayed and cannot arm, stop or alter control.
+
+The user-authorized macOS investigation on October 10, 2026 verified actual cursor
+position changes using bounded native velocity demands: +127 and -114 pixels
+through DriverOutput, and +68 pixels through the corrected Processing → driver
+path. No clicks/keys were requested; both tests ended paused with held-key mask 0.
+This verifies the tested launch context, not every app/game or real-person accuracy.
+Automated regression tests still use the compiled driver's dry-run backend.

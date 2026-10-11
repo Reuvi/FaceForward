@@ -6,7 +6,8 @@ from pathlib import Path
 import time
 
 from .mouse_runtime import MouseSession
-from .paths import DEFAULT_MODEL
+from .paths import DEFAULT_MODEL, ROOT
+from .diagnostics import DiagnosticLog
 
 
 def main():
@@ -26,10 +27,15 @@ def main():
     parser.add_argument("--no-preview", action="store_true", help="skip camera overlay drawing")
     parser.add_argument("--headless", action="store_true", help="bounded pipeline smoke check without Tk")
     parser.add_argument("--frames", type=int, default=120, help="headless source frame limit")
+    parser.add_argument("--diagnostic-log", type=Path, default=ROOT / ".local" / "diagnostics" / "live-control.jsonl",
+                        help="bounded local scalar/error log; contains no images or saved calibration models")
+    parser.add_argument("--no-diagnostics", action="store_true", help="disable local diagnostic logging")
     options = parser.parse_args()
     if options.output == "native" and options.source != "camera":
         parser.error("--output native requires --source camera")
     session = MouseSession()
+    if not options.no_diagnostics:
+        session.diagnostics = DiagnosticLog(options.diagnostic_log)
     try:
         session.lab.select_mapping(options.mapping)
         if options.config:
@@ -49,7 +55,11 @@ def main():
             keys = dict.fromkeys(("w", "s", "space", "left_shift"), False)
             cursor = 0
             while session.thread.is_alive():
-                state = session.lab.state(cursor)
+                with session.lock:
+                    source_state = session.state(include_detector=True) if session.diagnostics else None
+                    state = session.lab.state(cursor)
+                if session.diagnostics:
+                    session.diagnostics.record(source_state, state)
                 for row in state["trace"]:
                     left |= bool(row["left_out"]); right |= bool(row["right_out"])
                     pointer |= abs(row["out_x"] - 0.5) > 0.01 or abs(row["out_y"] - 0.5) > 0.01
@@ -75,6 +85,11 @@ def main():
         pass
     finally:
         session.close()
+        if session.diagnostics:
+            try:
+                session.diagnostics.record(session.state(include_detector=True), session.lab.state())
+            finally:
+                session.diagnostics.close()
 
 
 if __name__ == "__main__":
