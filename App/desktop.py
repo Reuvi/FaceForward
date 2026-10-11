@@ -120,7 +120,7 @@ class IntegratedDesktop(DesktopLab):
         self.button(self.replay_selection, "Use selected subject", lambda: self.session.select_subject(self.subject_var.get())).pack(side="left", padx=6)
         self.button(self.replay_selection, "Choose replay…", self.choose_replay).pack(side="left")
 
-        output_row = ttk.Frame(self.vision_page)
+        output_row = self.output_row = ttk.Frame(self.vision_page)
         output_row.pack(fill="x", pady=8)
         label(output_row, "Output").pack(side="left", padx=(0,8))
         self.output_choices = {"Preview": "preview", "Driver dry run": "dry-run", "Live mouse + keyboard": "native"}
@@ -130,6 +130,10 @@ class IntegratedDesktop(DesktopLab):
         self.driver_text = tk.StringVar()
         label(output_row, textvariable=self.driver_text, foreground=GREEN, wraplength=700).pack(side="left")
         self.button(output_row, "Target game…", self.show_target_game).pack(side="right", padx=6)
+        self.dictation_row = ttk.Frame(self.vision_page)
+        self.button(self.dictation_row, "Set up dictation", self.setup_dictation).pack(side="left", padx=(0,8))
+        self.dictation_text = tk.StringVar()
+        label(self.dictation_row, textvariable=self.dictation_text, wraplength=1000, foreground=GREEN).pack(side="left")
         self.source_status = tk.StringVar()
         label(self.vision_page, textvariable=self.source_status, foreground=GREEN).pack(anchor="w")
         self.source_detail = tk.StringVar()
@@ -382,6 +386,17 @@ class IntegratedDesktop(DesktopLab):
                 "Waiting for frames…" if state["running"] else "Camera stopped\n\nPress Start camera." if state["mode"]=="camera" else "Detector demo stopped")
             self.camera_canvas.itemconfigure(self.preview_hint,text=hint)
             self.camera_canvas.coords(self.preview_hint,160,16 if self.preview_photo else 120)
+        lab_state = self.lab.state()
+        presentation = bool((lab_state.get('mapping') or {}).get('presentation',{}).get('enabled'))
+        if presentation:
+            self.dictation_row.pack(fill="x", pady=(0,6), after=self.output_row)
+        else:
+            self.dictation_row.pack_forget()
+        speech = lab_state['snapshot'].get('dictation', {})
+        text = speech.get('message', '')
+        if speech.get('text'):
+            text += ' · '+speech['text'][-200:]
+        set_var(self.dictation_text, text)
         self.vision_after = self.root.after(100,self.refresh_vision)
 
     def draw_signal_scopes(self, detector):
@@ -411,6 +426,11 @@ class IntegratedDesktop(DesktopLab):
                 self.raw_canvas.delete("all")
                 self.raw_canvas.create_text(15,25,text="Choose Head processing or Pointer processing to see this demo's signals.",fill=MUTED,anchor="nw")
                 set_var(self.raw_capture,"Raw camera measurements appear with Camera or Detector demo")
+
+    def setup_dictation(self):
+        with self.lab.lock:
+            self.lab.action({"action":"stop"})
+            self.session.dictation.setup()
 
     def close(self):
         if self.target_game is not None and not self.target_game.closed:self.target_game.close()

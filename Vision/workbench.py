@@ -11,7 +11,7 @@ from .wink_model import NAMES, measure as measure_winks, score as wink_score, cl
 from .pupil import normalize as normalize_pupils, PupilReading, measure as measure_pupils, matrix_sample as pupil_matrix, MEASUREMENT as PUPIL_MEASUREMENT
 from .pipeline import VisionPipeline
 from .signals import SINGLE_SUBJECT, invalid, make_face, measurement, monotonic_ms
-from .mouth import mouth_open
+from .mouth import mouth_open, mouth_openness
 
 
 TARGETS = ("left_open", "left_closed", "right_open", "right_closed",
@@ -429,7 +429,8 @@ class DetectorWorkbench:
                         self.winks = dict(self.eye_guide.models)
                     self.notice = self.eye_guide.report
             height, width = captured.bgr.shape[:2]
-            values = {"mouth_open": mouth_open(observation, width, height)}
+            values = {"mouth_open": mouth_open(observation, width, height),
+                      "mouth_openness": mouth_openness(observation, width, height)}
             for side in ("left", "right"):
                 feature, calibration = self.features[side], self.eyes.get(side)
                 reason = feature.reason

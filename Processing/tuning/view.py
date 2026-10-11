@@ -146,7 +146,13 @@ class CurveEditor:
             detail='Plain open/closed signals: closure activates the assigned button immediately, including ordinary blinks. Open releases and re-arms that eye. Unknown releases it. Only Eye open/closed geometry is needed; wink training is ignored.'
         if self.channel in ('left','right') and legacy_eye_timing(state):
             detail='Legacy raw closure input: confirmation and reopening timers are active here. Calibrated camera winks bypass these timers. Each eye remains independent.'
-        binary=self.channel in ('left','right','mouth')
+        if self.channel=='mouth_brake':
+            detail='Wider mouth opening adds resistance to the pointer. Full opening stops it immediately; releasing rebuilds speed smoothly. No mouth calibration is needed. This curve does not reverse motion.'
+        if mapping and mapping.get('presentation',{}).get('enabled') and self.channel in ('left','right','gestures'):
+            detail='Presentation: close/reopen left for click, hold left for drag, close/reopen right for Enter. Hold both to toggle dictation. Solo actions wait for reopening so both-eye gestures cannot also click or press Enter. Unknown cancels the gesture; reopen both to resume.'
+        if mapping and mapping.get('presentation',{}).get('enabled'):
+            self.notice.set('Presentation uses gesture timing to separate clicks, dragging and both-eye dictation. Plain open/closed needs only eye geometry. Mode/profile changes stop output.')
+        binary=self.channel in ('left','right','mouth','gestures')
         self.timing_title.set('Timing preview · synthetic button activation' if binary else 'Timing preview · synthetic turn, hold, return')
         self.explanation.set(detail)
         target=self.channel=='pointer' and state['mapping'] and state['mapping']['pointer_mode']=='target'
@@ -154,6 +160,7 @@ class CurveEditor:
                                'Output: screen position, with 0.5 at center.' if target else
                                'Output: 0 = left/up, 0.5 = released, 1 = right/down.' if self.channel.startswith('head_') else
                                'Output speed: 0 = full left/up, 0.5 = stopped, 1 = full right/down.')
+        if self.channel=='mouth_brake':self.output_legend.set('Resistance: 0 = normal movement; 1 = full stop.')
         specs=sliders(state,self.channel)
         if not specs:
             ttk.Label(self.controls,text='Instant button action\n\nOFF → released\nON → key held or one mouse click\nUnknown → released',justify='left').pack(anchor='w',pady=20)

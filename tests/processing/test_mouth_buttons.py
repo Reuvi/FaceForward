@@ -136,7 +136,7 @@ class MouthButtonTests(unittest.TestCase):
         original['response']['pointer']['exponent'] = 2.1
         for version in (6, 7):
             old = deepcopy(original);old['format'] = f'input_mapping_v{version}'
-            del old['button_bindings']
+            del old['button_bindings'];del old['presentation']
             if version == 6:del old['require_wink']
             restored = Mapping.from_dict(old)
             self.assertEqual(restored.button_bindings, ('left_click', 'right_click', 'none'))

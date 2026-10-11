@@ -45,7 +45,11 @@ typedef enum fid_event_type {
     FID_EVENT_DELETE = 5,
     FID_EVENT_INSERT = 6,
     FID_EVENT_KEY_DOWN = 7,
-    FID_EVENT_KEY_UP = 8
+    FID_EVENT_KEY_UP = 8,
+    FID_EVENT_ENTER = 9,
+    FID_EVENT_LEFT_DOWN = 10,
+    FID_EVENT_LEFT_UP = 11,
+    FID_EVENT_TEXT = 12
 } fid_event_type;
 
 /* ABI v3 held-key state bits. A set bit means held; clearing it releases. */
@@ -68,7 +72,9 @@ enum fid_capability {
     FID_CAP_INSERT = 1u << 5,
     /* macOS emits the Help/Insert-position key, not guaranteed overwrite. */
     FID_CAP_INSERT_LIMITED = 1u << 6,
-    FID_CAP_HELD_KEYS = 1u << 7
+    FID_CAP_HELD_KEYS = 1u << 7,
+    FID_CAP_PRESENTATION = 1u << 8,
+    FID_CAP_UNICODE_TEXT = 1u << 9
 };
 
 typedef struct fid_axis_config {
@@ -157,6 +163,11 @@ FID_API fid_result fid_submit_processed(fid_driver *driver, const fid_frame *fra
 /* Enabling discards old frames; submit a fresh frame with no buttons or keys held.
  * ABI v3 adds complete held-key state to the v2 pointer and button contract. */
 FID_API fid_result fid_enable(fid_driver *driver);
+/* Additive ABI v3 operations. They require enabled, fresh, neutral-established
+ * output and never refresh the watchdog. Enter is edge-triggered, drag is held.
+ * text accepts one printable Unicode scalar; no control characters or surrogates. */
+FID_API fid_result fid_set_presentation(fid_driver *driver, uint32_t enter, uint32_t drag_left);
+FID_API fid_result fid_type_character(fid_driver *driver, uint32_t codepoint);
 FID_API fid_result fid_pause(fid_driver *driver);
 FID_API fid_result fid_get_status(fid_driver *driver, fid_status *status);
 /* Bounded, destructive event journal. Works for dry-run and native backends. */

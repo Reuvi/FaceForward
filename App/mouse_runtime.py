@@ -52,6 +52,9 @@ class MouseSession:
         self.profile_label = "Unsaved calibration"
         self.profile_binding = None
         self.diagnostics = None
+        from .dictation import DictationController
+        self.dictation = DictationController(allow_capture=lambda: self.mode == "camera")
+        self.lab.interaction = self.dictation
 
     def configure_output(self, mode="preview", library=None):
         with self.lock:
@@ -457,5 +460,6 @@ class MouseSession:
             self.closed = True
             self.preview = None
         self.lab.close()
+        self.dictation.cancel("App closed")
         if self.detector_runtime is not None:
             self.detector_runtime.close()

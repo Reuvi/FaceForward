@@ -2,11 +2,11 @@
 
 
 def frame(sequence=0, timestamp=1000., *, x=.5, y=.5, head_x=.5, head_y=.5,
-          left="open", right="open", mouth=0, session="synthetic", subject="person"):
+          left="open", right="open", mouth=0, openness=0, session="synthetic", subject="person"):
     def measurement(value):
         return {"value": value, "valid": value is not None, "confidence": 1 if value is not None else 0}
     values = {"gaze_x": x, "gaze_y": y, "head_x": head_x, "head_y": head_y,
-              "tongue_x": None, "tongue_y": None, "mouth_open": mouth,
+              "tongue_x": None, "tongue_y": None, "mouth_open": mouth, "mouth_openness": openness,
               "left_eye_open": 1 if left == "open" else 0 if left != "unknown" else None,
               "right_eye_open": 1 if right == "open" else 0 if right != "unknown" else None}
     result = {"schema_version": 1, "session_id": session, "sequence": sequence,

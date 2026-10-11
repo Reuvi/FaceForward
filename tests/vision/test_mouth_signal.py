@@ -4,7 +4,7 @@ import importlib.util
 from types import SimpleNamespace
 import unittest
 
-from Vision.mouth import mouth_open
+from Vision.mouth import mouth_open, mouth_openness
 from Vision.signals import Envelope, invalid, make_face, measurement, validate_frame
 
 
@@ -18,6 +18,16 @@ class MouthSignalTests(unittest.TestCase):
             self.assertEqual(result['valid'], expected is not None)
             self.assertEqual(obs.expressions.keys(), {'jawOpen'})
         self.assertEqual(mouth_open(SimpleNamespace(expressions={}, points=[]), 100, 100), invalid())
+
+    def test_continuous_opening_preserves_precision_and_invalidity(self):
+        for value in (0, .12, .499, .501, 1, None, -1, float('inf')):
+            obs = SimpleNamespace(expressions={'jawOpen':value}, points=[(30,30)]*478)
+            got = mouth_openness(obs,100,100)
+            expected = value if value is not None and 0 <= value <= 1 else None
+            self.assertEqual(got['value'], expected)
+        face=make_face('person',{'mouth_openness':measurement(.376,1)})
+        validate_frame(Envelope('test',1,1000).frame([face]))
+        self.assertEqual(face['signals']['mouth_openness']['value'],.376)
 
     def test_off_frame_or_missing_mouth_is_unknown(self):
         obs = SimpleNamespace(expressions={'jawOpen': .8}, points=[(30, 30)]*478)
@@ -48,6 +58,7 @@ class MouthSignalTests(unittest.TestCase):
             frame = bench.process(CapturedImage(Envelope('mouth-test', seq, now), image), observations)
             expected = None if score is None else int(score >= .5)
             self.assertEqual(frame['faces'][0]['signals']['mouth_open']['value'], expected)
+            self.assertEqual(frame['faces'][0]['signals']['mouth_openness']['value'], score)
             self.assertEqual(frame['timestamp_ms'], now)
             self.assertEqual(bench.trace[-1]['mouth_open'], expected)
             self.assertFalse(frame['faces'][0]['signals']['head_y']['valid'])

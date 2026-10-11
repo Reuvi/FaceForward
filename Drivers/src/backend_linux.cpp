@@ -154,6 +154,17 @@ public:
             }
             case FID_EVENT_LEFT_CLICK: return tap(mouse_, BTN_LEFT, 0);
             case FID_EVENT_RIGHT_CLICK: return tap(mouse_, BTN_RIGHT, 1);
+            case FID_EVENT_ENTER: return tap(keyboard_, KEY_ENTER, 4);
+            case FID_EVENT_LEFT_DOWN:
+            case FID_EVENT_LEFT_UP: {
+                const bool down = event.type == FID_EVENT_LEFT_DOWN;
+                if (down) held_[0] = true;
+                auto result = write(mouse_, EV_KEY, BTN_LEFT, down ? 1 : 0);
+                const auto synced = sync(mouse_);
+                if (result == FID_OK) result = synced;
+                if (result == FID_OK && !down) held_[0] = false;
+                return result;
+            }
             case FID_EVENT_DELETE: return tap(keyboard_, KEY_DELETE, 2);
             case FID_EVENT_INSERT: return tap(keyboard_, KEY_INSERT, 3);
             case FID_EVENT_KEY_DOWN:
@@ -178,8 +189,8 @@ public:
     }
     fid_result release() override {
         fid_result result = FID_OK;
-        const unsigned codes[] = {BTN_LEFT, BTN_RIGHT, KEY_DELETE, KEY_INSERT};
-        for (size_t i = 0; i < 4; ++i) {
+        const unsigned codes[] = {BTN_LEFT, BTN_RIGHT, KEY_DELETE, KEY_INSERT, KEY_ENTER};
+        for (size_t i = 0; i < 5; ++i) {
             if (!held_[i]) continue;
             auto *device = i < 2 ? mouse_ : keyboard_;
             auto r = write(device, EV_KEY, codes[i], 0);
@@ -256,7 +267,7 @@ private:
     }
     libevdev_uinput *mouse_ = nullptr;
     libevdev_uinput *keyboard_ = nullptr;
-    bool held_[4]{};
+    bool held_[5]{};
     uint32_t held_keys_ = 0;
 #ifdef FID_HAS_X11
     Display *display_ = nullptr;

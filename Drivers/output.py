@@ -45,6 +45,7 @@ class DriverOutput:
         self.lib = load_driver(library or default_library())
         self.handle = ct.c_void_p()
         self.active = False
+        self.presentation_active = False
         self.last_output = self.last_source = self.mapping = None
         self.events = deque(maxlen=32)
         self.counts = Counter()
@@ -85,7 +86,7 @@ class DriverOutput:
             self.check(self.lib.fid_drain_events(self.handle, events, 128, ct.byref(count)))
             for event in events[:count.value]:
                 self.counts[event.type] += 1
-                self.events.append({"type": event.type, "x": event.x, "y": event.y})
+                self.events.append({"type": event.type, "x": None if event.type == 12 else event.x, "y": event.y})
             if count.value < 128:
                 break
 
@@ -93,6 +94,8 @@ class DriverOutput:
         status = self.status()
         return {"mode": self.mode, "enabled": bool(status.enabled),
                 "awaiting_neutral": bool(status.awaiting_neutral),
+                "presentation_supported": bool(status.capabilities & 256),
+                "text_supported": bool(status.capabilities & 512),
                 "timed_out": bool(status.timed_out), "held_keys": status.held_key_mask,
                 "error": self.error, "events": list(self.events),
                 "pointer_mode": "target" if status.pointer_mode == 1 else "velocity",
@@ -103,6 +106,7 @@ class DriverOutput:
 
     def pause(self):
         self.active = False
+        self.presentation_active = False
         self.last_output = self.last_source = self.mapping = None
         if self.handle:
             self.check(self.lib.fid_pause(self.handle))
@@ -173,7 +177,25 @@ class DriverOutput:
                 raise DriverError("Unknown button input cannot click")
             if not known["pointer"] and (x != .5 or y != .5 or speed != 0):
                 raise DriverError("Unknown pointer input cannot move the pointer")
-        neutral = (not frame.keys_down and not any(buttons.values()) and scroll == .5
+        presentation = message.get("presentation")
+        if presentation is not None:
+            if (not gaming or not isinstance(presentation, dict) or
+                    set(presentation) != {"enter", "drag_left", "eyes_known"} or
+                    any(type(v) is not bool for v in presentation.values())):
+                raise DriverError("Expected complete presentation state")
+            if target:
+                raise DriverError("Presentation requires relative pointer movement")
+            enter, drag = presentation["enter"], presentation["drag_left"]
+            if ((enter or drag) and not presentation["eyes_known"] or (enter and drag) or
+                    ((enter or drag) and (any(buttons.values()) or frame.keys_down))):
+                raise DriverError("Invalid or unknown presentation gesture")
+            if not hasattr(self.lib, "fid_set_presentation") or not (self.status().capabilities & 256):
+                raise DriverError("Rebuild Drivers for presentation Enter and dragging support")
+        else:
+            enter = drag = False
+            if self.presentation_active and message["enabled"]:
+                raise DriverError("Presentation mode changed without stopping")
+        neutral = (not enter and not drag and not frame.keys_down and not any(buttons.values()) and scroll == .5
                    and (target or (x, y) == (.5, .5)))
         if not message["enabled"]:
             if not neutral or (target and (speed != 0 or (x, y) != (.5, .5))):
@@ -227,6 +249,11 @@ class DriverOutput:
             status = self.status()
             if not status.enabled or status.awaiting_neutral or status.last_error:
                 raise DriverError("Driver could not accept the fresh command; press Start again")
+            presentation = message.get("presentation")
+            if presentation is not None:
+                self.check(self.lib.fid_set_presentation(self.handle, int(presentation["enter"]),
+                                                        int(presentation["drag_left"])))
+            self.presentation_active = presentation is not None
             self.active = True
             self.last_output, self.last_source, self.mapping = output, capture, mapping
             self.error = None
@@ -237,3 +264,22 @@ class DriverOutput:
                 self.pause()
             finally:
                 raise DriverError(self.error) from exc
+
+    def type_character(self, character):
+        """One Unicode scalar, gated by the most recently accepted fresh command."""
+        try:
+            if (not isinstance(character, str) or len(character) != 1 or not character.isprintable()
+                    or 0xd800 <= ord(character) <= 0xdfff):
+                raise DriverError("Text output requires one printable Unicode scalar")
+            if (not self.active or not self.presentation_active or self.last_source is None or
+                    not 0 <= self.clock()-self.last_source[2] <= 250 or self.last_output is None or
+                    not 0 <= self.clock()-self.last_output[2] <= 250):
+                raise DriverError("Text output requires fresh enabled presentation input")
+            if not hasattr(self.lib, "fid_type_character"):
+                raise DriverError("Rebuild Drivers for text output support")
+            self.check(self.lib.fid_type_character(self.handle, ord(character)))
+            self.collect()
+        except (ValueError, TypeError, OSError) as exc:
+            self.error = str(exc)
+            self.pause()
+            raise DriverError(self.error) from exc

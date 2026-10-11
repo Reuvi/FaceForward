@@ -19,7 +19,7 @@ def main():
     parser.add_argument("--camera-id", type=int, default=0)
     parser.add_argument("--fps", type=float, default=30)
     parser.add_argument("--config", type=Path, help="Processing JSON settings")
-    parser.add_argument("--mapping", choices=("mouse", "gaming-keyboard-mouse-1", "mouse-test"), default=None,
+    parser.add_argument("--mapping", choices=("mouse", "gaming-keyboard-mouse-1", "mouse-test", "presentation"), default=None,
                         help="initial mapping; otherwise use a measured personal default when available")
     parser.add_argument("--factory-defaults", action="store_true",
                         help="ignore the personal target-game default for this run")

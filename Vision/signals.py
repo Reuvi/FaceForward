@@ -14,7 +14,7 @@ SIGNALS = (
     "gaze_x", "gaze_y", "tongue_x", "tongue_y",
     "left_eye_open", "right_eye_open", "head_x", "head_y",
 )
-OPTIONAL_SIGNALS = ("mouth_open",)
+OPTIONAL_SIGNALS = ("mouth_open", "mouth_openness")
 
 
 def finite_number(value):

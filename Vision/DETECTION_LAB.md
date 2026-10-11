@@ -1,3 +1,5 @@
+**Mouth signal update:** the existing jawOpen blendshape now emits both binary `mouth_open` and continuous `mouth_openness` (0–1) on the same capture. Both use identical availability checks and need no calibration. The continuous signal supports downstream Presentation braking. [Contract](../Contracts/PRESENTATION_MODE.md).
+
 # Native detection lab: calibration, measurements, and test procedure
 
 Current Mouse test layout: left eye → W, right eye → left click, mouth open → Space,

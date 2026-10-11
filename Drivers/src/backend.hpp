@@ -6,7 +6,7 @@
 namespace fid {
 constexpr uint32_t base_capabilities = FID_CAP_POINTER | FID_CAP_SCROLL |
     FID_CAP_LEFT_CLICK | FID_CAP_RIGHT_CLICK | FID_CAP_DELETE | FID_CAP_INSERT |
-    FID_CAP_HELD_KEYS;
+    FID_CAP_HELD_KEYS | FID_CAP_PRESENTATION;
 
 class Backend {
 public:

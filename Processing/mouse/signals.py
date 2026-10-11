@@ -70,6 +70,9 @@ class Sample:
     head_x: object = None
     instant_eyes: bool = False
     mouth_open: object = None
+    mouth_openness: object = None
+    anatomical_left: object = None
+    anatomical_right: object = None
 
     def __post_init__(self):
         for side in ("left", "right"):
@@ -102,6 +105,8 @@ def decode(frame, config, subject_id, *, ignore_eyes=False, raw_eyes=False):
                       one_hot_vector(frame.get("head_vertical")),
                       head_x=one_hot_vector(frame.get("head_horizontal")), instant_eyes=raw_eyes,
                       left_reopened=eye("left_eye") is False, right_reopened=eye("right_eye") is False,
+                      mouth_openness=(frame.get("mouth_openness") if finite(frame.get("mouth_openness"))
+                                      and 0 <= frame["mouth_openness"] <= 1 else None),
                       mouth_open=(bool(frame["mouth_open"]) if finite(frame.get("mouth_open"))
                                   and frame["mouth_open"] in (0, 1) else None))
 
@@ -135,7 +140,8 @@ def decode(frame, config, subject_id, *, ignore_eyes=False, raw_eyes=False):
 
     x, y = measurement(config.pointer_source + "_x"), measurement(config.pointer_source + "_y")
     mouth = measurement("mouth_open")
-    pointer_source = dict(mouth_open=bool(mouth) if mouth in (0, 1) else None)
+    pointer_source = dict(mouth_open=bool(mouth) if mouth in (0, 1) else None,
+                          mouth_openness=measurement("mouth_openness"))
     if config.pointer_source == "tongue" and "tongue_sample" in frame:
         origin = frame["tongue_sample"]
         valid = (isinstance(origin, dict) and origin.get("format") == "tongue_sample_v1"

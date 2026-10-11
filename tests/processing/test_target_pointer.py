@@ -125,13 +125,13 @@ class TargetPointerTests(unittest.TestCase):
         current=Mapping().to_dict()
         for version in ('input_mapping_v1','input_mapping_v2'):
             old=deepcopy(current);old['format']=version
-            for key in ('pointer_down_gain','target_smoothing_ms','target_interpolation_ms','head_motion','head_wink_clicks','require_wink','button_bindings'):del old[key]
+            for key in ('pointer_down_gain','target_smoothing_ms','target_interpolation_ms','head_motion','head_wink_clicks','require_wink','button_bindings','presentation'):del old[key]
             del old['pointer_mode'];del old['target_jitter']
             if version.endswith('v1'):
                 del old['input_mode'];del old['adaptive_pointer']
             self.assertEqual(Mapping.from_dict(old).pointer_mode,'velocity')
         old=deepcopy(current);old['format']='input_mapping_v3'
-        for key in ('pointer_down_gain','target_smoothing_ms','target_interpolation_ms','head_motion','head_wink_clicks','require_wink','button_bindings'):del old[key]
+        for key in ('pointer_down_gain','target_smoothing_ms','target_interpolation_ms','head_motion','head_wink_clicks','require_wink','button_bindings','presentation'):del old[key]
         old.update(pointer_gain=1,target_jitter=.01)
         migrated=Mapping.from_dict(old)
         self.assertEqual((migrated.pointer_down_gain,migrated.target_smoothing_ms,migrated.target_interpolation_ms),(1,90,50))

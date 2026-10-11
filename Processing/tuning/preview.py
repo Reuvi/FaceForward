@@ -26,6 +26,10 @@ def filter_for(state,channel):
 
 
 def steady_curves(state,channel):
+    if channel == 'mouth_brake':
+        config=Mapping.from_dict(state['mapping']).presentation
+        return {'Resistance':[(i/100,config.brake(i/100)) for i in range(101)]}
+    if channel == 'gestures':return {'OFF / ON':[(0,0),(1,1)]}
     if channel in ('left','right','mouth'):return {'ON/OFF':[(0,0),(1,1)]}
     if channel.startswith('head_'):
         config=getattr(Mapping.from_dict(state['mapping']),channel)
@@ -49,6 +53,16 @@ def steady_curves(state,channel):
 
 def response_preview(state,channel):
     """Synthetic outward turn, hold and return. Never feeds the live controller."""
+    if channel in ('left','right') and (state.get('mapping') or {}).get('presentation',{}).get('enabled'):
+        from Processing.mappings.presentation import EyeGestures
+        gestures=EyeGestures();config=Mapping.from_dict(state['mapping']).presentation
+        raw=[];out=[]
+        for t in range(0,2501,10):
+            closed=200<=t<800
+            gestures.sample(closed if channel=='left' else False, closed if channel=='right' else False,t,config)
+            raw.append((t/1000,int(closed)))
+            out.append((t/1000,int((gestures.click or gestures.drag) if channel=='left' else gestures.enter)))
+        return {'Eye closure':raw,'Command':out}
     if channel in ('left','right','mouth'):
         eye=EyeGate(None if channel=='mouth' else getattr(MouseConfig.from_dict(state['config']),channel+'_eye'))
         raw=[];out=[]
@@ -57,6 +71,20 @@ def response_preview(state,channel):
             eye.sample(closed,t,instant=channel=='mouth',appearance_intent=not legacy_eye_timing(state),reopened=not closed)
             raw.append((t/1000,int(closed)));out.append((t/1000,int(eye.down)))
         return {'Mouth open' if channel=='mouth' else 'Eye action':raw,'Command':out}
+    if channel == 'mouth_brake':
+        config=Mapping.from_dict(state['mapping']).presentation
+        raw=[(t/1000, max(0,min(1,(t-200)/600)) if t<1200 else max(0,1-(t-1200)/600)) for t in range(0,2501,10)]
+        return {'Opening':raw, 'Resistance':[(t,config.brake(value)) for t,value in raw]}
+    if channel == 'gestures':
+        from Processing.mappings.presentation import EyeGestures
+        gestures=EyeGestures();config=Mapping.from_dict(state['mapping']).presentation
+        result={'Both closed':[], 'Toggle':[]}
+        for t in range(0,2501,10):
+            closed=300<=t<1800
+            gestures.sample(closed,closed,t,config)
+            result['Both closed'].append((t/1000,int(closed)))
+            result['Toggle'].append((t/1000,int(gestures.toggle)))
+        return result
     head=channel.startswith('head_')
     if head:
         gates=[HeadGate(getattr(Mapping.from_dict(state['mapping']),channel))]
@@ -92,6 +120,12 @@ def response_preview(state,channel):
 
 def live_values(state,channel):
     snap=state['snapshot'];diag=snap['diagnostics']
+    if channel=='mouth_brake':
+        brake=diag.get('mouth_brake',{})
+        return [('Resistance',brake.get('openness'),brake.get('resistance') if brake.get('known') else None)]
+    if channel=='gestures':
+        request=snap.get('dictation_request',{})
+        return [('Dictation',int(request.get('active',False)),int(request.get('active',False)))]
     if channel=='pointer':
         raw=diag['raw_pointer']
         return [(name,None if raw is None else raw[i],snap['pointer_'+name.lower()] if raw is not None else None)

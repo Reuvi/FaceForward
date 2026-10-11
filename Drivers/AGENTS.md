@@ -1,3 +1,5 @@
+**Current presentation mode:** read [../Contracts/PRESENTATION_MODE.md](../Contracts/PRESENTATION_MODE.md). A separate mapping adds head movement, continuous mouth braking, left-eye click/drag, right-eye Enter and both-eyes dictation. Plain open/closed is its default; combined gesture timing supersedes independent instant eyes only in this explicit mode. Older maps are unchanged. Mapping v9 and additive ABI v3 APIs preserve old formats.
+
 **Current button layout:** read [Mouth buttons and relative movement](../Contracts/MOUTH_BUTTON_RELATIVE.md). Mouse test maps left eye → W, right eye → left click, mouth open → Space, and head X/Y → relative mouse movement. Mapping v8 preserves older imported assignments; mouth needs no calibration.
 
 # Drivers lane

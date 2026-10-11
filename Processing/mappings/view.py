@@ -117,13 +117,17 @@ class MappingPanel(ttk.Frame):
             widget.grid(row=row, column=1, sticky="w", padx=5)
             self.target_widgets.extend((title_widget, widget))
         self.button_bindings = {}
+        self.button_widgets = []
         for row, source in enumerate(BUTTON_INPUTS, start=8):
-            label(group, source.replace("_", " ").title()).grid(row=row, column=0, sticky="w", pady=3)
+            title = label(group, source.replace("_", " ").title())
+            title.grid(row=row, column=0, sticky="w", pady=3)
+            self.button_widgets.append(title)
             var = tk.StringVar()
             self.button_bindings[source] = var
             widget = ttk.Combobox(group, textvariable=var, state="readonly", values=BUTTON_OUTPUTS, width=14)
             widget.grid(row=row, column=1, columnspan=3, sticky="ew", padx=5)
             self.edit_widgets.append(widget)
+            self.button_widgets.append(widget)
         self.adaptive = tk.BooleanVar(value=True)
         self.adaptive_widget = ttk.Checkbutton(settings_parent, text="Adaptive pointer smoothing (1€)", variable=self.adaptive)
         self.adaptive_widget.pack(anchor="w", pady=5)
@@ -139,8 +143,9 @@ class MappingPanel(ttk.Frame):
             self.motion_fields[key] = var
             ttk.Entry(self.motion_group, textvariable=var, width=8).grid(row=1, column=col*2+1, padx=5)
         self.wink_clicks = tk.BooleanVar()
-        ttk.Checkbutton(self.motion_group, text="Enable eye button actions (wink/open-closed source in Live curves)",
-                        variable=self.wink_clicks).grid(row=2, column=0, columnspan=4, sticky="w", pady=4)
+        self.eye_enable = ttk.Checkbutton(self.motion_group, text="Enable eye button actions (wink/open-closed source in Live curves)",
+                        variable=self.wink_clicks)
+        self.eye_enable.grid(row=2, column=0, columnspan=4, sticky="w", pady=4)
         self.pointer_group = None
         if compact:
             pointer = ttk.LabelFrame(settings_parent, text="Pointer response", padding=8)
@@ -352,6 +357,12 @@ class MappingPanel(ttk.Frame):
                                + ("" if self.compact else " Velocity smoothing and response are in Transfer settings."))
             for widget in self.edit_widgets:
                 widget.configure(state="disabled" if mapping is None else "readonly" if isinstance(widget, ttk.Combobox) else "normal")
+            presentation = bool(mapping and mapping.get('presentation',{}).get('enabled'))
+            for widget in self.button_widgets:
+                widget.grid_remove() if presentation else widget.grid()
+            self.eye_enable.configure(state='disabled' if presentation else 'normal')
+            if presentation:
+                self.help_text.set('Presentation: head X/Y moves; mouth opening brakes. Left eye close/reopen clicks, hold drags; right eye close/reopen presses Enter. Hold both eyes to start/finish dictation. Mouth brake and gesture timings are in Live curves. Uncheck Require calibrated wink there to use plain open/closed eyes.')
             self.apply_button.configure(state="disabled" if mapping is None and not self.compact else "normal")
             self.name.set(mapping["name"] if mapping else "Mouse and scroll")
             for key, var in self.pointer_fields.items():

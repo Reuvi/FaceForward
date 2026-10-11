@@ -1,3 +1,5 @@
+**Current presentation integration:** [PRESENTATION_MODE.md](PRESENTATION_MODE.md) adds continuous mouth braking, combined eye gestures, Enter/drag and local speech-to-text through additive interfaces. Earlier mappings keep their behavior.
+
 # Shared contracts — initial v1
 
 [MOUTH_BUTTON_RELATIVE.md](MOUTH_BUTTON_RELATIVE.md) adds the mouth-open bit,

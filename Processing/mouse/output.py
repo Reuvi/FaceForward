@@ -32,4 +32,5 @@ def control_message(snapshot):
         "keys": dict(snapshot["keys"]),
         "pointer": pointer,
         "scroll_y": snapshot["scroll_y"], "known": dict(snapshot["known"]),
+        **({"presentation": dict(snapshot["presentation"])} if "presentation" in snapshot else {}),
     }

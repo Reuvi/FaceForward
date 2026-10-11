@@ -7,7 +7,7 @@ from pathlib import Path
 import tempfile
 
 from Processing.mouse.config import MouseConfig, number
-from Processing.mappings.config import Mapping, action_label, mouse_test_mapping
+from Processing.mappings.config import Mapping, action_label, mouse_test_mapping, presentation_mapping
 
 
 @dataclass(frozen=True)
@@ -44,6 +44,9 @@ def channels(state):
                        if mapping else side.title()+mode+' → '+side+' click') for side in ('left','right'))
     if mapping and mapping['button_bindings']['mouth'] != 'none':
         result.append(('mouth','Mouth open → '+action_label(mapping['button_bindings']['mouth'])))
+    if mapping and mapping.get('presentation',{}).get('enabled'):
+        result = [(key, 'Right eye → Enter' if key=='right' else label) for key,label in result]
+        result += [('mouth_brake','Mouth opening → pointer resistance'), ('gestures','Eye gesture timing')]
     return result
 
 
@@ -53,6 +56,19 @@ def sliders(state, channel):
     result=[]
     def add(key,label,lo,hi,step,path,unit=''):
         result.append(Slider(key,label,lo,hi,step,tuple(path.split('.')),unit))
+    if channel == 'mouth_brake':
+        for key,label,lo,hi,step in (
+            ('mouth_start','Brake begins at opening',0,.8,.01),
+            ('mouth_full','Full stop at opening',.1,1,.01),
+            ('mouth_exponent','Resistance curve',.2,4,.05)):
+            add(key,label,lo,hi,step,'mapping.presentation.'+key)
+        return result
+    if channel == 'gestures':
+        for key,label,lo,hi in (('solo_ms','Click / Enter minimum closure',0,400),
+                              ('chord_ms','Both eyes: dictation hold',250,1500),
+                              ('drag_ms','Left eye: start dragging',450,2000)):
+            add(key,label,lo,hi,10,'mapping.presentation.'+key,'ms')
+        return result
     if channel in ('left','right','mouth'):
         if channel != 'mouth' and legacy_eye_timing(state):
             add('dwell_ms','Closure confirmation',50,3000,10,f'config.{channel}_eye.dwell_ms','ms')
@@ -109,6 +125,11 @@ def edited(state,channel,changes):
         if head['release']>=head['activation']:
             if 'activation' in changes:head['release']=max(0,head['activation']-.01)
             else:head['activation']=min(1,head['release']+.01)
+    if channel == 'mouth_brake':
+        p = data['mapping']['presentation']
+        if p['mouth_full']-p['mouth_start'] < .05:
+            if 'mouth_start' in changes:p['mouth_full'] = min(1,p['mouth_start']+.05)
+            else:p['mouth_start'] = max(0,p['mouth_full']-.05)
     config=MouseConfig.from_dict(data['config'])
     mapping=None
     if data['mapping'] is not None:
@@ -156,7 +177,7 @@ def validate_profile(data):
 def default_profile(state):
     mapping=Mapping.from_dict(state['mapping']) if state['mapping'] else None
     if mapping:
-        base=mouse_test_mapping() if mapping.input_mode=='head-mouse' else Mapping()
+        base=presentation_mapping() if mapping.presentation.enabled else mouse_test_mapping() if mapping.input_mode=='head-mouse' else Mapping()
         # A user's routing/identity and pointer mode are separate from response tuning.
         base=replace(base,id=mapping.id,name=mapping.name,revision=mapping.revision+1,
                      bindings=mapping.bindings,pointer_mode=mapping.pointer_mode,

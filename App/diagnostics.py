@@ -67,6 +67,16 @@ def pointer_status(source, lab):
                 "Waiting to start: center head inputs." if head_only and not (lab.get("mapping") or {}).get("head_wink_clicks") else
                 "Waiting to start: release eye actions and center head inputs." if target or head_only else
                 "Waiting to start: release eye actions and center inputs.")
+    speech=snap.get('dictation',{})
+    if speech.get('state') in ('starting','listening','captured','finalizing','sending'):
+        return 'Pointer paused for dictation: '+speech.get('state','')
+    if diag.get('resume_head_neutral'):
+        return 'Return your head to its resting center to resume pointer movement after dictation.'
+    brake=diag.get('mouth_brake')
+    if brake and not brake['known']:
+        return 'Pointer paused: mouth opening is unknown.'
+    if brake and brake['resistance'] >= 1:
+        return 'Pointer stopped by full mouth brake. Close your mouth to move.'
     if target:
         location = f"X {snap['pointer_x']:.1%}, Y {snap['pointer_y']:.1%}"
         status = ("preview" if lab["output"]["mode"] == "preview" else
@@ -171,7 +181,9 @@ class DiagnosticLog:
                      "require_wink":(lab.get("mapping") or {}).get("require_wink", True),
                      "eyes":diag.get("eyes"), "head_center_pending":diag.get("head_center_pending", False),
                      "mouth_open":signals.get("mouth_open"), "button_actions":diag.get("button_actions"),
-                     "keys":snap.get("keys"),
+                     "keys":snap.get("keys"), "mouth_brake":diag.get("mouth_brake"),
+                     "presentation":snap.get("presentation"),
+                     "dictation":{k:snap.get("dictation",{}).get(k) for k in ("state","remaining","sent")},
                      "tuning_revision":lab.get("tuning_revision", 0),
                      "target_jitter":diag.get("target_jitter"), "min_confidence":lab["config"]["min_confidence"],
                      "pointer_gain":(lab.get("mapping") or {}).get("pointer_gain",1),

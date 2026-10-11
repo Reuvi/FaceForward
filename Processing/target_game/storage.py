@@ -79,11 +79,26 @@ def read_personal_default(path=DEFAULT_PATH):
 
 def configure_startup(lab, requested_mapping=None, path=DEFAULT_PATH, *, factory=False):
     """Explicit non-head mapping wins. Loading never starts output or the camera."""
-    from Processing.mappings.config import GAMING_ID
+    from Processing.mappings.config import GAMING_ID, Mapping, presentation_mapping
+    if requested_mapping == 'presentation':
+        if not factory and Path(path).is_file():
+            data=read_personal_default(path)
+            base=Mapping.from_dict(data['mapping'])
+            # Reuse measured movement response, keep old layouts in their own preset.
+            if not base.presentation.enabled:
+                data={**data,'name':'Presentation — personal head response',
+                      'mapping':presentation_mapping(base).to_dict()}
+            lab.apply_tuning_profile(data)
+            return 'Presentation with personal head response loaded'
+        lab.select_mapping('presentation')
+        return 'Presentation defaults loaded'
     if factory or requested_mapping not in (None,'mouse-test'):
         lab.select_mapping(requested_mapping or GAMING_ID);return 'Built-in mapping selected'
     if Path(path).is_file():
         data=read_personal_default(path)
+        base=Mapping.from_dict(data['mapping'])
+        if not base.presentation.enabled:
+            lab.mappings['presentation']=presentation_mapping(base)
         lab.apply_tuning_profile(data)
         return 'Personal target-game default loaded · '+data['name']
     lab.select_mapping(requested_mapping or GAMING_ID)

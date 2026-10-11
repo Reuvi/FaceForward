@@ -11,6 +11,7 @@ from Processing.mouse.config import MouseConfig, number
 
 GAMING_ID = "gaming-keyboard-mouse-1"
 MOUSE_TEST_ID = "mouse-test"
+PRESENTATION_ID = "presentation"
 KEYS = ("w", "a", "s", "d", "space", "left_shift")
 DIRECTIONS = ("down", "up", "left", "right")
 DEFAULT_BINDINGS = ("w", "space", "left_shift", "s")
@@ -35,6 +36,37 @@ class HeadMotionConfig:
             raise ValueError("Head motion response must be boolean")
         number(self.speed_gain, "head motion speed gain", 0, 2)
         number(self.return_brake, "head return braking", 0, 1)
+
+
+@dataclass(frozen=True)
+class PresentationConfig:
+    enabled: bool = False
+    mouth_start: float = .08
+    mouth_full: float = .65
+    mouth_exponent: float = 1.5
+    solo_ms: float = 120
+    chord_ms: float = 450
+    drag_ms: float = 650
+
+    def __post_init__(self):
+        if type(self.enabled) is not bool:
+            raise ValueError("Presentation mode must be boolean")
+        number(self.mouth_start, "mouth brake onset", 0, .8)
+        number(self.mouth_full, "full mouth brake", .1, 1)
+        if self.mouth_full-self.mouth_start < .05-1e-12:
+            raise ValueError("Full mouth brake must exceed onset by at least 0.05")
+        number(self.mouth_exponent, "mouth brake curve", .2, 4)
+        number(self.solo_ms, "single eye duration", 0, 400)
+        number(self.chord_ms, "both eyes duration", 250, 1500)
+        number(self.drag_ms, "drag hold duration", 450, 2000)
+        if self.drag_ms <= self.solo_ms:
+            raise ValueError("Drag hold must exceed single eye duration")
+
+    def brake(self, openness):
+        if openness is None:
+            return 1.0
+        value = max(0, min(1, (openness-self.mouth_start)/(self.mouth_full-self.mouth_start)))
+        return value ** self.mouth_exponent
 
 
 @dataclass(frozen=True)
@@ -79,6 +111,7 @@ class Mapping:
     head_wink_clicks: bool = False
     require_wink: bool = True
     button_bindings: tuple = DEFAULT_BUTTON_BINDINGS
+    presentation: PresentationConfig = field(default_factory=PresentationConfig)
 
     def __post_init__(self):
         if not isinstance(self.id, str) or not re.fullmatch(r"[a-z][a-z0-9-]{0,63}", self.id) or self.id == "mouse":
@@ -124,8 +157,14 @@ class Mapping:
                 or any(v not in BUTTON_OUTPUTS for v in self.button_bindings)):
             raise ValueError("Button bindings must use supported keys, mouse buttons or none")
 
+        if not isinstance(self.presentation, PresentationConfig):
+            raise ValueError("Invalid presentation settings")
+        if self.presentation.enabled and (self.input_mode != "head-mouse" or not self.head_wink_clicks
+                                          or self.button_bindings != ("left_click", "none", "none")):
+            raise ValueError("Presentation uses head mouse, enabled eyes and fixed click/Enter/brake gestures")
+
     def to_dict(self):
-        return {"format": "input_mapping_v8", "id": self.id, "name": self.name,
+        return {"format": "input_mapping_v9", "id": self.id, "name": self.name,
                 "revision": self.revision, "response": self.response.to_dict(),
                 "pointer_gain": self.pointer_gain, "head_x": asdict(self.head_x),
                 "head_y": asdict(self.head_y), "bindings": dict(zip(DIRECTIONS, self.bindings)),
@@ -136,14 +175,15 @@ class Mapping:
                 "target_interpolation_ms": self.target_interpolation_ms,
                 "head_motion": asdict(self.head_motion), "head_wink_clicks": self.head_wink_clicks,
                 "require_wink": self.require_wink,
-                "button_bindings": dict(zip(BUTTON_INPUTS, self.button_bindings))}
+                "button_bindings": dict(zip(BUTTON_INPUTS, self.button_bindings)),
+                "presentation": asdict(self.presentation)}
 
     @classmethod
     def from_dict(cls, data):
         fields = {"format", "id", "name", "revision", "response", "pointer_gain", "head_x", "head_y", "bindings"}
-        versions = tuple(f"input_mapping_v{i}" for i in range(1, 9))
+        versions = tuple(f"input_mapping_v{i}" for i in range(1, 10))
         if not isinstance(data, dict) or data.get("format") not in versions:
-            raise ValueError("Expected an input_mapping_v1–v8 file")
+            raise ValueError("Expected an input_mapping_v1–v9 file")
         version = versions.index(data["format"]) + 1
         if version >= 2:
             fields |= {"input_mode", "adaptive_pointer"}
@@ -159,8 +199,12 @@ class Mapping:
             fields.add("require_wink")
         if version >= 8:
             fields.add("button_bindings")
+        if version >= 9:
+            fields.add("presentation")
+            if not isinstance(data.get("presentation"), dict) or set(data["presentation"]) != set(asdict(PresentationConfig())):
+                raise ValueError("Expected complete presentation settings")
         if set(data) != fields:
-            raise ValueError("Expected complete input_mapping_v1–v8 settings")
+            raise ValueError("Expected complete input_mapping_v1–v9 settings")
         if version >= 5 and (not isinstance(data["head_motion"], dict) or
                 set(data["head_motion"]) != {"enabled", "speed_gain", "return_brake"}):
             raise ValueError("Malformed head motion settings")
@@ -180,7 +224,8 @@ class Mapping:
                        data.get("target_smoothing_ms", response.pointer.smoothing_ms),
                        data.get("target_interpolation_ms", response.interpolation_ms),
                        HeadMotionConfig(**data.get("head_motion", {})), data.get("head_wink_clicks", False),
-                       data.get("require_wink", True), tuple(buttons[k] for k in BUTTON_INPUTS))
+                       data.get("require_wink", True), tuple(buttons[k] for k in BUTTON_INPUTS),
+                       PresentationConfig(**data.get("presentation", {})))
         except TypeError as exc:
             raise ValueError("Malformed mapping settings") from exc
 
@@ -194,6 +239,15 @@ def mouse_test_mapping():
                    bindings=("none",) * 4, pointer_gain=1.4, pointer_down_gain=3, response=response,
                    head_motion=HeadMotionConfig(enabled=True), head_wink_clicks=True,
                    button_bindings=("w", "left_click", "space"))
+
+
+def presentation_mapping(response_source=None):
+    base = response_source or mouse_test_mapping()
+    return replace(base, id=PRESENTATION_ID, name="Presentation", revision=1,
+                   input_mode="head-mouse", pointer_mode="velocity", bindings=("none",)*4,
+                   head_wink_clicks=True, require_wink=False,
+                   button_bindings=("left_click", "none", "none"),
+                   presentation=PresentationConfig(enabled=True))
 
 
 def read_mapping(path):

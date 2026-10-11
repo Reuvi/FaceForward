@@ -13,8 +13,9 @@ from .mocks import SCENARIOS, raw_frame, scenario
 from .output import control_message
 from Processing.eye_samples import trace_fields
 from Processing.tuning.model import edited, validate_profile
-from Processing.mappings.config import GAMING_ID, MOUSE_TEST_ID, Mapping, mouse_test_mapping, read_mapping, write_mapping
+from Processing.mappings.config import GAMING_ID, MOUSE_TEST_ID, Mapping, mouse_test_mapping, presentation_mapping, read_mapping, write_mapping
 from Processing.mappings.engine import GamingProcessor, HeadMouseProcessor
+from Processing.mappings.presentation import PresentationProcessor
 
 
 def now_ms():
@@ -28,11 +29,12 @@ class Lab:
         self.locked_source = None
         self.locked_pointer_source = None
         self.mapping_id = "mouse"
-        self.mappings = {GAMING_ID: Mapping(), MOUSE_TEST_ID: mouse_test_mapping()}
+        self.mappings = {GAMING_ID: Mapping(), MOUSE_TEST_ID: mouse_test_mapping(), "presentation": presentation_mapping()}
         self.mouse_config = config or MouseConfig()
         self.commands = deque(maxlen=512)
         self.command_id = 0
         self.last_command_state = None
+        self.interaction = None
         self.output = None
         self.output_error = None
         self.output_status = {"mode": "preview", "enabled": False, "error": None}
@@ -113,10 +115,14 @@ class Lab:
     def take_snapshot(self, timestamp):
         """Called under the lab lock on captures and ticks, never from drawing."""
         self.snapshot = self.processor.tick(timestamp)
+        if self.interaction is not None:
+            self.interaction.prepare(self.snapshot, self.output, timestamp, self.processor)
         message = control_message(self.snapshot)
         if self.output is not None:
             try:
                 self.output.submit(message, self.runtime)
+                if self.interaction is not None:
+                    self.interaction.after_submit(self.output, self.snapshot, timestamp)
                 self.output_status = self.output.snapshot()
             except Exception as exc:
                 # A sink failure must never kill the independent freshness clock.
@@ -127,11 +133,14 @@ class Lab:
                 except Exception:
                     pass
                 self.snapshot = self.processor.tick(timestamp)
+                if self.interaction is not None:
+                    self.interaction.prepare(self.snapshot, self.output, timestamp, self.processor)
                 message = control_message(self.snapshot)
                 self.output_status = {"mode": self.output.mode, "enabled": False, "error": str(exc)}
         if message["format"] == "device_control_v1":
             state = (message["output_session_id"], message["enabled"],
-                     tuple(message["buttons"].values()), tuple(message["keys"].values()))
+                     tuple(message["buttons"].values()), tuple(message["keys"].values()),
+                     tuple(message.get("presentation", {}).values()))
             if state != self.last_command_state:
                 self.command_id += 1
                 self.commands.append({"id": self.command_id, "command": message})
@@ -249,7 +258,8 @@ class Lab:
                 self.processor = MouseProcessor(config, subject_id=runtime["subject_id"])
             else:
                 self.mappings[self.mapping_id] = mapping
-                processor = HeadMouseProcessor if mapping.input_mode == "head-mouse" else GamingProcessor
+                processor = (PresentationProcessor if mapping.presentation.enabled else
+                             HeadMouseProcessor if mapping.input_mode == "head-mouse" else GamingProcessor)
                 self.processor = processor(mapping, subject_id=runtime["subject_id"])
             self.runtime = runtime
             self.trace.clear()

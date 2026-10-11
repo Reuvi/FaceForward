@@ -312,6 +312,30 @@ class SimpleSignalsWindowTests(unittest.TestCase):
         self.assertFalse(editor.center_button.winfo_ismapped())
         self.assertTrue(editor.require_wink.get())
 
+    def test_presentation_controls_and_connected_brake_editor(self):
+        from unittest.mock import Mock
+        self.session.lab.select_mapping('presentation')
+        self.ui.refresh();self.root.update()
+        panel=self.ui.mapping_page
+        self.assertEqual(panel.selector.get(),'Presentation')
+        self.assertEqual(set(panel.table.get_children()),{'eye_left','eye_right','both_eyes','mouth_brake','head_pointer_x','head_pointer_y'})
+        panel.show_settings();self.root.update()
+        self.assertFalse(any(widget.winfo_ismapped() for widget in panel.button_widgets))
+        self.assertEqual(str(panel.eye_enable['state']),'disabled')
+        panel._apply();self.ui.refresh();self.root.update()
+        panel.show_curves();self.root.update();editor=panel.curve_editor
+        self.assertFalse(editor.require_wink.get())
+        index=next(i for i,(key,_) in enumerate(editor.channel_choices) if key=='mouth_brake')
+        editor.selector.current(index);editor.select_channel();self.root.update()
+        self.assertEqual(set(editor.widgets),{'mouth_start','mouth_full','mouth_exponent'})
+        self.assertIn('resistance',editor.explanation.get())
+        editor.eye_mode_button.invoke();self.root.update()
+        self.assertTrue(self.session.lab.processor.mapping.require_wink)
+        provider=Mock();self.session.dictation.provider=provider
+        self.ui.setup_dictation()
+        provider.start.assert_called_once_with(check=True)
+        self.assertFalse(self.session.lab.processor.armed)
+
     def test_screen_destination_settings_show_only_relevant_response_controls(self):
         self.ui.refresh();self.root.update()
         panel=self.ui.mapping_page

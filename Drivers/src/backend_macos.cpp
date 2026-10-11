@@ -27,7 +27,7 @@ public:
     fid_result ready() const override {
         return CGPreflightPostEventAccess() ? FID_OK : FID_PERMISSION_DENIED;
     }
-    uint32_t capabilities() const override { return base_capabilities | FID_CAP_INSERT_LIMITED; }
+    uint32_t capabilities() const override { return base_capabilities | FID_CAP_INSERT_LIMITED | FID_CAP_UNICODE_TEXT; }
     bool supports_target_pointer() const override { return true; }
     fid_result pointer_position(double &x, double &y) const override {
         Event current(CGEventCreate(nullptr));
@@ -63,7 +63,7 @@ public:
         reached = distance < 0.5 || (speed > 0 && distance <= speed * dt);
         if (reached) target = {CGRectGetMinX(screen) + tx * (width - 1),
                                CGRectGetMinY(screen) + ty * (height - 1)};
-        Event move(CGEventCreateMouseEvent(nullptr, kCGEventMouseMoved, target, kCGMouseButtonLeft));
+        Event move(CGEventCreateMouseEvent(nullptr, drag_left_ ? kCGEventLeftMouseDragged : kCGEventMouseMoved, target, kCGMouseButtonLeft));
         if (!move) return FID_INTERNAL_ERROR;
         CGEventPost(kCGHIDEventTap, move.get());
         dx = static_cast<int32_t>(std::lround(target.x - point.x));
@@ -79,11 +79,33 @@ public:
             CGEventPost(kCGHIDEventTap, up.get());
             held_keys_ &= ~key;
         }
+        if (drag_left_) {
+            Event current(CGEventCreate(nullptr));
+            if (!current) return FID_INTERNAL_ERROR;
+            Event up(CGEventCreateMouseEvent(nullptr, kCGEventLeftMouseUp,
+                      CGEventGetLocation(current.get()), kCGMouseButtonLeft));
+            if (!up) return FID_INTERNAL_ERROR;
+            CGEventPost(kCGHIDEventTap, up.get());
+            drag_left_ = false;
+        }
         return result;
     }
     fid_result emit(const fid_event &event) override {
         const auto access = ready();
         if (access != FID_OK) return access;
+        if (event.type == FID_EVENT_ENTER || event.type == FID_EVENT_TEXT) {
+            Event down(CGEventCreateKeyboardEvent(nullptr, event.type == FID_EVENT_ENTER ? 36 : 0, true));
+            Event up(CGEventCreateKeyboardEvent(nullptr, event.type == FID_EVENT_ENTER ? 36 : 0, false));
+            if (event.type == FID_EVENT_TEXT && down && up) {
+                uint32_t scalar = static_cast<uint32_t>(event.x);
+                UniChar units[2]; size_t count = 1;
+                if (scalar <= 0xffff) units[0] = static_cast<UniChar>(scalar);
+                else { scalar -= 0x10000; units[0] = 0xd800+(scalar >> 10); units[1] = 0xdc00+(scalar & 0x3ff); count = 2; }
+                CGEventKeyboardSetUnicodeString(down.get(), count, units);
+                CGEventKeyboardSetUnicodeString(up.get(), count, units);
+            }
+            return post_pair(down, up);
+        }
         if (event.type == FID_EVENT_DELETE || event.type == FID_EVENT_INSERT) {
             // macOS SDK: kVK_ForwardDelete=0x75, kVK_Help=0x72.
             // Help occupies the PC Insert key position; its behavior is limited.
@@ -116,13 +138,23 @@ public:
         Event current(CGEventCreate(nullptr));
         if (!current) return FID_INTERNAL_ERROR;
         CGPoint point = CGEventGetLocation(current.get());
+        if (event.type == FID_EVENT_LEFT_DOWN || event.type == FID_EVENT_LEFT_UP) {
+            const bool down = event.type == FID_EVENT_LEFT_DOWN;
+            Event button(CGEventCreateMouseEvent(nullptr, down ? kCGEventLeftMouseDown : kCGEventLeftMouseUp,
+                                                 point, kCGMouseButtonLeft));
+            if (!button) return FID_INTERNAL_ERROR;
+            CGEventSetIntegerValueField(button.get(), kCGMouseEventClickState, 1);
+            CGEventPost(kCGHIDEventTap, button.get());
+            drag_left_ = down;
+            return FID_OK;
+        }
         if (event.type == FID_EVENT_MOVE) {
             // Advance the visible cursor for ordinary desktop use, while also
             // supplying explicit deltas for applications that lock the cursor.
             const CGRect screen = CGDisplayBounds(CGMainDisplayID());
             point.x = std::clamp(point.x + event.x, CGRectGetMinX(screen), CGRectGetMaxX(screen) - 1);
             point.y = std::clamp(point.y + event.y, CGRectGetMinY(screen), CGRectGetMaxY(screen) - 1);
-            Event move(CGEventCreateMouseEvent(nullptr, kCGEventMouseMoved, point, kCGMouseButtonLeft));
+            Event move(CGEventCreateMouseEvent(nullptr, drag_left_ ? kCGEventLeftMouseDragged : kCGEventMouseMoved, point, kCGMouseButtonLeft));
             if (!move) return FID_INTERNAL_ERROR;
             CGEventSetIntegerValueField(move.get(), kCGMouseEventDeltaX, event.x);
             CGEventSetIntegerValueField(move.get(), kCGMouseEventDeltaY, event.y);
@@ -152,6 +184,7 @@ private:
         return FID_OK;
     }
     uint32_t held_keys_ = 0;
+    bool drag_left_ = false;
 };
 } // namespace
 

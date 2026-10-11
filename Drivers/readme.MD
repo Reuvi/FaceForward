@@ -1,3 +1,5 @@
+**Presentation extension:** ABI v3 layouts remain stable; additive `fid_set_presentation` and `fid_type_character` support Enter/drag and individual Unicode characters. macOS and dry-run support text; Linux explicitly rejects Unicode text. Auxiliary calls require fresh enabled input and never refresh the watchdog. Rebuild before selecting Presentation. [Contract](../Contracts/PRESENTATION_MODE.md).
+
 # Face input driver — phase 1
 
 **App integration is available:** [run the connected mouse and keyboard](../docs/DRIVER_CONNECTION_GUIDE.md).

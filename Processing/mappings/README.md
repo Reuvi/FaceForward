@@ -1,3 +1,5 @@
+**Presentation** is a separate head-mouse mapping with continuous mouth resistance and combined eye gestures. Mapping v9 stores presentation response/timing; v1–v8 migrate with it disabled. [Contract](../../Contracts/PRESENTATION_MODE.md), [user guide](../../docs/PRESENTATION_GUIDE.md).
+
 # Named mouse and keyboard mappings
 
 Current Mouse test layout: left eye → W, right eye → left click, mouth open → Space,

@@ -91,6 +91,14 @@ def load_driver(path):
                 f"The library is missing {name}. Rebuild this driver or correct --library."
             ) from error
         function.argtypes, function.restype = args, result
+    # Additive presentation support: old ABI v3 libraries keep old mappings usable.
+    for name, args in {
+        "fid_set_presentation": [ct.c_void_p, ct.c_uint32, ct.c_uint32],
+        "fid_type_character": [ct.c_void_p, ct.c_uint32],
+    }.items():
+        if hasattr(lib, name):
+            function = getattr(lib, name)
+            function.argtypes, function.restype = args, ct.c_int
     return lib
 
 

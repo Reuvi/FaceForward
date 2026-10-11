@@ -89,7 +89,7 @@ class EyeModeTests(unittest.TestCase):
     def test_mode_validation_migration_and_roundtrip(self):
         plain = replace(mouse_test_mapping(), require_wink=False)
         self.assertEqual(Mapping.from_dict(plain.to_dict()), plain)
-        old = plain.to_dict();old['format']='input_mapping_v6';del old['require_wink'];del old['button_bindings']
+        old = plain.to_dict();old['format']='input_mapping_v6';del old['require_wink'];del old['button_bindings'];del old['presentation']
         loaded = Mapping.from_dict(old)
         self.assertTrue(loaded.require_wink)
         self.assertEqual(loaded.response, plain.response)

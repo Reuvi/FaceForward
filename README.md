@@ -1,3 +1,5 @@
+**Presentation mode:** head X/Y moves the pointer; opening your mouth adds resistance. Left eye clicks or holds to drag, right eye presses Enter, and both eyes toggle local speech-to-text. Plain open/closed eyes are the default. [Build, permissions and controls](docs/PRESENTATION_GUIDE.md).
+
 # Face-controlled accessibility interface
 
 Measured tuning: **Signals → Target game…** measures head-controlled travel speed,

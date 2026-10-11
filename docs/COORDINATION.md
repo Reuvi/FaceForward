@@ -1,5 +1,54 @@
 # Main chat and agent coordination hub
 
+## Presentation mode handoff
+
+- Task / lane / branch / worktree: Reuvi integration; user-requested presentation
+  head pointer, mouth braking and eye/dictation gestures. Branch
+  `codex/integration/presentation-mode`, `.worktrees/reuvi-integration-presentation-mode`,
+  base local main `9de5942`. Contract first: `15cac7c`,
+  [PRESENTATION_MODE.md](../Contracts/PRESENTATION_MODE.md). Cross-component work
+  explicitly assigned in the main integration conversation; no external messages.
+- Behavior: new Presentation mapping retains relative head movement and can reuse
+  the local measured response. Continuous same-capture jawOpen applies monotone
+  mouth resistance, up to immediate stop. Left close/reopen clicks, left hold
+  drags until reopening, right close/reopen sends one Enter; both eyes held toggle
+  local dictation without click/Enter leakage. Plain eye geometry is the default;
+  the saved calibrated-wink flag remains. Mouth and gesture sliders are connected.
+- Changed paths: Vision optional mouth measurement, Processing mapping/gesture and
+  response modules, profiles and native settings, App speech lifecycle/Swift helper
+  and setup/status, Drivers additive C APIs and macOS/Linux adapters, corresponding
+  tests, instructions, contracts and guide. No active tongue changes.
+- Interfaces: additive optional `mouth_openness`; mapping v9 adds presentation
+  settings and migrates v1–v8 with mode off; optional device_control_v1 presentation
+  states; ABI v3 layouts unchanged with new Enter/drag/text functions/capabilities.
+  Existing mappings retain routing. Saved personal files are not rewritten.
+- Release/cancellation: unknown eyes cancel gestures; unknown mouth stops only the
+  presentation pointer. Stop/loss/staleness/source/profile/output changes cancel
+  speech, discard unsent text and release dragging/keys. The native watchdog also
+  releases dragging, and auxiliary operations cannot refresh it. Dictation sends
+  one printable scalar per 35 ms after an explicit finish and never appends Enter.
+- Verification: 214 Processing tests passed; 163 Vision tests ran with 3 optional
+  skips; 182 integration tests passed across isolated module runs, including 19
+  native Tk UI checks and 13 compiled presentation/dictation checks with injected
+  speech. Native macOS CMake build and all 5 CTest groups passed. Swift helper
+  compiled, was signed and launched in read-only permission-status mode; Speech
+  permission is not yet granted. Changed Python paths pass Ruff F; diff/scope pass.
+  Presentation accept+tick benchmark: 10,000 samples, 139.52 µs mean / 162.04 µs p95;
+  excludes camera, speech, UI and native injection. The 490-frame headless
+  Presentation demo accepted all frames, emitted 653 relative moves, one drag
+  down/up and one Enter, and ended disabled with no held keys or errors. No live
+  OS input was injected.
+- Setup / limits: [Presentation guide](PRESENTATION_GUIDE.md). Run camera with
+  `--mapping presentation`; click Set up dictation once, connect Live output and
+  Center head & start. The on-device macOS Speech provider is disabled for
+  synthetic/replay sources and requires system language availability and Speech/
+  Microphone permissions. Signed bundles use a checkout-specific Library cache,
+  since cloud-synced Desktop metadata invalidated signing. Linux supports new
+  Enter/drag but explicitly lacks native Unicode dictation output. Real-person
+  braking/gesture accuracy, microphone recognition and browser acceptance remain
+  operator trials; synthetic success is not human accuracy evidence.
+
+
 ## Mouth button and relative head-control handoff
 
 - Task / lane / branch / worktree: Reuvi integration, explicitly requested mouth

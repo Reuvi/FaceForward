@@ -1,3 +1,5 @@
+**Presentation mode:** head pointer with continuous mouth brake, click/drag/Enter eye gestures and both-eye dictation requests. Mapping v9 preserves all older assignments. [Controls and tests](../docs/PRESENTATION_GUIDE.md).
+
 # Signal processing and mappings
 
 **Implemented:** [gaming keyboard mouse mapping 1](mappings/README.md) maps

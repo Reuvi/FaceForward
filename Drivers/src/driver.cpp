@@ -16,6 +16,7 @@ double now_seconds() {
 class DryRun final : public fid::Backend {
 public:
     fid_result ready() const override { return FID_OK; }
+    uint32_t capabilities() const override { return fid::base_capabilities | FID_CAP_UNICODE_TEXT; }
     fid_result emit(const fid_event &) override { return FID_OK; }
     fid_result release() override { return FID_OK; }
     bool supports_target_pointer() const override { return true; }
@@ -70,6 +71,9 @@ struct fid_driver {
     }
     fid_result release_output(uint32_t keys_to_log) {
         const auto result = backend->release();
+        if (drag_left) record({FID_EVENT_LEFT_UP, 0, 0,
+            static_cast<uint64_t>(std::max(0.0, now_seconds())*1000000)});
+        drag_left = enter_down = false;
         if (result != FID_OK) status.last_error = result;
         const auto stamp = static_cast<uint64_t>(std::max(0.0, now_seconds()) * 1000000);
         for (uint32_t bit = 1; bit <= FID_KEY_LEFT_SHIFT; bit <<= 1)
@@ -161,6 +165,7 @@ struct fid_driver {
     std::deque<fid_event> journal;
     std::thread worker;
     bool stopping = false;
+    bool enter_down = false, drag_left = false;
 };
 
 extern "C" {
@@ -272,6 +277,61 @@ fid_result fid_pause(fid_driver *driver) {
         if (result != FID_OK) driver->status.last_error = result;
         return result;
     } catch (...) { return FID_INTERNAL_ERROR; }
+}
+
+static fid_result auxiliary(fid_driver *driver, uint32_t enter, uint32_t drag,
+                            uint32_t character, bool text) {
+    if (!driver) return FID_INVALID_ARGUMENT;
+    try {
+        std::lock_guard<std::mutex> lock(driver->mutex);
+        const bool invalid = text
+            ? (character < 32 || (character >= 127 && character <= 159) || character > 0x10ffff ||
+               (character >= 0xd800 && character <= 0xdfff))
+            : (enter > 1 || drag > 1 || (enter && drag));
+        auto fail = [&](fid_result result) {
+            const auto held = driver->control.held_key_mask();
+            driver->control.pause();
+            driver->release_output(held);
+            driver->status.last_error = result;
+            return result;
+        };
+        if (invalid) return fail(FID_INVALID_ARGUMENT);
+        // Check real monotonic freshness even if the worker was delayed.
+        driver->process_tick(now_seconds());
+        if (!driver->control.enabled() || driver->control.awaiting_neutral()) return FID_INVALID_ARGUMENT;
+        if (text && (!(driver->backend->capabilities() & FID_CAP_UNICODE_TEXT) || driver->drag_left ||
+                     driver->control.held_key_mask())) return fail(FID_UNSUPPORTED);
+        const auto stamp = static_cast<uint64_t>(std::max(0.0, now_seconds())*1000000);
+        auto emit = [&](uint32_t type, int32_t x=0) {
+            fid_event event{type, x, 0, stamp};
+            const auto result = driver->backend->emit(event);
+            if (result == FID_OK) driver->record(event);
+            return result;
+        };
+        if (text) {
+            const auto result = emit(FID_EVENT_TEXT, static_cast<int32_t>(character));
+            if (result != FID_OK) return fail(result);
+        } else {
+            if (driver->drag_left != static_cast<bool>(drag)) {
+                const auto result = emit(drag ? FID_EVENT_LEFT_DOWN : FID_EVENT_LEFT_UP);
+                if (result != FID_OK) return fail(result);
+                driver->drag_left = drag;
+            }
+            if (enter && !driver->enter_down) {
+                const auto result = emit(FID_EVENT_ENTER);
+                if (result != FID_OK) return fail(result);
+            }
+            driver->enter_down = enter;
+        }
+        return FID_OK;
+    } catch (...) { return FID_INTERNAL_ERROR; }
+}
+
+fid_result fid_set_presentation(fid_driver *driver, uint32_t enter, uint32_t drag_left) {
+    return auxiliary(driver, enter, drag_left, 0, false);
+}
+fid_result fid_type_character(fid_driver *driver, uint32_t codepoint) {
+    return auxiliary(driver, 0, 0, codepoint, true);
 }
 
 fid_result fid_get_status(fid_driver *driver, fid_status *status) {

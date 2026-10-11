@@ -1,3 +1,5 @@
+**Current presentation mode:** `--mapping presentation` adds head movement, continuous mouth braking, left-eye click/drag, right-eye Enter and both-eyes dictation. Plain open/closed eyes are the default. [Complete setup and controls](../docs/PRESENTATION_GUIDE.md). Build the driver and local macOS speech helper before use; output still needs Connect and Start.
+
 # Native face mouse and keyboard preview
 
 The app now tracks **independent eyes/winks, mouth open, Head Y, Head X and pupils**.

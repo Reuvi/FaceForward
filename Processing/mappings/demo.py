@@ -12,6 +12,7 @@ def gaming_demo_frame(frame, fps):
     values["head_x"] = {"value": .8 if 10 <= t < 11.5 else .2 if 11.5 <= t < 13 else .5,
                         "valid": True, "confidence": 1}
     values["mouth_open"] = {"value": int(14 <= t < 14.7), "valid": True, "confidence": 1}
+    values["mouth_openness"] = {"value": .8 if 14 <= t < 14.7 else 0, "valid": True, "confidence": 1}
     intent = {"format": "eye_intent_v1", "subject_id": face["subject_id"],
               **{key: frame[key] for key in ("session_id", "sequence", "timestamp_ms")}}
     for side in ("left", "right"):

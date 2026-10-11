@@ -35,7 +35,8 @@ freshness, neutral startup, pause, errors, shutdown and its independent watchdog
 release dragging as well as keys. Auxiliary calls never refresh the watchdog.
 
 App injects a bounded asynchronous dictation service. macOS Speech/AVAudioEngine
-run in a local helper with explicit microphone and Speech permissions and required
+run only from explicit Camera control, never synthetic/replay input, in a local
+helper with explicit microphone and Speech permissions and required
 on-device recognition. No network fallback, runtime model download, clipboard,
 stored audio or transcript log. Starting/recording/finalizing/sending freezes the
 pointer and other actions. A second deliberate both-eye gesture ends recording;

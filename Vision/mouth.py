@@ -3,7 +3,7 @@
 from .signals import invalid, measurement, unit_number, finite_number
 
 
-def mouth_open(observation, width, height):
+def mouth_openness(observation, width, height):
     score = observation.expressions.get("jawOpen")
     if not unit_number(score):
         return invalid()
@@ -15,4 +15,9 @@ def mouth_open(observation, width, height):
         if not (finite_number(x) and finite_number(y) and 0 <= x < width and 0 <= y < height):
             return invalid()
     # Availability flag, not a probability of correct expression recognition.
-    return measurement(int(score >= .5), 1)
+    return measurement(score, 1)
+
+
+def mouth_open(observation, width, height):
+    sample = mouth_openness(observation, width, height)
+    return measurement(int(sample["value"] >= .5), 1) if sample["valid"] else invalid()
