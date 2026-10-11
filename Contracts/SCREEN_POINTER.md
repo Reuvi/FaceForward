@@ -48,7 +48,8 @@ release, mode/persistence compatibility and unchanged head-only velocity behavio
 ## Pupil reach and response update
 
 The user requested stronger downward pupil movement, corner access and less
-filtering, specifically in the gaming pupil mapping (not head-only Mouse test).
+filtering, in the gaming pupil mapping, and then confirmed that Mouse test also needs
+a stronger downward response.
 The built-in mapping now uses 2× pointer gain and an additional 4× downward gain
 (8× total below the configured pupil center), 20 ms position smoothing, zero
 interpolation delay and a .002 fixation dead band. Downward amplification is
@@ -58,12 +59,17 @@ At a saturated target, settle exactly at that screen edge once the filtered axis
 is within .002 normalized units, even if the fixation dead band would hold it
 short. This permits every corner without radial normalization or ongoing drift.
 
-Mapping files become `input_mapping_v4`, adding `target_down_gain` (1–8),
+Mapping files become `input_mapping_v4`, adding `pointer_down_gain` (1–8),
 `target_smoothing_ms` (0–500) and `target_interpolation_ms` (0–250). Fully validate
 v1–v3 files and preserve their response: downward gain 1, prior response smoothing
 and interpolation, prior pointer gain and fixation band; v1/v2 remain velocity.
 Target smoothing/delay now belong to the mapping. Loading a face profile keeps
 all these target settings, instead of restoring its old velocity filtering.
 Expose separate target controls and log the effective filter and gain settings.
-Mouse test, velocity filters, independent eye/head actions, detector calibration,
+Mouse test uses a separate 3× downward pointer gain, .10 dead zone / .02 activation
+margin, 20 ms smoothing, curve 1.2, acceleration 10/s and deceleration 14/s, with
+zero interpolation delay. Apply downward gain before the pointer dead-zone/curve
+and axis inversion, clamping each scaled input axis. Its actual center still maps
+to zero. Its pointer response stays with the selected mapping when a face profile
+loads. Other velocity defaults, independent eye/head actions, detector calibration,
 freshness checks, unknown input and explicit arming rules are unchanged.
