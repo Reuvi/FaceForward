@@ -874,3 +874,12 @@ Handoff:
   algorithm tests remain. No live camera or human accuracy claim; Drivers pending.
 - User runbook: `App/README.md`. Restart the app; Detection calibration now has
   1 Eyes, 2 Head Y, 3 Head X, 4 Pupils, Settings. No pupil setup is required.
+
+## 2026-10-10 — pupil calibration with head-angle compensation
+
+- Owner: Reuvi integration conversation; branch `work/reuvi/integration/pupil-head-calibration`.
+- Base: `63fb5d3590d040bb82be7b9962c225c26405adbd`.
+- Scope: coordinated Vision/App calibration, persistence, diagnostics, contracts,
+  tests and documentation. Preserve independent eyes/head and tongue retirement.
+- Contract: `Contracts/PUPIL_HEAD_CALIBRATION.md`; supersedes fixed pupil mapping.
+- Work in progress: personal directional endpoints plus learned head compensation.

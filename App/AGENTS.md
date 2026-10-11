@@ -1,5 +1,7 @@
 # Application integration
 
+**Latest pupil update:** follow `Contracts/PUPIL_HEAD_CALIBRATION.md` (relative to repository root). Personal pupil endpoints and head-angle compensation supersede fixed/no-calibration mapping below. Tongue remains retired.
+
 **Current user decision — tongue retired:** read [../Contracts/TONGUE_RETIREMENT.md](../Contracts/TONGUE_RETIREMENT.md).
 App and Vision lab have no tongue detection, worker, calibration, graphs or input
 choice. App uses fixed pupils for pointer movement; preserve independent eyes and
