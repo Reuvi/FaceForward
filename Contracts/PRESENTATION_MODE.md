@@ -18,13 +18,22 @@ Mapping v9 adds a presentation settings group. Older files migrate with this mod
 disabled. Mouth start/full opening and response exponent are connected live
 controls; profile loads, mapping changes and eye-mode changes disarm as before.
 
-Only in this explicit combined-gesture mapping, solo eye actions wait for release
-and require 120 ms of closure. Left closure held 650 ms presses the mouse button
+Only in this explicit combined-gesture mapping, solo eye actions wait for release.
+Plain closure requires 120 ms; a calibrated wink already supplies action evidence
+and has no additional solo duration threshold. Known closed non-wink frames wait
+for recognition instead of rejecting the whole closure. Unknown anatomical or
+active-eye wink evidence cancels the pending action and requires reopening;
+unknown is never interpreted as a release-click. A later known non-wink frame
+clears pending recognition; a subsequent valid wink may qualify again. Left closure
+(or recognized wink) held 650 ms presses the mouse button
 for dragging; reopening releases. Both closed 450 ms toggles dictation once,
 suppresses click/Enter, and requires both to reopen before another gesture. Any
 unknown eye cancels pending gestures and releases dragging; both known-open eyes
 are needed to resume. Short ordinary blinks do not toggle dictation. This gesture
 arbitration supersedes independent instantaneous eye actions only for this mode.
+Signals exposes the current gesture blocker and capture-level eye/action counts.
+The bounded scalar diagnostic log retains these counts so a brief wink is visible
+even between UI observations. No face features, calibration or transcripts are logged.
 
 `device_control_v1` gains optional `presentation` with boolean `enter`, `drag_left`
 and `eyes_known`. Enter is one press/release per activation; dragging is a held
