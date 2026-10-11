@@ -2,7 +2,7 @@
 
 Current user decision: a separate Presentation mapping uses calibrated head X/Y
 for relative pointer velocity, anatomical left-eye closure for click/drag,
-right-eye closure for Enter, and both eyes for speech-to-text dictation. Existing
+right-eye closure for Return, and both eyes for speech-to-text dictation. Existing
 mappings retain their assignments. The saved `require_wink` option remains; this
 preset defaults to plain open/closed eyes. Eye geometry still needs calibration.
 
@@ -29,14 +29,14 @@ After a press, invalid/nonmatching left evidence releases and consumes that cycl
 only an actual left reopen permits another press. Stop/loss/staleness clear all
 baselines and never auto-arm. No held numeric/display value is action evidence.
 
-Right-eye Enter retains release timing (120 ms in plain mode; no extra minimum
+Right-eye Return retains release timing (120 ms in plain mode; no extra minimum
 for a recognized wink). Both known closed 450 ms toggles dictation once, releases
 the mouse and suppresses solo actions until both reopen. Short simultaneous blinks
 do not toggle dictation. An immediate left press can already have occurred if the
 second eye closes later; subsequent chord detection releases it but cannot undo
 events already sent. This is the requested immediate press/release behavior.
 The old saved drag timing field remains readable but is not applied or shown;
-plain-mode solo timing now describes right-eye Enter only.
+plain-mode solo timing now describes right-eye Return only.
 Signals exposes the current gesture blocker and capture-level eye/action counts.
 The bounded scalar diagnostic log retains these counts so a brief wink is visible
 even between UI observations. No face features, calibration or transcripts are logged.
@@ -69,3 +69,24 @@ The native helper does not activate a window, preserving the focused text field.
 Permission/setup failures are visible with actionable instructions. Live human
 speech, gesture reliability and foreground application acceptance require a trial;
 unit tests do not establish those properties.
+
+## Return and audible dictation update
+
+User-facing Return is the main Return key on macOS (`kVK_Return`, 0x24),
+not keypad Enter. Existing `enter` payload/event/API names remain compatible.
+It creates a newline in multiline fields or activates the focused field's Return
+handling. Unicode text and Return are separate driver operations.
+
+Launch the signed speech **app bundle** through LaunchServices, without activation,
+so microphone/Speech permission belongs to Face Controller Dictation rather than
+the Python/terminal/IDE host. Communicate through a private ephemeral local socket;
+no transcript/audio files. Disconnect cancels recognition. Setup reports permissions
+and local-language availability; failures expose a stable diagnostic code without
+logging dictated text. A rising cue marks actual microphone listening, a falling
+cue marks recording stopped (finish, captured, cancellation or failure). Repeated
+partial results never replay the cues. No sound on a failed start before listening.
+
+Preserve the observed both-open baseline across uncertain closing frames so a
+subsequent fully known both-closed hold can start. Unknown input cancels any pending
+solo Return and resets the chord duration; it never counts toward the 450 ms hold
+or rearms a consumed chord. Both eyes must reopen after a successful toggle.
