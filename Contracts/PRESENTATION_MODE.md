@@ -18,26 +18,36 @@ Mapping v9 adds a presentation settings group. Older files migrate with this mod
 disabled. Mouth start/full opening and response exponent are connected live
 controls; profile loads, mapping changes and eye-mode changes disarm as before.
 
-Only in this explicit combined-gesture mapping, solo eye actions wait for release.
-Plain closure requires 120 ms; a calibrated wink already supplies action evidence
-and has no additional solo duration threshold. Known closed non-wink frames wait
-for recognition instead of rejecting the whole closure. Unknown anatomical or
-active-eye wink evidence cancels the pending action and requires reopening;
-unknown is never interpreted as a release-click. A later known non-wink frame
-clears pending recognition; a subsequent valid wink may qualify again. Left closure
-(or recognized wink) held 650 ms presses the mouse button
-for dragging; reopening releases. Both closed 450 ms toggles dictation once,
-suppresses click/Enter, and requires both to reopen before another gesture. Any
-unknown eye cancels pending gestures and releases dragging; both known-open eyes
-are needed to resume. Short ordinary blinks do not toggle dictation. This gesture
-arbitration supersedes independent instantaneous eye actions only for this mode.
+Current user correction: left eye uses a held mouse button, not a complete click
+pulse on recognition or reopening. After a known-open baseline, a valid selected
+left action presses immediately: recognized wink in wink mode, anatomical closure
+in plain mode. Reopening releases; moving while held drags with no extra timer.
+Unknown/unsupported left evidence releases immediately and cannot press. Right-eye
+uncertainty does not veto a valid left action. An unknown transition before the
+first press does not erase the last known-open baseline; it produces no output.
+After a press, invalid/nonmatching left evidence releases and consumes that cycle;
+only an actual left reopen permits another press. Stop/loss/staleness clear all
+baselines and never auto-arm. No held numeric/display value is action evidence.
+
+Right-eye Enter retains release timing (120 ms in plain mode; no extra minimum
+for a recognized wink). Both known closed 450 ms toggles dictation once, releases
+the mouse and suppresses solo actions until both reopen. Short simultaneous blinks
+do not toggle dictation. An immediate left press can already have occurred if the
+second eye closes later; subsequent chord detection releases it but cannot undo
+events already sent. This is the requested immediate press/release behavior.
+The old saved drag timing field remains readable but is not applied or shown;
+plain-mode solo timing now describes right-eye Enter only.
 Signals exposes the current gesture blocker and capture-level eye/action counts.
 The bounded scalar diagnostic log retains these counts so a brief wink is visible
 even between UI observations. No face features, calibration or transcripts are logged.
 
-`device_control_v1` gains optional `presentation` with boolean `enter`, `drag_left`
-and `eyes_known`. Enter is one press/release per activation; dragging is a held
-state. ABI v3 struct layouts stay unchanged. Additive driver APIs set those states
+`device_control_v1` has optional `presentation` with boolean `enter`, `drag_left`
+and `eyes_known`. Additive paired `left_known`/`right_known` flags let the adapter
+validate each held-left/Enter action independently; legacy messages without them
+retain the both-eyes validity gate. `eyes_known` still reports both eyes known.
+Presentation left input uses `drag_left` for mouse down/up, never a separate click
+pulse; Enter is one press/release per activation. ABI v3 layouts stay unchanged.
+Additive driver APIs set those states
 and type one Unicode scalar at a time. Native macOS supports Unicode text; other
 backends explicitly report unsupported text instead of pretending to type. Driver
 freshness, neutral startup, pause, errors, shutdown and its independent watchdog
