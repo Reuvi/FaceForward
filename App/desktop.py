@@ -47,8 +47,8 @@ class CalibrationBridge:
 class IntegratedDesktop(DesktopLab):
     appearance_eyes = True
     heading = "Vision + Processing"
-    subtitle = "Native signal lab · named mouse/keyboard mappings · preview output"
-    footer = "Preview only    •    Choose and tune controls in Signal mapping; real OS output is not connected"
+    subtitle = "Native signal lab · named mouse/keyboard mappings · selectable driver output"
+    footer = "Stop, Escape in App, and window close release output    •    Live output requires Camera and an explicit Start"
 
     def __init__(self, root, session, options):
         self.session = session
@@ -63,6 +63,8 @@ class IntegratedDesktop(DesktopLab):
         root.title("Face Input Preview — Vision + Processing")
         self.notebook.select(self.vision_page)
         self.start_source()
+        if getattr(options, "output", "preview") != "preview":
+            self.guarded(lambda:self.session.configure_output(options.output, getattr(options,"driver_library",None)))
         self.refresh_vision()
         self.notebook.bind("<<NotebookTabChanged>>", self.open_calibration, add="+")
 
@@ -116,6 +118,18 @@ class IntegratedDesktop(DesktopLab):
         label(pointer_row,"Pointer input: Pupils · personal directions + head compensation",foreground=MUTED).pack(side="left")
         self.profile_text = tk.StringVar()
         label(self.vision_page, textvariable=self.profile_text, foreground=MUTED).pack(anchor="w", pady=(0,8))
+
+        output_row = ttk.Frame(self.vision_page)
+        output_row.pack(fill="x", pady=(0,8))
+        label(output_row, "Output").pack(side="left", padx=(0,8))
+        self.output_choices = {"Preview": "preview", "Driver dry run": "dry-run", "Live mouse + keyboard": "native"}
+        self.output_var = tk.StringVar(value=next(name for name, mode in self.output_choices.items()
+                                                 if mode == getattr(self.options,"output","preview")))
+        ttk.Combobox(output_row, textvariable=self.output_var, values=list(self.output_choices),
+                     state="readonly", width=25).pack(side="left")
+        self.button(output_row, "Connect output", self.connect_output).pack(side="left", padx=8)
+        self.driver_text = tk.StringVar()
+        label(output_row, textvariable=self.driver_text, foreground=GREEN, wraplength=720).pack(side="left")
 
         panels = ttk.Frame(self.vision_page); panels.pack(fill="both", expand=True)
         panels.columnconfigure(0, weight=1); panels.columnconfigure(1, weight=1)
@@ -242,12 +256,18 @@ class IntegratedDesktop(DesktopLab):
     def select_subject(self):
         self.session.select_subject(self.subject_var.get())
 
+    def connect_output(self):
+        self.session.configure_output(self.output_choices[self.output_var.get()], getattr(self.options,"driver_library",None))
+
     def refresh_vision(self):
         if self.closed:
             return
         state = self.session.state(include_detector=True)
         frame = state["frame"]
         lab_state = self.lab.state(self.after)
+        output = lab_state["output"]
+        output_label = {"preview": "Preview", "dry-run": "Driver dry run", "native": "LIVE mouse + keyboard"}[output["mode"]]
+        set_var(self.driver_text, output_label+" · "+(output.get("error") or ("running" if output["enabled"] else "stopped; press Start when ready")))
         selected = lab_state["runtime"]["subject_id"]
         fresh = (state["running"] and state["age_ms"] is not None
                  and state["age_ms"] <= lab_state["config"]["stale_ms"])
@@ -270,9 +290,9 @@ class IntegratedDesktop(DesktopLab):
         age = "—" if state["age_ms"] is None else f"{state['age_ms']:.0f}"
         set_var(self.source_status, f"{state['status']}  |  actual {state['actual_hz']:.1f} Hz  |  received {state['received']} / accepted {state['accepted']}  |  age {age} ms")
         details = {
-            "demo": "SYNTHETIC: all four mouse actions. Click Start preview, then open Live lab. Cycle: short blink → left wink → right wink → both → pupil circle → head up/down. Neutral periods allow arming.",
+            "demo": "SYNTHETIC: choose Preview or Driver dry run, press Start, then open Signal mapping. Cycle: eye actions → pupil circle → head directions. Neutral periods allow arming.",
             "replay": "REPLAY: select a subject explicitly, then Start preview with neutral input. Capture gaps are preserved. EOF stops output; restart the source and re-arm to repeat.",
-            "camera": "LIVE CAMERA · ONE USER: face connects automatically → Detection calibration (or Load saved profile) → Start preview → Live lab. Calibration survives brief loss and camera restart; no OS mouse output.",
+            "camera": "LIVE CAMERA · ONE USER: calibrate or load a profile, choose output and Connect output, then press Start with centered inputs and open eyes. Live mouse + keyboard controls the OS; Stop/Esc and window close release it.",
             "detector-demo": "SYNTHETIC PIXELS · ONE USER: run Eye open/closed, then start Wink action separately in Detection calibration. The fixture follows each guide, then cycles independent closures. No camera or ML.",
         }
         set_var(self.source_detail, state["error"] or details[state["mode"]])

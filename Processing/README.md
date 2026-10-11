@@ -5,14 +5,16 @@ independent calibrated eye actions to mouse buttons, head directions to
 W/Space/Shift/S, and precise calibrated pupils to pointer velocity. Select it in
 **Signal mapping**; App selects it by default. The native panel shows raw and
 filtered values, thresholds and readable commands. Named copies and local mapping
-files support additional presets. Output is a command preview; no real OS input
-is emitted. See [the adopted contract](../Contracts/GAMING_MAPPING.md).
+files support additional presets. App now connects commands to the merged driver:
+choose Preview, Driver dry run, or Live mouse + keyboard. Native eyes produce
+one click per activation; head keys are held. See [the live-output guide](../docs/DRIVER_CONNECTION_GUIDE.md)
+and [adopted contract](../Contracts/DRIVER_CONNECTION.md).
 
 The remaining sections describe the preserved **Mouse and scroll** developer
 mode, including its legacy synthetic eye timers and tongue replay support.
 The current App uses calibrated eye intent without those timers and fixed pupil
 input. No tongue detector runs in App. The [original gaming plan](GAMING_KEYBOARD_MOUSE_MAPPING_1.md)
-records the driver investigation and remaining native-driver prerequisites.
+records the original driver investigation and provisional interaction choices.
 
 Async neural tongue frames now preserve their original capture time. Repeated
 origins do not add interpolation samples; stale tongue releases pointer motion

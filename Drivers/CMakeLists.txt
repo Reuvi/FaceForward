@@ -65,6 +65,12 @@ if(BUILD_TESTING)
             COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_testing_console.py
                     --library $<TARGET_FILE:face_input_driver>)
         set_tests_properties(testing_console PROPERTIES TIMEOUT 45)
+        add_test(NAME processing_adapter
+            COMMAND ${Python3_EXECUTABLE} -m unittest discover
+                    -s ${CMAKE_CURRENT_SOURCE_DIR}/tests -p test_output_adapter.py)
+        set_tests_properties(processing_adapter PROPERTIES TIMEOUT 15
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/..
+            ENVIRONMENT "FID_LIBRARY=$<TARGET_FILE:face_input_driver>")
     else()
         message(STATUS "Python 3.9+ not found; skipping terminal tester checks")
     endif()

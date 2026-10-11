@@ -150,7 +150,9 @@ class MappingPanel(ttk.Frame):
         elif not self.mock.winfo_manager():
             self.mock.pack(fill="x", pady=5)
         snap = state["snapshot"]
-        set_var(self.notice, "PREVIEW ONLY · "+snap["status"]+" · no real keyboard/mouse events")
+        output = state["output"]
+        mode = {"preview": "PREVIEW ONLY", "dry-run": "DRIVER DRY RUN · no OS events", "native": "LIVE MOUSE + KEYBOARD"}[output["mode"]]
+        set_var(self.notice, mode+" · "+(output.get("error") or snap["status"]))
         rows = snap.get("instructions", [])
         existing = set(self.table.get_children())
         for row in rows:
@@ -164,7 +166,7 @@ class MappingPanel(ttk.Frame):
         for identity in existing:
             self.table.delete(identity)
         if not rows:
-            set_var(self.notice, "Mouse and scroll selected. Choose a gaming mapping to see head-to-key instructions. Preview only.")
+            set_var(self.notice, mode+" · Mouse and scroll · "+(output.get("error") or snap["status"]))
         events = []
         for event in state["commands"][-3:]:
             command = event["command"]
@@ -172,6 +174,9 @@ class MappingPanel(ttk.Frame):
             held += [key.replace("_click", " mouse") for key, value in command["buttons"].items() if value]
             events.append(f"#{event['id']} "+(" + ".join(held) or "all released"))
         set_var(self.events, "Recent command transitions: "+("   ·   ".join(events) or "none"))
+        if output["mode"] != "preview":
+            counts = output.get("event_counts", {})
+            set_var(self.events, f"Driver events: {counts.get(3,0)} left clicks · {counts.get(4,0)} right clicks · {counts.get(7,0)} key downs · {counts.get(8,0)} key ups · {counts.get(1,0)} mouse moves")
         if self.desktop.notebook.select() == str(self):
             for scope in self.scopes:
                 scope.draw(list(history))

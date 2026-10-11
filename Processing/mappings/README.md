@@ -1,13 +1,14 @@
 # gaming keyboard mouse mapping 1
 
 The middle phase is implemented: current Vision measurements feed independent
-filters and action gates, then a readable keyboard/mouse command preview. No
-native driver library is loaded and no OS events are sent.
+filters and action gates, then readable keyboard/mouse commands. App can connect
+these to the merged C driver with explicit Preview, Driver dry run and
+Live mouse + keyboard choices. See [build and live-output setup](../../docs/DRIVER_CONNECTION_GUIDE.md).
 
 | Input | Command |
 | --- | --- |
-| Left eye's calibrated closed action | Hold left mouse; release on OFF/unknown |
-| Right eye's calibrated closed action | Hold right mouse; release on OFF/unknown |
+| Left eye's calibrated closed action | One left click on activation; OFF/unknown resets |
+| Right eye's calibrated closed action | One right click on activation; OFF/unknown resets |
 | Head down | Hold W |
 | Head up | Hold Space |
 | Head left | Hold left Shift |
@@ -16,8 +17,9 @@ native driver library is loaded and no OS events are sent.
 
 Both head axes can act together (down + left = W + Shift). Eyes remain independent.
 A and D are available for edited bindings but inactive in the built-in mapping.
-Scroll stays neutral. These are held states; a native adapter still needs to
-translate their transitions into actual button/key down and up events.
+Scroll stays neutral. Head keys are held states. The existing driver's mouse
+behavior is one complete click per activation; a sustained eye action does not
+repeat clicks or drag. The raw command button fields remain activation levels.
 
 ## Try it
 
@@ -133,10 +135,12 @@ not a reliable live transport: a future driver consumer must stop on gaps, rejec
 old sources, never replay stale commands, and use only the latest pointer demand.
 See [device_control_v1](../../Contracts/GAMING_MAPPING.md) for complete fields.
 
-`driverTest` ABI v3 has the requested held keys and velocity support, but its
-mouse fields currently generate dwell-qualified complete clicks. Held mouse
-semantics, an ordered handoff and a lifecycle-validating Python adapter remain
-required for native output. See the [driver investigation](../GAMING_KEYBOARD_MOUSE_MAPPING_1.md).
+`driverTest` ABI v3 is now merged and connected via `Drivers.output.DriverOutput`.
+The adapter validates source age/order and disabled/unknown states, disables the
+extra driver dwell/dead zone, and uses synchronous `fid_submit_processed` to
+preserve action edges. The C worker retains its independent watchdog. Mouse
+commands are clicks, not dragging. App close releases output and destroys the
+driver. See [the connection contract](../../Contracts/DRIVER_CONNECTION.md).
 
 ## Checks
 

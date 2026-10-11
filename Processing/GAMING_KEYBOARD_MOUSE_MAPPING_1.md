@@ -4,8 +4,10 @@ Status: original design record; the Processing middle phase is now implemented.
 Use [the implementation runbook](mappings/README.md) and
 [adopted contract](../Contracts/GAMING_MAPPING.md) for current behavior. Current
 pupils use personal endpoints and head-angle compensation; older fixed-pupil
-assumptions below are superseded by PUPIL_HEAD_CALIBRATION.md. Native driver
-injection remains pending. The original plan was requested by Reuvi on
+assumptions below are superseded by PUPIL_HEAD_CALIBRATION.md. The native driver
+is now connected under [DRIVER_CONNECTION.md](../Contracts/DRIVER_CONNECTION.md):
+the user requested the existing driver, so this connection uses one click per activation,
+resolving the provisional held-mouse/drag proposal below. The original plan was requested by Reuvi on
 2026-10-10. Processing lane; branch `work/reuvi/processing/gaming-mapping-plan`.
 Base: `63fb5d3590d040bb82be7b9962c225c26405adbd`.
 

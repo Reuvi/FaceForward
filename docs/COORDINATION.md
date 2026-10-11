@@ -959,3 +959,26 @@ Handoff:
 - Run in this checkout: `python3 -m App --source demo`, then Signal mapping and
   Start preview. Read [the runbook](../Processing/mappings/README.md). No main
   merge/push or changes to other active checkouts were performed.
+
+## Driver connection and main merge — user-authorized follow-up
+
+- Reuvi explicitly requested connecting the existing driver and merging driverTest
+  into main. Latest `origin/driverTest` at `2e3e734` merged cleanly into the existing
+  integration branch after Processing `804f462`; base main was `7175a89`.
+- Shared connection contract first: `8b1679c`. Implementation and full verification
+  handoff: [Drivers/APP_CONNECTION_HANDOFF.md](../Drivers/APP_CONNECTION_HANDOFF.md).
+- App now connects via a synchronous Processing sink, public ctypes ABI v3 binding
+  and metadata-validating adapter. Existing driver click behavior is one click per
+  eye activation; head keys are held. Pupil motion uses processed velocity. The
+  provisional dragging/held-mouse proposal is not part of this connection.
+- Additive `fid_abi_version`/`fid_submit_processed` preserve ABI struct layouts and
+  standalone tools, prevent short action loss, and retain the C watchdog. Stop,
+  calibration, loss, settings/mapping/source/profile changes and close release output.
+- UI/CLI expose Preview, Driver dry run and explicit Camera-only Live output.
+  No background service. [Setup and use](DRIVER_CONNECTION_GUIDE.md).
+- Verified: native macOS build, 5/5 CTest suites (including 8 adapter tests), 98
+  Processing tests and 113 integration tests including Tk; both complete 490-frame
+  demos ran through the compiled driver, emitted all expected actions and ended
+  released. No camera or OS injection was used; human/game behavior remains untested.
+- Landing includes the completed Processing mapping and the teammate's driver
+  history. Other active worktrees and detector code are preserved.

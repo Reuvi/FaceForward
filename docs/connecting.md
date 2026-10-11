@@ -1,5 +1,14 @@
 # Connecting Vision, Processing, and Drivers
 
+**Implemented App connection:** follow [the live output guide](DRIVER_CONNECTION_GUIDE.md)
+and [current contract](../Contracts/DRIVER_CONNECTION.md). The driverTest library is
+now integrated with both App mapping modes. This update supersedes the earlier
+background-service proposal below: Stop and closing App release/destroy output.
+No background service is installed. `Drivers.binding` is the shared public ctypes
+binding; `Drivers.output.DriverOutput` validates Processing commands. App calls
+`fid_submit_processed` synchronously, with zero additional button dwell/dead zone.
+Original ABI v3 structs and `fid_submit` remain available to standalone tools.
+
 ```text
 Camera → Vision (SignalFrame) → Processing (ControlFrame) → Python adapter → C ABI v3 → OS
 ```
@@ -11,9 +20,9 @@ and [Driver guide](../Drivers/readme.MD).
 
 ## Runtime
 
-Use one opt-in per-user background runtime (`systemd --user` on Linux; a
-permission-authorized app/background item on macOS). Start camera and input only
-when assistance is enabled. Closing the UI leaves an active session running.
+App owns one camera and one optional driver handle. Preview is the default;
+Driver dry run and Live mouse + keyboard are explicit choices. Native output
+requires Camera, usable calibration and a new Start. Close always stops output.
 
 ## Python → C ABI
 
@@ -26,10 +35,12 @@ Axes are finite `[0,1]`; `0.5` is neutral, lower/higher means left/up and
 right/down. The Driver applies its dead zone and speed curve. Keep invalid
 measurements invalid; do not replace them with neutral values.
 
-Python must validate ControlFrame metadata omitted by `fid_frame`. Mouse fields
-trigger one dwell-qualified click per activation. ABI v3 key holds need a
-ControlFrame contract change. Dictation is phase two. The 250 ms watchdog works
-only while the process is alive.
+The adapter validates `device_control_v1` or legacy `mouse_preview_v0` metadata
+omitted by `fid_frame`. Native eye commands trigger one complete click per
+activation, without driver dwell. Gaming head directions use ABI v3 held keys.
+The adapter and independent C worker each enforce the 250 ms freshness limit;
+the worker can release if Python stops sending while the process remains alive.
+Dictation remains phase two.
 
 ## Test order
 

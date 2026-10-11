@@ -196,7 +196,8 @@ class DesktopLab:
         label(header, self.heading, style="Title.TLabel").grid(row=1, column=0, sticky="w")
         label(header, self.subtitle, foreground=MUTED).grid(row=2, column=0, sticky="w", pady=(3, 0))
         header.columnconfigure(0, weight=1)
-        self.button(header, "Start preview", lambda: self.action("arm"), style="Start.TButton").grid(row=1, column=1, padx=5)
+        self.start_button = self.button(header, "Start preview", lambda: self.action("arm"), style="Start.TButton")
+        self.start_button.grid(row=1, column=1, padx=5)
         self.button(header, "Stop / Esc", lambda: self.action("stop")).grid(row=1, column=2, padx=5)
         self.status = tk.StringVar(value="Preview stopped")
         self.timing = tk.StringVar()
@@ -366,7 +367,7 @@ class DesktopLab:
 
     def build_inspector(self):
         label(self.inspect_page, "Raw input and processed command", font=("Helvetica Neue", 16, "bold")).pack(anchor="w")
-        label(self.inspect_page, "Preview only. Gaming commands include held keys/buttons and original capture freshness; no OS driver is connected.", foreground=MUTED).pack(anchor="w", pady=8)
+        label(self.inspect_page, "Processing commands retain original capture freshness. Output mode and driver events appear in Signal mapping.", foreground=MUTED).pack(anchor="w", pady=8)
         panes = ttk.Panedwindow(self.inspect_page, orient="horizontal"); panes.pack(fill="both", expand=True)
         self.raw_text, self.output_text = (tk.Text(panes, background=BG, foreground=TEXT, insertbackground=TEXT, font=("Menlo", 10), wrap="none", width=50) for _ in range(2))
         panes.add(self.raw_text, weight=1); panes.add(self.output_text, weight=1)
@@ -531,6 +532,7 @@ class DesktopLab:
         self.integrate(state["trace"], state["runtime"])
         self.history.extend(state["trace"])
         self.mapping_page.refresh(state, self.history)
+        self.start_button.configure(text="Start live control" if state["output"]["mode"] == "native" else "Start dry run" if state["output"]["mode"] == "dry-run" else "Start preview")
         if state["trace"]:
             self.after = state["trace"][-1]["id"]
         snap, diag = state["snapshot"], state["snapshot"]["diagnostics"]

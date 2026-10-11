@@ -18,11 +18,16 @@ def main():
     parser.add_argument("--config", type=Path, help="Processing JSON settings")
     parser.add_argument("--mapping", choices=("mouse", "gaming-keyboard-mouse-1"), default="gaming-keyboard-mouse-1",
                         help="initial mapping; both remain selectable in Signal mapping")
+    parser.add_argument("--output", choices=("preview", "dry-run", "native"), default="preview",
+                        help="native sends real OS input and requires the camera source")
+    parser.add_argument("--driver-library", type=Path, help="compiled face_input_driver library (default Drivers/build)")
     parser.add_argument("--subject", help="explicit replay subject (camera calibration requires selection in the UI)")
     parser.add_argument("--no-preview", action="store_true", help="skip camera overlay drawing")
     parser.add_argument("--headless", action="store_true", help="bounded pipeline smoke check without Tk")
     parser.add_argument("--frames", type=int, default=120, help="headless source frame limit")
     options = parser.parse_args()
+    if options.output == "native" and options.source != "camera":
+        parser.error("--output native requires --source camera")
     session = MouseSession()
     try:
         session.lab.select_mapping(options.mapping)
@@ -35,6 +40,7 @@ def main():
             session.start(options.source, path=options.replay, fps=options.fps,
                           model=options.model, camera_id=options.camera_id,
                           preview=False, count=options.frames)
+            session.configure_output(options.output, options.driver_library)
             if options.subject and options.source == "replay":
                 session.lab.settings({"runtime": {"subject_id": options.subject}})
             session.lab.action({"action": "arm"})
@@ -54,9 +60,11 @@ def main():
             result = session.state()
             print(json.dumps({key: result[key] for key in ("mode", "status", "received", "accepted", "actual_hz", "error")}
                              | {"observed": {"left": left, "right": right, "pointer": pointer, "scroll": scroll, "keys": keys},
-                                "final_output": session.lab.state()["message"]}, indent=2))
-            if result["error"]:
-                parser.exit(1, result["error"] + "\n")
+                                "final_output": session.lab.state()["message"],
+                                "driver": session.lab.state()["output"]}, indent=2))
+            error = result["error"] or session.lab.state()["output"].get("error")
+            if error:
+                parser.exit(1, error + "\n")
         else:
             from .desktop import run
             run(session, options)

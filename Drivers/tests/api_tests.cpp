@@ -38,6 +38,7 @@ bool wait_for_target(fid_driver *driver, double x, double y, int ms = 1500) {
 } // namespace
 
 int main() {
+    require(fid_abi_version() == FID_ABI_VERSION, "ABI handshake before reading structs");
     fid_config config{}; fid_default_config(&config);
     require(config.backend == FID_DRY_RUN && config.tick_hz == 60, "safe default backend");
     fid_driver *raw = nullptr;
@@ -164,6 +165,30 @@ int main() {
     require(saw_watchdog_key_up, "watchdog key-up is observable in journal");
     fid_neutral_frame(&frame); require(fid_submit(second, &frame) == FID_OK, "submit after timeout");
     require(!status_of(second).enabled, "submit cannot resume output");
+    // Processed actions cannot disappear between the periodic worker's ticks.
+    require(fid_enable(raw) == FID_OK, "enable processed stream");
+    fid_neutral_frame(&frame);
+    require(fid_submit_processed(raw, &frame) == FID_OK, "processed neutral arms synchronously");
+    require(!status_of(raw).awaiting_neutral, "no wait for neutral tick");
+    do { fid_drain_events(raw, events, 8, &count); } while (count);
+    frame.left_click = 1; frame.keys_down = FID_KEY_W;
+    require(fid_submit_processed(raw, &frame) == FID_OK, "processed pulse starts");
+    require(status_of(raw).held_key_mask == FID_KEY_W, "key pressed before submit returns");
+    frame.left_click = 0; frame.keys_down = 0;
+    require(fid_submit_processed(raw, &frame) == FID_OK, "processed pulse ends immediately");
+    require(fid_drain_events(raw, events, 8, &count) == FID_OK, "collect short pulse");
+    unsigned clicks = 0, downs = 0, ups = 0;
+    for (size_t i = 0; i < count; ++i) {
+        clicks += events[i].type == FID_EVENT_LEFT_CLICK;
+        downs += events[i].type == FID_EVENT_KEY_DOWN;
+        ups += events[i].type == FID_EVENT_KEY_UP;
+    }
+    require(clicks == 1 && downs == 1 && ups == 1, "short click/key pulse preserved exactly once");
+    frame.keys_down = FID_KEY_S;
+    require(fid_submit_processed(raw, &frame) == FID_OK, "hold before rejected input");
+    frame.pointer_x = std::numeric_limits<double>::quiet_NaN();
+    require(fid_submit_processed(raw, &frame) == FID_INVALID_ARGUMENT, "reject bad processed state");
+    require(!status_of(raw).enabled && !status_of(raw).held_key_mask, "rejected processed state releases synchronously");
     fid_destroy(nullptr);
     std::cout << "C API lifecycle, worker, journal, and watchdog checks passed\n";
 }

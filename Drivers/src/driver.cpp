@@ -80,67 +80,70 @@ struct fid_driver {
         return result;
     }
     void start() { worker = std::thread([this] { run(); }); }
+    void process_tick(double now) {
+        try {
+            const bool was_enabled = control.enabled();
+            const uint32_t held_before_tick = control.held_key_mask();
+            auto events = control.tick(now);
+            bool absolute_target_moved = false;
+            status.pointer_velocity_x = status.pointer_velocity_y = 0;
+            status.target_reached = 0;
+            if (control.enabled() && !control.awaiting_neutral() &&
+                control.frame().pointer_mode == FID_POINTER_TARGET) {
+                const auto &frame = control.frame();
+                bool reached = false;
+                int32_t dx = 0, dy = 0;
+                const double dt = control.tick_seconds();
+                const auto moved = backend->move_toward(frame.target_x, frame.target_y,
+                    frame.target_speed * config.target_max_speed, dt, reached, dx, dy);
+                if (moved != FID_OK) {
+                    status.last_error = moved;
+                    control.pause();
+                    events.clear();
+                } else {
+                    status.target_reached = reached;
+                    if (dt > 0) {
+                        status.pointer_velocity_x = dx / dt;
+                        status.pointer_velocity_y = dy / dt;
+                    }
+                    if (dx || dy) {
+                        absolute_target_moved = true;
+                        events.push_back({FID_EVENT_MOVE, dx, dy,
+                            static_cast<uint64_t>(std::max(0.0, now_seconds()) * 1000000)});
+                    }
+                }
+            }
+            if (was_enabled && !control.enabled()) {
+                release_output(held_before_tick);
+            }
+            for (const auto &event : events) {
+                // Target mode already performed this step through the
+                // backend's absolute-position path; do not inject REL too.
+                const auto result = absolute_target_moved && event.type == FID_EVENT_MOVE
+                    ? FID_OK : backend->emit(event);
+                if (result != FID_OK) {
+                    status.last_error = result;
+                    const auto held = control.held_key_mask();
+                    control.pause();
+                    release_output(held);
+                    break;
+                }
+                record(event);
+            }
+        } catch (...) {
+            status.last_error = FID_INTERNAL_ERROR;
+            const auto held = control.held_key_mask();
+            control.pause();
+            release_output(held);
+        }
+    }
     void run() {
         std::unique_lock<std::mutex> lock(mutex);
         auto deadline = Clock::now() + period;
         while (!stopping) {
             wake.wait_until(lock, deadline, [this] { return stopping; });
             if (stopping) break;
-            try {
-                const bool was_enabled = control.enabled();
-                const uint32_t held_before_tick = control.held_key_mask();
-                auto events = control.tick(now_seconds());
-                bool absolute_target_moved = false;
-                status.pointer_velocity_x = status.pointer_velocity_y = 0;
-                status.target_reached = 0;
-                if (control.enabled() && !control.awaiting_neutral() &&
-                    control.frame().pointer_mode == FID_POINTER_TARGET) {
-                    const auto &frame = control.frame();
-                    bool reached = false;
-                    int32_t dx = 0, dy = 0;
-                    const double dt = control.tick_seconds();
-                    const auto moved = backend->move_toward(frame.target_x, frame.target_y,
-                        frame.target_speed * config.target_max_speed, dt, reached, dx, dy);
-                    if (moved != FID_OK) {
-                        status.last_error = moved;
-                        control.pause();
-                        events.clear();
-                    } else {
-                        status.target_reached = reached;
-                        if (dt > 0) {
-                            status.pointer_velocity_x = dx / dt;
-                            status.pointer_velocity_y = dy / dt;
-                        }
-                        if (dx || dy) {
-                            absolute_target_moved = true;
-                            events.push_back({FID_EVENT_MOVE, dx, dy,
-                                static_cast<uint64_t>(std::max(0.0, now_seconds()) * 1000000)});
-                        }
-                    }
-                }
-                if (was_enabled && !control.enabled()) {
-                    release_output(held_before_tick);
-                }
-                for (const auto &event : events) {
-                    // Target mode already performed this step through the
-                    // backend's absolute-position path; do not inject REL too.
-                    const auto result = absolute_target_moved && event.type == FID_EVENT_MOVE
-                        ? FID_OK : backend->emit(event);
-                    if (result != FID_OK) {
-                        status.last_error = result;
-                        const auto held = control.held_key_mask();
-                        control.pause();
-                        release_output(held);
-                        break;
-                    }
-                    record(event);
-                }
-            } catch (...) {
-                status.last_error = FID_INTERNAL_ERROR;
-                const auto held = control.held_key_mask();
-                control.pause();
-                release_output(held);
-            }
+            process_tick(now_seconds());
             deadline += period;
             // Skip missed ticks rather than replaying a backlog.
             if (deadline <= Clock::now()) deadline = Clock::now() + period;
@@ -160,6 +163,7 @@ struct fid_driver {
 };
 
 extern "C" {
+uint32_t fid_abi_version(void) { return FID_ABI_VERSION; }
 void fid_default_config(fid_config *config) {
     if (!config) return;
     *config = {};
@@ -202,11 +206,17 @@ fid_result fid_create(const fid_config *config, fid_driver **out_driver) {
     } catch (...) { return FID_INTERNAL_ERROR; }
 }
 
-fid_result fid_submit(fid_driver *driver, const fid_frame *frame) {
-    if (!driver || !frame) return FID_INVALID_ARGUMENT;
+static fid_result submit_frame(fid_driver *driver, const fid_frame *frame, bool processed) {
+    if (!driver) return FID_INVALID_ARGUMENT;
     try {
         std::lock_guard<std::mutex> lock(driver->mutex);
-        if (!fid::valid_frame(*frame)) {
+        if (!frame || !fid::valid_frame(*frame)) {
+            if (processed) {
+                const auto held = driver->control.held_key_mask();
+                driver->control.pause();
+                driver->release_output(held);
+                driver->status.last_error = FID_INVALID_ARGUMENT;
+            }
             ++driver->status.rejected_frames;
             return FID_INVALID_ARGUMENT;
         }
@@ -219,8 +229,20 @@ fid_result fid_submit(fid_driver *driver, const fid_frame *frame) {
             driver->release_output(held_before_submit);
         }
         ++driver->status.accepted_frames;
+        if (processed) {
+            driver->process_tick(now_seconds());
+            return static_cast<fid_result>(driver->status.last_error);
+        }
         return FID_OK;
     } catch (...) { return FID_INTERNAL_ERROR; }
+}
+
+fid_result fid_submit(fid_driver *driver, const fid_frame *frame) {
+    return submit_frame(driver, frame, false);
+}
+
+fid_result fid_submit_processed(fid_driver *driver, const fid_frame *frame) {
+    return submit_frame(driver, frame, true);
 }
 
 fid_result fid_enable(fid_driver *driver) {

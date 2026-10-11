@@ -22,7 +22,7 @@ class MouseSession:
     All state locks are acquired session → lab. Frames/diagnostics handed to this
     class must not be mutated afterwards. Preview retains one PPM image in memory.
     Camera and detector-demo share one selected-face calibration workbench.
-    Uncalibrated channels remain invalid; output is the simulated mouse only.
+    Uncalibrated channels remain invalid; native output is an explicit mode.
     """
 
     def __init__(self, lab=None, *, clock=monotonic_ms):
@@ -50,6 +50,24 @@ class MouseSession:
         self.detector_runtime = None
         self.profile_label = "Unsaved calibration"
         self.profile_binding = None
+
+    def configure_output(self, mode="preview", library=None):
+        with self.lock:
+            if self.closed:
+                raise ValueError("Session is closed")
+            if mode not in ("preview", "dry-run", "native"):
+                raise ValueError("Choose preview, dry-run or native output")
+            if mode == "native" and self.mode != "camera":
+                raise ValueError("Live mouse/keyboard output requires the Camera source")
+            self.lab.set_output(None)
+            if mode != "preview":
+                from Drivers.output import DriverOutput
+                output = DriverOutput(mode, library, clock=self.clock)
+                try:
+                    self.lab.set_output(output)
+                except Exception:
+                    output.close()
+                    raise
 
     def select_subject(self, subject_id):
         with self.lock:
@@ -259,6 +277,8 @@ class MouseSession:
                 raise RuntimeError("Session is closed")
             if self.thread is not None and self.thread.is_alive():
                 raise ValueError("Stop the current source and wait for it to close before restarting")
+            if mode != "camera" and self.lab.state()["output"]["mode"] == "native":
+                self.lab.set_output(None)
             if mode in ("camera", "detector-demo"):
                 self.ensure_detector_runtime()
             changed_source = mode != self.mode

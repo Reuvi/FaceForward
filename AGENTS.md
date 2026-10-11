@@ -1,5 +1,12 @@
 # Agent working agreement
 
+**Current driver connection:** read `Contracts/DRIVER_CONNECTION.md` and
+`docs/DRIVER_CONNECTION_GUIDE.md`. App connects the merged ABI v3 driver through
+public Python bindings and an injected Processing sink. Native output is an
+explicit Camera-only mode; Stop/close release it. Eye activations produce single
+clicks, head controls hold keys, and pupils request velocity. Preview remains the
+default. This supersedes older statements that Drivers integration is pending.
+
 **Latest pupil update:** follow `Contracts/PUPIL_HEAD_CALIBRATION.md` (relative to repository root). Personal pupil endpoints and head-angle compensation supersede fixed/no-calibration mapping below. Tongue remains retired.
 
 **Current user decision — tongue retired:** read [Contracts/TONGUE_RETIREMENT.md](Contracts/TONGUE_RETIREMENT.md).

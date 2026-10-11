@@ -1,5 +1,10 @@
 # Mouse MVP testing companion
 
+> Driver integration is now available: [build, dry-run and live-output tests](DRIVER_CONNECTION_GUIDE.md).
+> Automated tests exercise the compiled driver's dry-run backend. Native output
+> is explicit, Camera-only, and stops on App close; older preview-only statements
+> below describe the historical baseline.
+
 > Current workflow: use [App's guide](../App/README.md),
 > [gaming mapping tests and tuning](../Processing/mappings/README.md), and
 > [pupil calibration](PUPIL_HEAD_CALIBRATION_GUIDE.md). App now defaults to gaming

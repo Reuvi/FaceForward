@@ -1,5 +1,12 @@
 # Drivers lane
 
+App now uses the public `binding.py` and `output.py`; read
+`../Contracts/DRIVER_CONNECTION.md`. Preserve ABI v3 struct layouts and the legacy
+`fid_submit` tools. The additive `fid_submit_processed` path consumes processed
+click/key transitions synchronously with zero extra dwell/dead zone configured
+by the adapter. Both paths retain the independent C watchdog. Default App output
+is preview; native is explicit and stops on App close. Test through dry-run.
+
 Read the root `AGENTS.md` and `Contracts/README.md`. Own only `Drivers/**` and
 `tests/drivers/**`. Preserve the existing `readme.MD`. Keep adapters, dependencies,
 manual slider tools, and lane documentation here. Put shared requests in

@@ -3,7 +3,9 @@
 The app now tracks **independent eyes/winks, Head Y, Head X and pupils**.
 Tongue detection has been retired: no tongue tab, calibration, graphs, mouth crop,
 model or background worker runs. Pupils are the mouse pointer input. The application
-is local Python/Tk; it does not use a browser or send real OS mouse/keyboard events.
+is local Python/Tk. Output is selectable: Preview, Driver dry run, or Live mouse +
+keyboard. Native output is explicitly enabled with the Camera source; Stop and
+closing App release it. [Build and live-output instructions](../docs/DRIVER_CONNECTION_GUIDE.md).
 The default is **gaming keyboard mouse mapping 1**: left/right eye actions →
 left/right mouse, head down/up/left/right → W/Space/Shift/S, pupils → pointer
 velocity. The previous **Mouse and scroll** mode remains selectable. See
@@ -25,6 +27,9 @@ Vision/.venv/bin/python -m App --source demo
 
 # Previous mouse/scroll exercise.
 Vision/.venv/bin/python -m App --source demo --mapping mouse
+
+# Exercise the compiled driver without sending OS events.
+Vision/.venv/bin/python -m App --source demo --output dry-run
 ```
 
 Restart an already-open app to get these changes. A sole visible face attaches as
@@ -57,7 +62,7 @@ camera/demo/replay. No second application is required.
    matrix** highlights the cell; a white dot shows continuous position.
    [Full guide and engineering details](../docs/PUPIL_HEAD_CALIBRATION_GUIDE.md).
 6. Open **Signal mapping**, center your head/pupil direction, open both eyes,
-   and press **Start preview**. Inspect raw → filtered → instruction for each
+   and press **Start**. Inspect raw → filtered → instruction for each
    input. Head X/Y have separate activation/release thresholds, smoothing and
    confirmation settings. Change key bindings or use **Copy as…** to make another
    named mapping; **Export mapping** saves it locally. **Live lab** also shows
@@ -66,6 +71,11 @@ camera/demo/replay. No second application is required.
 7. **Transfer settings** changes pointer dead zones, smoothing, acceleration and
    preview speeds. These device response functions are separate from detection.
    Applying changes stops preview. Its pointer source is fixed to `gaze` (pupils).
+8. To control the OS, build Drivers and choose **Output → Live mouse + keyboard →
+   Connect output** on the source tab, then **Start live control**. Native eyes
+   produce one complete click per activation (no dragging); head keys stay held
+   until neutral/invalid. **Driver dry run** exercises the actual library without
+   OS input. Any driver error stops output and remains visible in the UI.
 
 Unknown plots hold the last displayed position in a darker color. Actual unknown
 observations remain invalid. Unknown eye Processing samples hold the previous
@@ -133,17 +143,19 @@ without quantizing mouse movement. `gaze_measurement` is now
 `mediapipe_iris_direction_v3`. Independent `eye_intent_v1` samples remain on
 every capture. Gaming emits `device_control_v1` with held keys/buttons, velocity,
 validity and original capture provenance. Mouse mode preserves `mouse_preview_v0`.
-See [the new command boundary](../Contracts/GAMING_MAPPING.md). The bounded
-transition journal preserves short eye ON/OFF evidence between output ticks;
-it is not a reliable live-driver transport.
+See [the command boundary](../Contracts/GAMING_MAPPING.md) and
+[driver connection](../Contracts/DRIVER_CONNECTION.md). Driver commands are sent
+synchronously on captures and output ticks, preserving short eye activations.
+The bounded UI transition journal is diagnostic only and is never replayed to
+the driver. Close stops/destroys the driver; no background service is installed.
 
 `Vision/legacy_presets.py` validates old files. Retired tongue algorithm modules,
 notices and unit tests remain for historical compatibility/developer use; they
 are not imported by a fresh current runtime or current-profile round trip.
 The standalone Processing developer library still accepts legacy tongue replays.
 Read [the retirement contract](../Contracts/TONGUE_RETIREMENT.md) before modifying
-these compatibility boundaries. Drivers integration and human accuracy testing
-remain pending.
+these compatibility boundaries. Human accuracy and live OS/game behavior still
+need operator testing; automated evidence uses the compiled driver's dry-run mode.
 
 ## Software checks
 

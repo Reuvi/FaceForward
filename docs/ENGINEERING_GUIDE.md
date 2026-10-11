@@ -1,5 +1,11 @@
 # Mouse MVP engineering guide
 
+> Current driver boundary: [DRIVER_CONNECTION.md](../Contracts/DRIVER_CONNECTION.md).
+> App injects a synchronous validated output sink into Processing; the merged
+> C driver emits single eye-activation clicks, held keys and pupil velocity.
+> Public Python bindings, explicit output modes, release behavior and build steps
+> are in [the connection guide](DRIVER_CONNECTION_GUIDE.md).
+
 > Current implementation: [gaming Processing](../Processing/mappings/README.md)
 > adds independent head gates and keyboard states to the preserved mouse engine.
 > App defaults to gaming keyboard mouse mapping 1; mouse/scroll remains selectable.

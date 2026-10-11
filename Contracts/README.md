@@ -1,8 +1,11 @@
 # Shared contracts — initial v1
 
-[GAMING_MAPPING.md](GAMING_MAPPING.md) adopts the named gaming Processing preset,
-device_control_v1 preview commands and separate mapping persistence. Real Drivers
-integration remains a later step; existing mouse_preview_v0 is unchanged.
+[DRIVER_CONNECTION.md](DRIVER_CONNECTION.md) connects Processing to the merged
+ABI v3 driver, with explicit preview/dry-run/native modes, synchronous processed
+commands and immediate release on stop/fault. Eye activations produce single
+clicks; head directions hold keys. [GAMING_MAPPING.md](GAMING_MAPPING.md) defines
+the preset, device_control_v1 and separate mapping persistence. The existing
+mouse_preview_v0 remains supported.
 
 [PUPIL_HEAD_CALIBRATION.md](PUPIL_HEAD_CALIBRATION.md) is the latest pupil contract:
 personal endpoints plus learned head compensation, detector presets v12. It

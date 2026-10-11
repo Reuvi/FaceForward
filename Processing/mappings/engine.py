@@ -142,7 +142,7 @@ class GamingProcessor(MouseProcessor):
         for side in ("left", "right"):
             gate = getattr(self, side)
             raw = diag[side+"_closed"]
-            status = "unknown; released" if raw is None else "waiting for reopen" if not gate.ready else "held" if snap[side+"_click"] else "released"
+            status = "unknown; released" if raw is None else "waiting for reopen" if not gate.ready else "active" if snap[side+"_click"] else "released"
             rows.append({"id": "eye_"+side, "input": side.title()+" eye action", "raw": None if raw is None else int(raw),
                          "filtered": None if raw is None else int(raw), "threshold": "Calibrated action",
                          "instruction": side.title()+" mouse: "+status})

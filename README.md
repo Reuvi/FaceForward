@@ -15,8 +15,10 @@ in the same window. **gaming keyboard mouse mapping 1** maps independent eyes
 to mouse buttons, head down/up/left/right to W/Space/Shift/S, and pupils to pointer
 velocity. The Signal mapping tab shows raw values, filters, thresholds and readable
 commands, with named mapping copies and local import/export. Saved face profiles
-keep detector fits and mouse response settings together. Live accuracy validation
-and the real Drivers connection remain pending.
+keep detector fits and mouse response settings together. The merged driver now
+connects through selectable Preview, Driver dry run and Live mouse + keyboard
+output. [Build and run live output](docs/DRIVER_CONNECTION_GUIDE.md). Human accuracy
+and live game behavior still need operator testing.
 
 ## Calibrate and test in one window
 
@@ -51,7 +53,8 @@ then **Signal mapping** to watch independent left/right mouse commands, pointer
 motion and W/Space/Shift/S. Use `--mapping mouse` for the previous scroll mode.
 **Vision source & raw signals** shows measurements,
 validity, actual source timing, and optional camera diagnostics. There is no
-browser, JavaScript, network service, or real OS mouse injection.
+browser, JavaScript or network service. Real OS input requires Camera plus the
+explicit Live mouse + keyboard output choice and Start.
 
 Read [the complete MVP runbook](App/README.md),
 [Processing tuning instructions](Processing/README.md),

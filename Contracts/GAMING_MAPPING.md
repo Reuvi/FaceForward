@@ -1,5 +1,11 @@
 # Gaming signal processing and preview
 
+**Driver connection update:** [DRIVER_CONNECTION.md](DRIVER_CONNECTION.md)
+supersedes the preview-only driver boundary below. Native output uses the existing
+driver's one-click-per-eye-activation behavior (no dragging); the mouse fields
+remain activation levels. Head keys are held states. Both formats connect through
+an explicit runtime output choice with no extra driver dwell/dead zone.
+
 User-authorized middle-phase implementation, based on 7175a89. Adopt the
 Processing plan's gaming keyboard mouse mapping 1. Vision measurement semantics
 are unchanged: consume personal, head-compensated gaze_x/y under

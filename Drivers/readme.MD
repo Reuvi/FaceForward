@@ -1,5 +1,13 @@
 # Face input driver — phase 1
 
+**App integration is available:** [run the connected mouse and keyboard](../docs/DRIVER_CONNECTION_GUIDE.md).
+The public `Drivers.binding` module is shared by App and the existing console.
+App uses `Drivers.output.DriverOutput` and `fid_submit_processed` to consume
+processed click/key transitions synchronously. ABI v3 structs and the legacy
+`fid_submit` path remain compatible. Rebuild after pulling to obtain the additive
+ABI handshake and processed-submission exports. Stop and App close release output;
+App does not install or leave a background service running.
+
 C++17 userspace input library for Linux and macOS. Processing submits named
 controls in `[0,1]`; this library generates mouse/keyboard events. See
 [`passoff.md`](passoff.md) for actual verification and remaining work.

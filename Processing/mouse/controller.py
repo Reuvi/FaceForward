@@ -32,6 +32,9 @@ class Lab:
         self.commands = deque(maxlen=512)
         self.command_id = 0
         self.last_command_state = None
+        self.output = None
+        self.output_error = None
+        self.output_status = {"mode": "preview", "enabled": False, "error": None}
         self.processor = MouseProcessor(config)
         self.runtime = {"sample_hz": 30, "rows": 9, "columns": 9, "vector_size": 11,
                         "pointer_speed": 900, "scroll_speed": 450, "source": "mock", "subject_id": "mock-person"}
@@ -103,6 +106,21 @@ class Lab:
         """Called under the lab lock on captures and ticks, never from drawing."""
         self.snapshot = self.processor.tick(timestamp)
         message = control_message(self.snapshot)
+        if self.output is not None:
+            try:
+                self.output.submit(message, self.runtime)
+                self.output_status = self.output.snapshot()
+            except Exception as exc:
+                # A sink failure must never kill the independent freshness clock.
+                self.output_error = str(exc)
+                self.processor.disarm("Driver stopped: "+str(exc))
+                try:
+                    self.output.pause()
+                except Exception:
+                    pass
+                self.snapshot = self.processor.tick(timestamp)
+                message = control_message(self.snapshot)
+                self.output_status = {"mode": self.output.mode, "enabled": False, "error": str(exc)}
         if message["format"] == "device_control_v1":
             state = (message["output_session_id"], message["enabled"],
                      tuple(message["buttons"].values()), tuple(message["keys"].values()))
@@ -112,6 +130,19 @@ class Lab:
                 self.last_command_state = state
         else:
             self.last_command_state = None
+
+    def set_output(self, output=None):
+        """App injects a serialized sink; Processing has no driver dependency."""
+        with self.lock:
+            self.processor.disarm("Output changed; press Start again")
+            self.take_snapshot(self.clock())
+            previous, self.output = self.output, None
+            if previous is not None:
+                previous.close()
+            self.output = output
+            self.output_error = None
+            self.output_status = {"mode": "preview", "enabled": False, "error": None}
+            self.take_snapshot(self.clock())
 
     def start(self):
         if self.thread is not None:
@@ -135,6 +166,9 @@ class Lab:
         with self.lock:
             self.processor.disarm("Lab closed")
             self.take_snapshot(self.clock())
+            if self.output is not None:
+                self.output.close()
+                self.output = None
         if self.thread:
             self.thread.join(timeout=2)
 
@@ -143,6 +177,7 @@ class Lab:
             commands = list(self.commands)
             gap = after_command is not None and bool(commands) and after_command < commands[0]["id"]-1
             return {"eye_sample": self.processor.eye_sample, "snapshot": self.snapshot, "message": control_message(self.snapshot),
+                    "output": deepcopy(dict(self.output_status, error=self.output_error or self.output_status.get("error"))),
                     "mapping_id": self.mapping_id,
                     "mapping": self.mappings[self.mapping_id].to_dict() if self.mapping_id != "mouse" else None,
                     "mappings": [{"id": "mouse", "name": "Mouse and scroll"}] +
@@ -262,6 +297,7 @@ class Lab:
         with self.lock:
             timestamp = self.clock()
             if action == "arm":
+                self.output_error = None
                 self.processor.arm()
             elif action == "stop":
                 self.processor.disarm()
@@ -316,6 +352,6 @@ class Lab:
             # Show the actual latest input, including subject loss/rejected frames.
             self.last_raw = frame
             self.last_ingest = result
-            if self.mapping_id != "mouse":
+            if self.mapping_id != "mouse" or self.output is not None:
                 self.take_snapshot(timestamp)
             return dict(result, eye_sample=self.processor.eye_sample)

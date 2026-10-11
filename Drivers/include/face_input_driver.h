@@ -144,10 +144,16 @@ typedef struct fid_event {
 } fid_event;
 
 /* Live output is opt-in: defaults select dry-run and creation starts paused. */
+FID_API uint32_t fid_abi_version(void);
 FID_API void fid_default_config(fid_config *config);
 FID_API void fid_neutral_frame(fid_frame *frame);
 FID_API fid_result fid_create(const fid_config *config, fid_driver **out_driver);
 FID_API fid_result fid_submit(fid_driver *driver, const fid_frame *frame);
+/* For already-processed states: consume transitions synchronously, without a
+ * latest-frame overwrite between worker ticks. Struct layouts remain ABI v3.
+ * Use zero button dwell when the producer has already classified eye actions.
+ * Invalid processed frames pause and release output immediately. */
+FID_API fid_result fid_submit_processed(fid_driver *driver, const fid_frame *frame);
 /* Enabling discards old frames; submit a fresh frame with no buttons or keys held.
  * ABI v3 adds complete held-key state to the v2 pointer and button contract. */
 FID_API fid_result fid_enable(fid_driver *driver);
