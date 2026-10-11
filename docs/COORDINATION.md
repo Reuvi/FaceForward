@@ -841,3 +841,12 @@ Contract: PUPIL_MATRIX.md, landed before implementation.
   usable range versus tracking loss and blink rejection. Fixed scale/gates are
   experimental engineering defaults; generated fixtures do not measure human accuracy.
   No camera or personal recordings/profile data used for verification.
+
+## Tongue retirement — active
+
+Reuvi integration, branch `work/reuvi/integration/remove-tongue`, base `d36cb18`.
+User authorizes removing tongue from the MVP. Writable paths: App, Vision,
+shared contracts/docs and integration tests; narrowly scoped Processing UI wiring
+if needed to prevent the embedded App selecting a retired input. Drivers untouched.
+Contract: `Contracts/TONGUE_RETIREMENT.md`. Preserve eyes/winks and head axes;
+use fixed pupils for pointer. Validate legacy files then discard tongue state.
