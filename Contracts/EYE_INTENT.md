@@ -2,6 +2,26 @@
 
 ## Current calibration workflow
 
+Current update: the second guide is **Wink action**, with six short captures:
+open/left/right to learn, then open/left/right to check. No prompted natural blinks,
+blink counting or blink-versus-wink discrimination is required. A sole calibrated
+eye uses four captures. At default settings the two-eye guide takes about 32 seconds
+including rest. Geometry stays separate and survives retries as below.
+
+Same-eye eyelid and facial appearance features learn the open-to-closed action;
+surrounding-muscle separation from a natural blink is no longer a prerequisite.
+ON requires both valid closed-eye geometry and matching trained appearance. Valid
+open is OFF; a supported closed non-match is OFF with state `closed`. Unsupported
+appearance or uncertain geometry is unknown. No temporal/opposite-eye gate is added.
+Natural blinks are not a distinct class and may activate if they match the action.
+`eye_intent_v1` adds the OFF state `closed`; Processing also accepts historical
+`blink` OFF samples. Existing numeric model fields and preset versions are compatible;
+fresh checks now require one open and one action window per eye. Old models still
+load but can be replaced using the short guide. No raw training recordings are saved.
+
+The following describes the earlier fourteen-step workflow; the update above
+supersedes its blink-specific training, validation and OFF-class requirements.
+
 The eye tab has two separately started native guides: **Eye open/closed** (seven
 geometry steps) and **Blinks & winks** (fourteen appearance/check steps).
 `start_eye_guide` starts geometry only. `start_wink_guide` requires at least one

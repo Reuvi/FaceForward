@@ -1,5 +1,15 @@
 # Experimental color-mask tongue tip
 
+Current calibration usability update: keep **Reset tongue** visible outside the
+scrolling setup controls. It cancels tongue collection/position guidance and clears
+appearance, training colors/marks, range, checks and current tip without requiring
+a face. It preserves completed eye/head fits. It must not cancel unrelated active
+eye/head work. Clearing tongue marks keeps the empty-mouth background so a bad
+positive click can be retried. Show the actual clicked patches on the frozen image,
+not a fixed center marker. Numbered instructions and prerequisite-aware controls
+guide background → tongue photo/marks → appearance fit/inspection → position guide.
+No segmentation or coordinate algorithm changes are implied by this UI update.
+
 Authorized integration task: Reuvi, base `0123b8d`, branch
 `work/reuvi/integration/tongue-tip`. Keep native local Python and the existing color
 segmentation approach. No pretrained network or Processing/driver change.

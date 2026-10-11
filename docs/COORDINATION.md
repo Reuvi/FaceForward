@@ -1,6 +1,16 @@
 # Main chat and agent coordination hub
 
-## Current head pitch range task
+## Current quick wink / tongue reset task
+
+Claim: Reuvi integration, `work/reuvi/integration/quick-winks-tongue-reset`, base
+`8f13166`. Scope: Vision wink training/model/UI and tongue reset/setup UI, App
+commands/copy, Processing's additive OFF-state decoder, relevant tests/contracts/docs.
+Shorten wink learning to open/left/right plus fresh checks, drop natural-blink
+training, require valid closed-eye geometry for action, retain independent samples.
+Fix reset during tongue capture and clarify all setup steps. Preserve other fits.
+Contracts land first: EYE_INTENT.md and TONGUE_TIP.md.
+
+## Previous head pitch range handoff (8f13166)
 
 Claim: Reuvi integration, `work/reuvi/integration/head-pitch-range`, base
 `d539a78`. Scope: Vision head configuration/calibration/preset migration/display,
