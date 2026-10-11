@@ -735,3 +735,11 @@ compatibility, matching views, invalid input, independent fits and native tests.
   both clicks, scrolling and pointer movement, and finished disabled/released.
   Changed Python passes Ruff F; whitespace and integration scope checks pass.
   Synthetic fixtures verify software behavior, not human detection accuracy.
+
+## Direct pupil direction — active
+
+Reuvi integration, branch `work/reuvi/integration/direct-pupils`, base `fe95527`.
+User requests MediaPipe-only pupil directions without the failing range guide.
+Scope: Vision measurement/normalization/native UI/profile, App command/lifecycle,
+relevant tests, contracts, documentation. Contract: DIRECT_PUPILS.md, committed
+before implementation. Keep other detectors and independent tongue scheduling.

@@ -90,3 +90,11 @@ Read Contracts/HEAD_HORIZONTAL.md relative to the repository root. Add independe
 yaw/head_x beside pitch/head_y; the pitch-only measurement-mode rule remains for
 vertical detection. Guides and fits are separate. New detector presets are v7,
 with v1–v6 readable; combined profiles remain v3. No implicit device remapping.
+
+## Direct pupil update
+
+Read Contracts/DIRECT_PUPILS.md relative to the repository root. It supersedes
+pupil fitting/rechecks above: normalize MediaPipe iris direction directly on every
+usable capture. No pupil guide or calibrated pose/eye gate. New detector presets
+are v8 with sensitivity settings; fully validate then discard legacy pupil fits.
+Combined profiles remain v3; all other detector calibration remains independent.
