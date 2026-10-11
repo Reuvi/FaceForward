@@ -10,7 +10,7 @@ if AVAILABLE:
     import numpy as np
     from Vision.demo_detection import demo_image
     from Vision.features import DetectionConfig, analyze_features
-    from Vision.pupil import measure, pose_supported
+    from Vision.pupil import measure, normalize, settings
     from Vision.tongue import mouth_crop
     from Vision.tongue_segment import SegmentedTongueModel, decode_mask
 
@@ -19,7 +19,7 @@ if AVAILABLE:
 class PupilMeasurements(unittest.TestCase):
     def reading(self, **kwargs):
         b, obs = demo_image(**kwargs)
-        return measure(obs[0], analyze_features(b, obs[0], DetectionConfig()), {})
+        return measure(obs[0], analyze_features(b, obs[0], DetectionConfig()))
 
     def test_direction_units_and_polarity(self):
         for x,y in ((.5,.5),(0,.5),(1,.5),(.5,0),(.5,1)):
@@ -36,18 +36,42 @@ class PupilMeasurements(unittest.TestCase):
 
     def test_missing_iris_blur_and_disagreement(self):
         b, obs=demo_image(); o=obs[0]
-        self.assertIsNone(measure(o,analyze_features(np.zeros_like(b),o,DetectionConfig()),{}).xy)
+        self.assertIsNone(measure(o,analyze_features(np.zeros_like(b),o,DetectionConfig())).xy)
         points=list(o.points)
         for i in (474,475,476,477):points[i]=(points[i][0]+24,points[i][1])
         o.points=tuple(points)
-        self.assertIn('disagree',measure(o,analyze_features(b,o,DetectionConfig()),{}).reason)
+        self.assertIn('disagree',measure(o,analyze_features(b,o,DetectionConfig())).reason)
         o.points=o.points[:468]
-        self.assertIsNone(measure(o,analyze_features(b,o,DetectionConfig()),{}).xy)
+        self.assertIsNone(measure(o,analyze_features(b,o,DetectionConfig())).xy)
 
-    def test_pose_envelope(self):
-        self.assertTrue(pose_supported((10,4,5),(0,0,0)))
-        self.assertFalse(pose_supported((20,0,0),(0,0,0)))
-        self.assertFalse(pose_supported(None,(0,0,0)))
+    def test_fixed_normalization_clamps_without_training_or_history(self):
+        for raw, want in (((0,0),(.5,.5)), ((-.2,-.1),(0,0)), ((.2,.1),(1,1)),
+                          ((.1,-.05),(.75,.25)), ((-.3,.2),(0,1))):
+            self.assertEqual(normalize(raw,settings()),want)
+        for raw in (None, (float('nan'),0), (0,float('inf'))):
+            self.assertIsNone(normalize(raw,settings()))
+        options=settings(dict(settings(), x_sensitivity=2, y_sensitivity=.5))
+        self.assertEqual(normalize((.1,.1),options),(1,.75))
+
+    def test_settings_validate_and_do_not_share_defaults(self):
+        first=settings();first['x_sensitivity']=3
+        self.assertEqual(settings()['x_sensitivity'],1)
+        for value in (True, 0, .24, 4.01, float('nan'), float('inf')):
+            with self.assertRaises(ValueError):settings(dict(settings(), x_sensitivity=value))
+        for value in ({}, dict(settings(), extra=1), dict(settings(), measurement='old')):
+            with self.assertRaises(ValueError):settings(value)
+
+    def test_direction_survives_translation_scale_roll_and_missing_pose(self):
+        import math
+        b, obs=demo_image(pupil_x=.75,pupil_y=.25);o=obs[0]
+        features=analyze_features(b,o,DetectionConfig());original=measure(o,features).xy
+        angle=math.radians(20)
+        o.points=tuple((30+1.4*(x*math.cos(angle)-y*math.sin(angle)),
+                        45+1.4*(x*math.sin(angle)+y*math.cos(angle))) for x,y in o.points)
+        o.rotation=None
+        changed=measure(o,features)
+        self.assertIsNone(changed.pose)
+        for actual,want in zip(changed.xy,original):self.assertAlmostEqual(actual,want)
 
 
 @unittest.skipUnless(AVAILABLE, "pixel dependencies required")

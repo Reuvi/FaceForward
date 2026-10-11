@@ -156,7 +156,7 @@ def draw_calibrated_scope(canvas, state):
     canvas.create_text(
         8,
         5,
-        text="Calibrated positions · 0–1 · center .5 · no device mapping",
+        text="Normalized positions · 0–1 · center .5 · no device mapping",
         fill="white",
         anchor="nw",
         font=("Arial", 10),
@@ -299,7 +299,7 @@ def draw_position(canvas, state, kind):
                 ),
                 (
                     ("gaze_x", "gaze_y") if kind == "pupil" else ("tongue_x", "tongue_y"),
-                    "Personal position · center (.5, .5)",
+                    "Direct pupil direction · center (.5, .5)" if kind == "pupil" else "Personal position · center (.5, .5)",
                     "#6ed7fe",
                 ),
             )
@@ -337,8 +337,13 @@ def draw_position(canvas, state, kind):
                 font=("Arial", 8),
             )
             def plot_value(value):
-                return (value+.5 if kind == "pupil" else (value+.8)/1.6) if index==0 else value
-            bounds = state.get("pupil_range" if kind == "pupil" else "tongue_range")
+                return max(0, min(1, value+.5 if kind == "pupil" else (value+.8)/1.6)) if index==0 else value
+            bounds = state.get("tongue_range") if kind != "pupil" else None
+            if kind == "pupil":
+                from .pupil import HALF_RANGES
+                options = state["pupil_settings"]
+                bounds = {axis: dict(low=-span/options[axis+"_sensitivity"], high=span/options[axis+"_sensitivity"])
+                          for axis, span in zip(("x", "y"), HALF_RANGES)}
             if index == 0 and bounds:
                 canvas.create_rectangle(
                     x0 + plot_value(bounds["x"]["low"]) * (x1 - x0),
@@ -450,7 +455,7 @@ class MovementPanel:
         ttk.Button(row, text="Cancel", command=lambda: call("cancel")).pack(
             side="left", padx=5
         )
-        if kind in ("tongue", "pupil"):
+        if kind == "tongue":
             self.ready = ttk.Button(self.frame, text="I'm in position — capture", command=self.capture_pose)
             self.ready.pack(fill="x", pady=3)
             self.retry = ttk.Button(self.frame, text="Retry this pose", command=lambda: call("retry_tongue_step"))
@@ -469,7 +474,7 @@ class MovementPanel:
             if state["calibrating"] or self.kind == "tongue" and not state["tongue_fit"]
             else "normal"
         )
-        if self.kind in ("tongue", "pupil"):
+        if self.kind == "tongue":
             ours = guide and guide["kind"] == self.kind
             self.ready.configure(state="normal" if ours and guide["active"] and guide["waiting"] and guide["phase"] == "prepare" else "disabled")
             self.retry.configure(state="normal" if ours and not guide["active"] and not guide["passed"] and not state["calibrating"] else "disabled")
@@ -485,7 +490,6 @@ class MovementPanel:
                 if self.kind == "head"
                 else "Neutral → your left → your right, followed by new checks. Turn your head; keep your face visible."
                 if self.kind == "head_x"
-                else "Follow the full-screen dot with your eyes; keep your head still. Press Space at each target to capture." if self.kind == "pupil"
                 else "Inspect the live segmentation mask below, then start this guide. Each pose waits for capture." if state.get("tongue_backend")=="segmentation"
                 else "First complete the numbered appearance steps below. Then start this guide. Each pose waits for I'm in position — capture."
             )
@@ -517,11 +521,11 @@ class MovementPanel:
         )
         self.progress.set(
             "Get into the pose, then press I'm in position — capture. No samples recorded yet."
-            if self.kind in ("tongue", "pupil") and guide["active"] and guide["waiting"] and guide["phase"] == "prepare" else
+            if self.kind == "tongue" and guide["active"] and guide["waiting"] and guide["phase"] == "prepare" else
             f"{guide['phase'].upper()} · {guide['remaining_ms'] / 1000:.1f}s · {guide['samples']} usable / {guide['rejected']} unavailable"
             if guide["active"]
             else f"Retry this pose to keep earlier captures, or Reset {self.kind} to start over."
-            if self.kind in ("tongue", "pupil") and not guide["passed"] else
+            if self.kind == "tongue" and not guide["passed"] else
             "Raw and calibrated positions appear beside the camera. Output remains stopped."
         )
         if self.kind == "tongue" and guide["active"]:
@@ -529,7 +533,7 @@ class MovementPanel:
                     if guide["name"] == "absent" else "Live tip: " + state.get("tip_reason", "Waiting for camera"))
             self.progress.set(self.progress.get() + "\n" + hint)
         if (guide["active"] and guide["waiting"] and self.pending is None
-                and not (self.kind in ("tongue", "pupil") and guide["phase"] == "prepare")):
+                and not (self.kind == "tongue" and guide["phase"] == "prepare")):
             self.pending = self.root.after_idle(lambda: self.present(event))
 
     def capture_pose(self):

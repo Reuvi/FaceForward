@@ -1,5 +1,7 @@
 # Native detection lab: calibration, measurements, and test procedure
 
+Current pupil workflow: [direct MediaPipe pupil testing](../docs/DIRECT_PUPIL_TESTING.md). No pupil guide, learned range or saved-pose gate; detector presets are v8.
+
 Current head update: [Head X yaw testing](../docs/HEAD_HORIZONTAL_TESTING.md).
 Horizontal and vertical guides/fits are separate. New detector presets are v7;
 older presets remain readable. Earlier vertical-only descriptions below are historical.

@@ -42,7 +42,6 @@ class LabRuntime:
             self.source_kind = kind
             self.workbench.disconnect("Starting source; calibration retained. Waiting for the face.")
             self.workbench.validation.clear()
-            self.workbench.pupil_ready = False
             self.preview = None
             self.timing = {}
             self.preview_due = 0
@@ -126,9 +125,6 @@ class LabRuntime:
                     controls["head"]={"neutral":.5,"up":.2,"down":.8}[state["name"]]
                 elif movement.kind=="head_x":
                     controls["head_x"]={"neutral":.5,"left":.2,"right":.8}[state["name"]]
-                elif movement.kind == "pupil":
-                    x,y=dict(center=(.5,.5),left=(0,.5),right=(1,.5),up=(.5,0),down=(.5,1))[state["name"]]
-                    controls.update(pupil_x=x,pupil_y=y,left_closed=False,right_closed=False,left_ratio=.25,right_ratio=.25)
                 else:
                     controls["tongue"]=state["name"]!="absent"
                     x,y={"absent":(.5,.5),"center":(.5,.5),"left":(.3,.5),

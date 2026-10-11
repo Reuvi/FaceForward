@@ -127,7 +127,7 @@ class HorizontalHeadTests(unittest.TestCase):
     def test_saved_yaw_only_profile_can_load_stopped_and_rejects_bad_fit_atomically(self):
         self.assertTrue(self.guide("head_x").passed); saved=self.core.head_x
         data=self.core.export_calibration()
-        self.assertEqual(data["version"],7); self.assertIsNone(data["head"])
+        self.assertEqual(data["version"],8); self.assertIsNone(data["head"])
         with tempfile.TemporaryDirectory() as folder:
             path=folder+"/profile.json";self.session.save_profile(path)
             self.session.stop();self.core.reset_calibration()
@@ -154,6 +154,7 @@ class HorizontalHeadTests(unittest.TestCase):
                     "color-tongue-tip-v5","tongue-segmentation-pupil-joystick-v6")
         for version,algorithm in enumerate(algorithms,1):
             old=deepcopy(original);old.update(version=version,algorithm=algorithm)
+            old["pupil"] = None
             old.pop("head_x");old["settings"].pop("head_yaw_separation")
             for key,min_version in (("pupil",6),("tongue_measurement",5),("tongue_range",4),("winks",3)):
                 if version<min_version:old.pop(key)
@@ -192,7 +193,7 @@ class HorizontalHeadTests(unittest.TestCase):
                 self.assertAlmostEqual((xy[0]+xy[2])/2,30+w/2+want*(w/2-60))
             self.assertIn("Left -12.0° = 0",ui.head_x_details.get())
             self.assertIn("Right 12.0° = 1",ui.head_x_details.get())
-            ui.movement_scope_mode.set("Calibrated positions");ui.tick();root.update()
+            ui.movement_scope_mode.set("Normalized positions");ui.tick();root.update()
             labels=[ui.scope.itemcget(i,"text") for i in ui.scope.find_all() if ui.scope.type(i)=="text"]
             self.assertIn("Head X",labels)
             ui.head_x_panel.start.invoke();ui.tick();root.update()

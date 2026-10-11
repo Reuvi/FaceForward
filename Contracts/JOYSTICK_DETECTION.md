@@ -1,5 +1,7 @@
 # Tongue segmentation and pupil joystick detection
 
+The pupil calibration requirements below are superseded by [DIRECT_PUPILS.md](DIRECT_PUPILS.md): direct normalization without training or rechecks. Tongue remains independent.
+
 Reuvi's integration task `work/reuvi/integration/tongue-pupil-joysticks`, based on
 4b8b25d, replaces the active camera's color-only tongue setup with local ONNX
 segmentation and adds a calibrated pupil-direction joystick. This supersedes the

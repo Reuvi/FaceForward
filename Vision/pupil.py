@@ -3,8 +3,31 @@ import math
 from dataclasses import dataclass, field
 from .geometry import eye_ratios, midpoint, sub
 from .landmarks import EYES
+from .signals import finite_number
 
-MEASUREMENT = "personal_pupil_joystick_v1"
+MEASUREMENT = "mediapipe_iris_direction_v2"
+HALF_RANGES = (.2, .1)  # Eye widths, independent of changing lid opening.
+
+
+def settings(value=None):
+    if value is None:
+        return dict(measurement=MEASUREMENT, x_sensitivity=1., y_sensitivity=1.)
+    if (not isinstance(value, dict)
+            or set(value) != {"measurement", "x_sensitivity", "y_sensitivity"}
+            or value["measurement"] != MEASUREMENT):
+        raise ValueError("Unsupported direct pupil settings")
+    for key in ("x_sensitivity", "y_sensitivity"):
+        if not finite_number(value[key]) or not .25 <= value[key] <= 4:
+            raise ValueError(f"{key} must be a finite number from 0.25 to 4")
+    return dict(value)
+
+
+def normalize(xy, options):
+    """Fixed geometric scale, no training, temporal extrema or pose reference."""
+    if xy is None or len(xy) != 2 or not all(finite_number(v) for v in xy):
+        return None
+    return tuple(max(0., min(1., .5+v*options[key]/(2*span)))
+                 for v, span, key in zip(xy, HALF_RANGES, ("x_sensitivity", "y_sensitivity")))
 
 
 @dataclass
@@ -24,7 +47,7 @@ def pose_angles(rotation):
             math.degrees(math.atan2(rotation[1][0], rotation[1][1])))
 
 
-def measure(observation, features, calibrations):
+def measure(observation, features):
     result = PupilReading(pose=pose_angles(observation.rotation))
     points = observation.points
     if len(points) < 478:
@@ -34,10 +57,8 @@ def measure(observation, features, calibrations):
     qualities = []
     for side, (corners, pairs, ring) in EYES.items():
         f = features[side]
-        fit = calibrations.get(side)
         blink = observation.expressions.get("eyeBlink"+side.title(), 0)
-        opened = (fit.classify(f.value, f.quality).get("value") == 1 if fit and f.value is not None
-                  else f.value is not None and f.value >= .16)
+        opened = f.value is not None and f.value >= .16
         entry = {"xy": None, "valid": False, "reason": "Open eye clearly to measure its iris"}
         result.eyes[side] = entry
         if not f.quality or not opened or blink >= .4:
@@ -70,8 +91,3 @@ def measure(observation, features, calibrations):
     result.quality = min(qualities)
     result.reason = "Raw pupil direction available"
     return result
-
-
-def pose_supported(current, reference):
-    return (current is not None and reference is not None
-            and all(abs(a-b) <= limit for a, b, limit in zip(current, reference, (18, 18, 25))))

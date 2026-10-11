@@ -1,5 +1,7 @@
 # One native lab: detection calibration + mouse processing
 
+Pupils now use [direct MediaPipe direction](../docs/DIRECT_PUPIL_TESTING.md), with no guide/recheck and two optional sensitivity controls. Detector saves are v8; v1–v7 remain readable.
+
 New: [horizontal head calibration](../docs/HEAD_HORIZONTAL_TESTING.md) adds a
 separate **3 Head X** yaw guide beside **2 Head Y** pitch. Head X supplies personal
 left=0/neutral=.5/right=1, raw degrees, a horizontal indicator and shared scopes.
@@ -9,7 +11,7 @@ Current scheduling: [independent detector workers and testing](../docs/INDEPENDE
 Tongue latency no longer blocks eye/head/pupil samples; original capture times are preserved.
 
 Current update: [tongue segmentation + pupil joystick testing](../docs/TONGUE_PUPIL_TESTING.md).
-Camera tongue uses local neural masks; pupils have a full-screen range guide.
+Camera tongue uses local neural masks; pupils use direct MediaPipe iris normalization.
 Choose **Pointer joystick input** on the source tab. Detector preset v6 stores
 these fits; v7 additionally stores head yaw. Combined profile v3 and head pitch remain unchanged.
 

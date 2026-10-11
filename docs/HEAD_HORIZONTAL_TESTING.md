@@ -1,5 +1,7 @@
 # Test horizontal head detection
 
+Current profile/UI update: [direct pupil testing](DIRECT_PUPIL_TESTING.md) uses detector v8 and the scope label **Normalized positions**. Head calibration is unchanged.
+
 Restart the native app from the repository root:
 
 ```bash
@@ -23,7 +25,7 @@ Vision/.venv/bin/python -m App --source camera --model Vision/.local/face_landma
    your learned left limit = **0**, neutral = **0.5**, right limit = **1**.
    The two halves use their own learned ranges, so unequal mobility is supported.
    Amber shows raw yaw in degrees. Learned references are printed beside it.
-5. Select **Calibrated positions** for the normalized Head X scope, or
+5. Select **Normalized positions** for the normalized Head X scope, or
    **Raw detector signals** for raw yaw/pitch and the other inputs. Camera setup
    and calibration read the same captured samples.
 6. Nod vertically while holding horizontal neutral, then turn left/right while

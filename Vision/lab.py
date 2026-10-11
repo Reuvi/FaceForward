@@ -72,7 +72,7 @@ class DetectionLab:
         self.eye_scope_picker.pack(fill="x")
         self.movement_scope_mode=tk.StringVar(value="Raw detector signals")
         self.movement_scope_picker=ttk.Combobox(left,textvariable=self.movement_scope_mode,state="readonly",
-            values=("Raw detector signals","Calibrated positions"))
+            values=("Raw detector signals","Normalized positions"))
         self.scope=tk.Canvas(left,height=180 if self.embedded else 220,bg="#14202c",highlightthickness=0)
         self.scope.pack(fill="x",pady=6)
         ttk.Label(left,textvariable=self.metrics,justify="left",wraplength=620,font=("Menlo",9 if self.embedded else 10)).pack(anchor="w")
@@ -104,9 +104,8 @@ class DetectionLab:
         self.mouth.bind("<Button-1>",self.mark_tongue)
         ttk.Label(tongue,textvariable=self.tongue_details,justify="left",wraplength=420,font=("Menlo",10)).pack(anchor="w",pady=6)
         self.pupil_tab=self.tab(tabs,"5 Pupils")
-        self.text(self.pupil_tab,"Use your pupil direction as a joystick. Center stops; farther left/right/up/down means more input. Both eyes must be open and visible. This is eye direction, not exact screen gaze.")
+        self.text(self.pupil_tab,"MediaPipe iris direction is available immediately: no pupil calibration or dot guide. Center is (.5, .5); left/up approach 0 and right/down approach 1. Keep both eyes open and visible. Head turns can still affect direction; this is not screen gaze.")
         self.pupil_panel=PupilPanel(self.pupil_tab,root,self.call)
-        ttk.Button(self.pupil_tab,text="Reset pupil calibration",command=lambda:self.call("reset_pupil")).pack(fill="x",pady=4)
         self.pupil_details=tk.StringVar()
         ttk.Label(self.pupil_tab,textvariable=self.pupil_details,wraplength=440,justify="left").pack(anchor="w",pady=8)
         settings=self.tab(tabs,"Settings")
@@ -234,13 +233,12 @@ class DetectionLab:
             state=self.runtime.snapshot()
             self.eye_panel.update(state)
         if hidden:
-            self.pupil_panel.close_window()
             if state.get("movement_guide") and state["movement_guide"]["active"]:
                 self.call("cancel")
             self.after_id=self.root.after(200,self.tick)
             return
         guide=state.get("movement_guide")
-        expected=({"head":self.head_tab,"head_x":self.head_x_tab,"tongue":self.tongue_tab,"pupil":self.pupil_tab}.get(guide["kind"]) if guide else None)
+        expected=({"head":self.head_tab,"head_x":self.head_x_tab,"tongue":self.tongue_tab}.get(guide["kind"]) if guide else None)
         if guide and guide["active"] and self.calibration_tabs.select()!=str(expected):
             self.call("cancel")
             state=self.runtime.snapshot()
@@ -294,8 +292,12 @@ class DetectionLab:
         fit=state.get("head_x")
         self.head_x_details.set(f"Raw yaw: {self.fmt(yaw.get('value'))}°\nNormalized X: {self.fmt(signals.get('head_x',{}).get('value'))}\nQuality: {yaw.get('quality',0):.2f}\n{state['reasons'].get('head_x','Waiting for face')}\n\nLearned references: " + (f"\nLeft {fit['low']:.1f}° = 0\nNeutral {fit['center']:.1f}° = .5\nRight {fit['high']:.1f}° = 1" if fit else "not calibrated"))
         pupil=state.get("pupil",{})
-        self.pupil_details.set("Raw position (eye widths): "+str(pupil.get("xy"))+"\n"+state["reasons"].get("pupil",pupil.get("reason","Waiting"))+"\n"+
-            "\n".join(f"{side.title()}: {v.get('xy')} · {v.get('reason')}" for side,v in pupil.get("eyes",{}).items()))
+        def pair_text(values):
+            return "("+", ".join(self.fmt(v) for v in values)+")" if values else "unavailable"
+        self.pupil_details.set("Raw position (eye widths): "+pair_text(pupil.get("xy"))+"\nNormalized X/Y: "+
+            pair_text(tuple(signals.get(k,{}).get("value") for k in ("gaze_x","gaze_y")))+"\n"+
+            state["reasons"].get("pupil",pupil.get("reason","Waiting"))+"\n"+
+            "\n".join(f"{side.title()}: {pair_text(v.get('xy'))} · {v.get('reason')}" for side,v in pupil.get("eyes",{}).items()))
         val=state["validation"]
         worker = state.get("tongue_worker")
         crop_label = 'FROZEN — click tissue' if state['frozen'] else 'LIVE crop / green candidate mask'
@@ -320,7 +322,7 @@ class DetectionLab:
             self.movement_scope_picker.pack(fill="x",before=self.scope)
             kind="pupil" if self.calibration_tabs.select()==str(self.pupil_tab) else "tongue" if self.calibration_tabs.select()==str(self.tongue_tab) else "head_x" if self.calibration_tabs.select()==str(self.head_x_tab) else "head"
             draw_position(self.eye_scope,state,kind)
-            if self.movement_scope_mode.get()=="Calibrated positions":draw_calibrated_scope(self.scope,state)
+            if self.movement_scope_mode.get()=="Normalized positions":draw_calibrated_scope(self.scope,state)
             elif kind=="pupil":draw_pupil_scope(self.scope,state)
             else:draw_raw_scopes(self.scope,state)
         self.after_id=self.root.after(100,self.tick)

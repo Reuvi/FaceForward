@@ -143,7 +143,7 @@ class PipelineTests(unittest.TestCase):
             self.lab.settings({"runtime": {"source": "mock"}})
 
     @unittest.skipUnless(all(importlib.util.find_spec(n) for n in ("cv2", "numpy")), "Install Vision requirements for camera adapter")
-    def test_camera_adapter_exposes_raw_ratios_without_fabricated_controls(self):
+    def test_camera_adapter_exposes_raw_ratios_and_direct_pupils(self):
         clock = self.clock
         from Vision.demo_detection import demo_image
         image, observations = demo_image()
@@ -163,7 +163,11 @@ class PipelineTests(unittest.TestCase):
             self.session._camera(0, "stub-model", 30, False, 1)
         state = self.session.state()
         self.assertEqual(state["observations"]["single-user"]["eyes"]["left"]["openness"], 0.24)
-        self.assertTrue(all(not item["valid"] for item in state["frame"]["faces"][0]["signals"].values()))
+        values = state["frame"]["faces"][0]["signals"]
+        for key in ("gaze_x", "gaze_y"):
+            self.assertTrue(values[key]["valid"])
+            self.assertAlmostEqual(values[key]["value"], .5)
+        self.assertTrue(all(not item["valid"] for key, item in values.items() if key not in ("gaze_x", "gaze_y")))
 
 
 class LifecycleTests(unittest.TestCase):

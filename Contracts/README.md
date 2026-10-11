@@ -1,5 +1,7 @@
 # Shared contracts — initial v1
 
+[DIRECT_PUPILS.md](DIRECT_PUPILS.md) replaces learned pupil ranges with direct MediaPipe iris normalization and detector presets v8.
+
 [HEAD_HORIZONTAL.md](HEAD_HORIZONTAL.md) activates calibrated head_x from yaw,
 with an independent guide and detector preset v7. Vertical pitch is unchanged.
 

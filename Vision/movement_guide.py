@@ -43,8 +43,8 @@ def validate_range(value, config, *, bounds=(-.8, .8), separation=None, label="T
 
 class MovementGuide:
     def __init__(self, kind, config, *, existing=None):
-        if kind not in ("head", "head_x", "tongue", "pupil"):
-            raise ValueError("Movement guide must be head, head_x, tongue or pupil")
+        if kind not in ("head", "head_x", "tongue"):
+            raise ValueError("Movement guide must be head, head_x or tongue")
         self.kind, self.config = kind, config
         self.label = "Head X" if kind == "head_x" else kind.title()
         targets = HEAD_TARGETS if kind == "head" else HEAD_X_TARGETS if kind == "head_x" else TONGUE_TARGETS
@@ -172,12 +172,11 @@ class MovementGuide:
                         [v[index] for v in self.groups[name]]
                         for name in (low, "center", high)
                     ),
-                    min_separation=.015 if self.kind == "pupil" else c.tongue_position_separation,
+                    min_separation=c.tongue_position_separation,
                 )
                 self.fits[key] = replace(fit, endpoint_tolerance=c.endpoint_tolerance)
             validate_range({key: asdict(fit) for key, fit in self.fits.items()}, c,
-                           bounds=(-.5,.5) if self.kind == "pupil" else (-.8,.8),
-                           separation=.015 if self.kind == "pupil" else None, label=self.kind.title())
+                           bounds=(-.8,.8), label=self.kind.title())
 
     def _finish(self):
         role, name, target = self.steps[self.index]
@@ -288,8 +287,6 @@ class MovementGuide:
                 if name == "neutral"
                 else f"{movement} {name.upper()} to a comfortable limit"
             )
-        elif self.kind == "pupil":
-            instruction = f"Look {name.upper()} with your eyes, keeping your head comfortably still. Both eyes open; use comfortable directions, not forced extremes."
         else:
             instruction = (
                 "Show your tongue at its comfortable CENTER"

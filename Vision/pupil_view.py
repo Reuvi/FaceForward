@@ -1,73 +1,50 @@
-"""Temporary native full-screen pupil target, sharing the existing capture guide."""
+"""Live direct pupil direction controls; no calibration wizard or popup."""
 import tkinter as tk
-from .movement_view import MovementPanel
+from tkinter import ttk
 
 
-class PupilPanel(MovementPanel):
+class PupilPanel:
     def __init__(self, parent, root, call):
-        super().__init__(parent, root, call, "pupil")
-        self.window = self.canvas = None
-        self.root_space_binding = self.root_escape_binding = None
-        self.focus_pending = None
+        self.call = call
+        self.frame = ttk.Frame(parent)
+        self.frame.pack(fill="x", pady=8)
+        self.values = [tk.StringVar(value="1.0"), tk.StringVar(value="1.0")]
+        self.applied = None
+        self.message = tk.StringVar(value="Direct MediaPipe tracking · no calibration required")
+        ttk.Label(self.frame, textvariable=self.message, wraplength=420).pack(anchor="w")
+        self.inputs = []
+        for title, value in zip(("Horizontal sensitivity", "Vertical sensitivity"), self.values):
+            row = ttk.Frame(self.frame)
+            row.pack(fill="x", pady=5)
+            ttk.Label(row, text=title).pack(side="left")
+            control = ttk.Spinbox(row, from_=.25, to=4, increment=.25, textvariable=value, width=7)
+            control.pack(side="right")
+            self.inputs.append(control)
+        ttk.Label(self.frame, text="Higher sensitivity reaches the edges with less eye movement. Range: 0.25–4. Both start at 1.", wraplength=420).pack(anchor="w", pady=5)
+        self.apply_button = ttk.Button(self.frame, text="Apply pupil sensitivity", command=self.apply)
+        self.apply_button.pack(fill="x", pady=3)
+        self.reset_button = ttk.Button(self.frame, text="Restore default sensitivity", command=lambda: call("set_pupil_sensitivity", 1., 1.))
+        self.reset_button.pack(fill="x", pady=3)
+
+    def apply(self):
+        try:
+            values = [float(v.get()) for v in self.values]
+        except (ValueError, tk.TclError):
+            self.message.set("Enter two numbers from 0.25 to 4.")
+            return
+        self.call("set_pupil_sensitivity", *values)
 
     def update(self, state):
-        super().update(state)
-        guide = state.get("movement_guide")
-        active = guide and guide["kind"] == "pupil" and guide["active"]
-        if not active:
-            self.close_window()
-            return
-        if self.window is None:
-            self.window = tk.Toplevel(self.root)
-            self.window.title("Pupil joystick calibration")
-            self.window.attributes("-fullscreen", True)
-            self.window.configure(bg="#101c29")
-            self.canvas = tk.Canvas(self.window, bg="#101c29", highlightthickness=0)
-            self.canvas.pack(fill="both", expand=True)
-            self.window.bind("<Escape>", lambda e: self.call("cancel"))
-            self.window.bind("<space>", lambda e: self.capture_pose())
-            self.window.protocol("WM_DELETE_WINDOW", lambda: self.call("cancel"))
-            # On macOS fullscreen can leave keyboard focus on the parent toplevel.
-            # Bind both, and remove only our temporary parent bindings on close.
-            self.root_space_binding = self.root.bind("<space>", lambda e: self.capture_pose(), add="+")
-            self.root_escape_binding = self.root.bind("<Escape>", lambda e: self.call("cancel"), add="+")
-            self.window.update_idletasks()
-            self.window.lift()
-            self.focus_pending = self.window.after_idle(self.focus_target)
-        c = self.canvas
-        c.delete("all")
-        w, h = max(c.winfo_width(), 400), max(c.winfo_height(), 300)
-        target = guide.get("target") or (.5, .5)
-        x, y = (w*(.12+.76*target[0]), h*(.18+.58*target[1]))
-        resting = guide["phase"] == "rest"
-        c.create_oval(x-18, y-18, x+18, y+18, fill="#526070" if resting else "#55cfff", outline="white", width=2)
-        c.create_text(w/2, 38, text=f"{guide['index']+1}/{guide['total']} · {guide['role'].upper()} · {guide['name'].upper()}", fill="white", font=("Arial",24,"bold"))
-        text = (f"REST {guide['remaining_ms']/1000:.1f}s · relax your eyes" if resting else
-                "Look at the dot. Keep your head still. Press SPACE when ready." if guide["waiting"] else
-                f"{guide['phase'].upper()} {guide['remaining_ms']/1000:.1f}s · keep looking at the dot")
-        c.create_text(w/2, h-100, text=text, fill="#ffe2a6", font=("Arial",22,"bold"), width=w-60)
-        c.create_text(w/2, h-65, text="Tracking: "+state.get("pupil",{}).get("reason","Waiting"), fill="#a8dce9", font=("Arial",13), width=w-60)
-        c.create_text(w/2, h-32, text="Comfortable movement only · Escape cancels · These are joystick directions, not screen-gaze training", fill="white", font=("Arial",14), width=w-60)
-
-    def focus_target(self):
-        self.focus_pending = None
-        if self.window is not None:
-            self.window.focus_force()
-
-    def close_window(self):
-        if self.focus_pending is not None and self.window is not None:
-            self.window.after_cancel(self.focus_pending)
-            self.focus_pending = None
-        if self.root_space_binding:
-            self.root.unbind("<space>", self.root_space_binding)
-            self.root_space_binding = None
-        if self.root_escape_binding:
-            self.root.unbind("<Escape>", self.root_escape_binding)
-            self.root_escape_binding = None
-        if self.window is not None:
-            self.window.destroy()
-            self.window = self.canvas = None
+        options = state["pupil_settings"]
+        pair = tuple(options[k] for k in ("x_sensitivity", "y_sensitivity"))
+        if pair != self.applied:
+            for variable, value in zip(self.values, pair):
+                variable.set(f"{value:g}")
+            self.applied = pair
+            self.message.set("Direct MediaPipe tracking · no calibration required")
+        enabled = "disabled" if state["calibrating"] else "normal"
+        for widget in (*self.inputs, self.apply_button, self.reset_button):
+            widget.configure(state=enabled)
 
     def close(self):
-        self.close_window()
-        super().close()
+        pass

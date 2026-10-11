@@ -1,5 +1,7 @@
 # Face-controlled accessibility interface
 
+Pupils now use [direct MediaPipe direction](docs/DIRECT_PUPIL_TESTING.md) without a pupil calibration guide.
+
 A hackathon prototype for controlling a computer through a consumer webcam and
 comfortable facial movements. The pipeline separates measurement, personalized
 signal processing, and device output so three teammates can develop independently.

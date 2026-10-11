@@ -743,3 +743,22 @@ User requests MediaPipe-only pupil directions without the failing range guide.
 Scope: Vision measurement/normalization/native UI/profile, App command/lifecycle,
 relevant tests, contracts, documentation. Contract: DIRECT_PUPILS.md, committed
 before implementation. Keep other detectors and independent tongue scheduling.
+
+### Direct pupil handoff
+
+- Contract `d8f508c` landed first. Existing MediaPipe iris geometry now feeds fixed
+  eye-width normalization on every usable capture, with no pupil guide, learned
+  range, eye-fit gate or saved head-pose reference. Both open eyes must remain usable.
+- Replaced the full-screen pupil wizard with live raw/normalized readings and
+  horizontal/vertical sensitivity controls. Changing scales stops preview and
+  preserves other detector fits. Unknown graph holds remain display-only.
+- Detector presets v8 store direct sensitivities; old v1–v7 validate completely
+  before loading. Legacy pupil fits are ignored; compatible other fits survive.
+  Direct-pupil-only profiles can save without fitted eye/head/tongue detectors.
+  Combined profiles remain v3; source selection and mouse transfer functions unchanged.
+- Runbook: docs/DIRECT_PUPIL_TESTING.md. Head-pose compensation and measured human
+  accuracy remain outside this change; check those limits with live camera input.
+- Verification: 301 tests pass: 129 Vision (local model smoke checks included),
+  97 integration (native Tk enabled), and 75 Processing. The 490-frame mouse demo
+  accepted all frames, observed all four actions and finished disabled/released.
+  Changed Python passes Ruff F; whitespace and integration scope checks pass.

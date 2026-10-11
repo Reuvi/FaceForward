@@ -70,7 +70,7 @@ class MouseSession:
 
     def detector_command(self, name, *args):
         allowed = {"start_eye_guide", "start_wink_guide", "present_eye_step", "start_movement_guide", "present_movement_step",
-                   "load_tongue_model", "reset_head_x", "reset_pupil", "collect", "cancel", "freeze_mouth", "mark_tongue", "clear_tongue_marks", "fit_tongue", "reset_tongue", "retry_tongue_step", "configure", "reset_calibration"}
+                   "load_tongue_model", "reset_head_x", "set_pupil_sensitivity", "collect", "cancel", "freeze_mouth", "mark_tongue", "clear_tongue_marks", "fit_tongue", "reset_tongue", "retry_tongue_step", "configure", "reset_calibration"}
         if name not in allowed:
             raise ValueError("Unsupported calibration command")
         with self.lock:
@@ -278,7 +278,6 @@ class MouseSession:
                     core.tongue_model = None
                 core.disconnect("Source starting; calibration retained. Waiting for the face.")
                 core.validation.clear()
-                core.pupil_ready = False
                 self.detector_runtime.preview = None
                 self.detector_runtime.preview_due = 0
                 self.detector_runtime.previous_timestamp = None

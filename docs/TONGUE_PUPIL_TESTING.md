@@ -1,8 +1,7 @@
 # Test the new tongue and pupil joysticks
 
 The new [horizontal head guide](HEAD_HORIZONTAL_TESTING.md) is tab **3 Head X**;
-Tongue is now **4 Tongue**, Pupils **5 Pupils**. New detector saves use v7, retaining
-these v6 tongue/pupil fields plus independent yaw. Combined profiles remain v3.
+Tongue is now **4 Tongue**, Pupils **5 Pupils**. New detector saves use v8 with direct pupil settings and independent yaw. Combined profiles remain v3.
 
 Restart the native app to load this update. Head pitch and its calibration are
 unchanged. Load your saved profile to recover eyes/head. Old color tongue ranges
@@ -45,63 +44,33 @@ Camera preview is unmirrored: YOUR right appears toward image left. Position plo
 use YOUR right as positive X. Raw tongue axes are mouth widths, centered between
 the mouth corners, spanning −.8 to +.8; the personal plot is 0–1.
 
-## Pupils: an alternative joystick
+## Pupils: direct MediaPipe direction
 
-1. Open **Detection calibration → 4 Pupils**. Look straight ahead. Check both
-   independent eye readings and the raw dot. Eye open/closed calibration is useful
-   if your natural eye opening varies; wink-action training is not required here.
-2. Press **Start pupil position guide**. A temporary full-screen dot appears.
-   Keep your head comfortably still, look at the dot, and press **Space** when ready.
-   Hold through PREPARE/CAPTURE. Relax during the rest countdown. The guide collects
-   center/left/right/up/down and repeats them as fresh checks. Escape cancels.
-3. The popup closes on completion or failure. **Retry this pose** keeps previous
-   captures after a failed pose. **Reset pupil calibration** clears only pupil fits.
-4. Inspect the raw and personal plots. Center is (.5,.5). Comfortable endpoints are
-   0 or 1, with linear interpolation on each side of center. Raw scopes show each
-   eye separately; camera setup shows the combined raw direction from the same frames.
-5. Blink or wink: pupil control must become unavailable while either eye is closed.
-   It must not jump to a one-eye estimate. Reopening restores current measurements.
-6. Look at a fixed target and turn your head. This is **not** compensated screen-gaze
-   estimation: some movement within the accepted pose range can still change the
-   signal. Larger turns invalidate the calibrated output; return toward the pose
-   used at calibration. Head scrolling and pupil control need this live check.
-
-[MediaPipe’s iris documentation](https://github.com/google-ai-edge/mediapipe/blob/master/docs/solutions/iris.md) distinguishes iris landmarks from where a person looks.
-Our feature is an iris-center proxy for pupil direction, not exact pupil center or screen gaze. We average each four-point iris ring, project onto the eye's
-corner axes, and divide both axes by that eye's width. Raw center X=horizontal−.5;
-Y is downward displacement from the corner midpoint. Both open eyes must pass
-image/geometry gates; their directions must agree within .18 eye widths.
-No independent-eye switching occurs. Without eye geometry fits, openness must be
-at least .16 eye widths; with fits, the eye must classify OPEN. eyeBlink must be
-below .4. Iris radius must be .025–.25 eye widths. These are experimental gates.
-
-Pupil range fitting requires at least .015 eye-width separation on either side of
-center, stable nonoverlapping groups, ≥80% usable captures, then ≥90% of fresh
-check samples within .2 normalized units of the target (existing configurable
-position tolerance). Output also requires head pose within yaw/pitch ±18° and
-roll ±25° of the calibration pose. These gates reject unsupported observations;
-they are not head-pose compensation or validated population limits.
+Pupils now work without a calibration guide or saved head pose. Open **5 Pupils**,
+inspect the raw and normalized readings, and optionally adjust the two sensitivity
+scales. See [direct pupil testing](DIRECT_PUPIL_TESTING.md) for steps, math and limits.
+This supersedes the earlier full-screen pupil range guide.
 
 ## Use either input in the mouse preview
 
 On **Vision source & raw signals**, choose **Pointer joystick input → Tongue tip**
-or **Pupil direction**. Changing it stops preview. Calibrate the chosen detector,
-then press **Start preview** and open **Live lab**. This uses the existing mouse
+or **Pupil direction**. Changing it stops preview. Tongue requires its position guide; pupils are direct.
+Then press **Start preview** and open **Live lab**. This uses the existing mouse
 velocity/dead-zone/smoothing settings. Center means no commanded motion; increasing
 distance means more commanded motion. Left/right eye click inputs and head scroll
 keep their existing mappings. No actual OS cursor injection is added here.
 
-Save with **Save active profile**. Detector v6 stores the segmentation model hash,
-tongue/pupil fits and pupil head reference; it stores no camera images. Old v1–v5
-files remain validated/readable and compatible eye/head fits survive. Restoring a
-pupil or neural tongue range requires its **Recheck saved … range** before output.
-Profiles retain the selected pointer source. A source restart also requires fresh
-range checks. Brief face loss preserves fits, stops output, and never auto-arms.
+Save with **Save active profile**. Detector v8 stores tongue model identity/range,
+independent head fits, eye/wink fits and direct pupil sensitivities. Old v1–v7
+files remain validated/readable; compatible other fits survive and old pupil
+fits are discarded. Only tongue requires fresh range checks after load/restart.
+Profiles retain the selected pointer source. Brief face loss preserves fits,
+stops output, and never auto-arms.
 
 Every capture has its original timestamp and fresh measurements. Unknown numeric
 pupil/tongue observations remain null/invalid; plots hold the last height in darker
 colors only for display. CSV exports include per-eye raw pupils, combined raw
-pupils, calibrated gaze, tongue mask score/timing and validity. Eye-input numeric
+pupils, direct normalized gaze, tongue mask score/timing and validity. Eye-input numeric
 holds retain their separate established semantics.
 
 ## What to record during the live test
