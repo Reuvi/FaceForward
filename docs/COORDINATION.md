@@ -763,11 +763,11 @@ before implementation. Keep other detectors and independent tongue scheduling.
   accepted all frames, observed all four actions and finished disabled/released.
   Changed Python passes Ruff F; whitespace and integration scope checks pass.
 
-## Lip-boundary tongue + direct head X — active
+## Lip-boundary tongue + Head X reliability — active
 
-Reuvi integration, branch `work/reuvi/integration/lip-boundary-direct-yaw`, base
-`06a9e80`. User requests color extension beyond tracked lips and direct raw-yaw
-normalization without a Head X guide. Scope: Vision features/crop/backend/worker,
+Reuvi integration, branch `work/reuvi/integration/lip-boundary-head-reliability`, base
+`06a9e80`. User requests color extension beyond tracked lips and better Head X reliability. Latest
+clarification keeps Head X calibration; the proposed direct-yaw change is cancelled. Scope: Vision features/crop/backend/worker,
 calibration UI/profile/lifecycle; App wiring; relevant tests, contracts and docs.
-Contract: LIP_BOUNDARY_DIRECT_YAW.md, committed before implementation. Preserve
+Contract: LIP_BOUNDARY_HEAD_RELIABILITY.md, committed before implementation. Preserve
 working head Y, eye/wink behavior, direct pupils and independent tongue scheduling.

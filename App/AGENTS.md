@@ -87,10 +87,12 @@ usable capture. No pupil guide or calibrated pose/eye gate. New detector presets
 are v8 with sensitivity settings; fully validate then discard legacy pupil fits.
 Combined profiles remain v3; all other detector calibration remains independent.
 
-## Lip boundary and direct yaw update
+## Lip boundary and head X reliability update
 
-Read Contracts/LIP_BOUNDARY_DIRECT_YAW.md relative to the repository root. Head X
-now normalizes raw yaw without calibration; Head Y keeps its fit. Camera tongue
-defaults to an experimental local color extension outside MediaPipe's outer lips,
-in the independent worker; ONNX remains an explicit option. Presets v9 validate
-and migrate older files, preserving compatible other fits. Combined files stay v3.
+Read Contracts/LIP_BOUNDARY_HEAD_RELIABILITY.md relative to the repository root.
+The user reversed the proposed no-calibration Head X change: keep its guide and
+fit, saturate valid measurements past endpoints, and retain a working fit across
+failed retries. Head Y stays unchanged. Camera tongue defaults to an experimental
+local color extension outside MediaPipe's outer lips, in the independent worker;
+ONNX remains an explicit option. Presets v9 validate/migrate older files, preserving
+compatible other fits. Combined files stay v3.

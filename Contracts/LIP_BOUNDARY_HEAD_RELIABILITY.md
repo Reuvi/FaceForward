@@ -1,19 +1,23 @@
-# Lip-boundary tongue candidate and direct head yaw
+# Lip-boundary tongue candidate and reliable calibrated head yaw
 
 Reuvi requests two changes after DIRECT_PUPILS.md: infer tongue direction from
-color extending beyond MediaPipe's lip outline, and use raw head X without a guide.
+color extending beyond MediaPipe's lip outline, and improve Head X dropouts while retaining calibration (latest clarification).
 Head Y and eye/wink calibration stay unchanged. Keep native local execution and
 independent bounded tongue scheduling from ASYNC_DETECTION.md.
 
-## Direct head X
+## Calibrated head X reliability
 
-Reuse yaw degrees from the current face transformation. Emit the existing head_x
-slot immediately on every usable capture: clip(.5 + yaw / (2 * half_range), 0, 1).
-Default half_range is 30 degrees; allow 5–90 with a direct native scale control.
-Raw zero maps to .5, negative yaw toward 0, positive yaw toward 1. No trained
-neutral/endpoints, guide, recheck or old fit may gate this channel. Head Y retains
-its personal pitch fit. Unavailable pose/image quality remains invalid; graph
-holds stay display-only. Scale changes disarm preview and preserve other fits.
+Keep independent neutral/left/right calibration, raw degrees and learned 0/.5/1
+mapping. Going beyond a learned endpoint is saturation at 0 or 1, not loss of
+tracking. Apply saturation only after valid current yaw/image evidence; actual
+face loss, missing pose or failed image quality remains invalid. Never fabricate
+a current sample from a display hold. Head Y behavior is unchanged.
+
+Keep the last completed horizontal fit while retrying its guide. Only a successful
+new guide replaces it; cancelling, failing or losing the face during a retry must
+not destroy a working fit. Explicit Reset Head X still clears it. Output is stopped
+during calibration. Explain saturation separately from actual tracking failure in
+the live readings and trace, so a user can identify which source is dropping.
 
 ## Lip-boundary tongue candidate
 
@@ -41,14 +45,14 @@ clears only its old range/validation. Other completed fits survive.
 
 ## Persistence
 
-Detector preset v9 (`lip-boundary-direct-yaw-v9`) replaces head_x fit with direct
-settings `{measurement: mediapipe_yaw_v2, half_range_degrees: 30}`; nullable head
-still stores vertical pitch. Pupil direct settings remain unchanged. Tongue may
-identify built-in `{backend: lip-boundary, algorithm: lip-color-extension-v1}` or
-the pinned existing ONNX backend, or legacy developer color prototypes.
+Detector preset v9 (`lip-boundary-head-reliability-v9`) retains the existing
+independent head_x fit and direct pupil settings. Tongue may identify built-in
+`{backend: lip-boundary, algorithm: lip-color-extension-v1}` or the pinned existing
+ONNX backend, or legacy developer color prototypes.
 
-Fully validate v1–v8 before state mutation; ignore legacy horizontal fits in favor
-of direct yaw. Legacy ONNX profiles migrate to the new built-in tongue backend
-and discard incompatible tongue ranges. Preserve compatible other fits/settings.
-New v9 files restore their explicit backend; tongue ranges still need fresh checks.
+Fully validate v1–v8 before state mutation, retaining compatible eye/head/pupil
+calibration. Legacy ONNX profiles migrate to the new built-in tongue backend and
+discard incompatible tongue ranges. New v9 files restore their explicit backend;
+tongue ranges still need fresh checks. Calibrated head_x now saturates past trained
+limits when the raw observation remains usable.
 Combined profile v3 and mouse mappings/Drivers remain unchanged.
