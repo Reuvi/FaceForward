@@ -9,6 +9,10 @@ positive click can be retried. Show the actual clicked patches on the frozen ima
 not a fixed center marker. Numbered instructions and prerequisite-aware controls
 guide background → tongue photo/marks → appearance fit/inspection → position guide.
 No segmentation or coordinate algorithm changes are implied by this UI update.
+Tongue position capture is user-paced: after each rest, instructions remain visible
+until **I'm in position — capture** acknowledges that pose. Failure offers retry
+of that pose, retaining preceding successful groups and the appearance model;
+only a fully checked range enables normalized output. Head guidance is unchanged.
 
 Authorized integration task: Reuvi, base `0123b8d`, branch
 `work/reuvi/integration/tongue-tip`. Keep native local Python and the existing color
