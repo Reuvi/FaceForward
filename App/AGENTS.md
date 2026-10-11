@@ -86,3 +86,11 @@ pupil fitting/rechecks above: normalize MediaPipe iris direction directly on eve
 usable capture. No pupil guide or calibrated pose/eye gate. New detector presets
 are v8 with sensitivity settings; fully validate then discard legacy pupil fits.
 Combined profiles remain v3; all other detector calibration remains independent.
+
+## Lip boundary and direct yaw update
+
+Read Contracts/LIP_BOUNDARY_DIRECT_YAW.md relative to the repository root. Head X
+now normalizes raw yaw without calibration; Head Y keeps its fit. Camera tongue
+defaults to an experimental local color extension outside MediaPipe's outer lips,
+in the independent worker; ONNX remains an explicit option. Presets v9 validate
+and migrate older files, preserving compatible other fits. Combined files stay v3.

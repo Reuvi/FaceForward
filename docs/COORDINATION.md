@@ -762,3 +762,12 @@ before implementation. Keep other detectors and independent tongue scheduling.
   97 integration (native Tk enabled), and 75 Processing. The 490-frame mouse demo
   accepted all frames, observed all four actions and finished disabled/released.
   Changed Python passes Ruff F; whitespace and integration scope checks pass.
+
+## Lip-boundary tongue + direct head X — active
+
+Reuvi integration, branch `work/reuvi/integration/lip-boundary-direct-yaw`, base
+`06a9e80`. User requests color extension beyond tracked lips and direct raw-yaw
+normalization without a Head X guide. Scope: Vision features/crop/backend/worker,
+calibration UI/profile/lifecycle; App wiring; relevant tests, contracts and docs.
+Contract: LIP_BOUNDARY_DIRECT_YAW.md, committed before implementation. Preserve
+working head Y, eye/wink behavior, direct pupils and independent tongue scheduling.
