@@ -1,5 +1,9 @@
 # Presentation: head pointer, mouth brake and dictation
 
+For the project introduction and first-time installation, start with the
+[README](../README.md). The [final technical overview](TECHNICAL_OVERVIEW.md)
+consolidates architecture, algorithms, interfaces, and verification evidence.
+
 Select **Presentation** on Signals. Existing Mouse test and gaming mappings stay
 available with their previous bindings. Presentation defaults to **plain eye
 open/closed**; wink training is optional. It still needs your saved/calibrated

@@ -1,5 +1,29 @@
 # Main chat and agent coordination hub
 
+## Presentation documentation handoff
+
+- Lane/task/branch: Reuvi integration, presentation README cleanup and one final
+  technical overview, in owned `codex/integration/presentation-wink-fix` from
+  `a51aace`. Main merge/push remains authorized by the user.
+- Changed paths: root README, new `docs/TECHNICAL_OVERVIEW.md`, navigation in the
+  presentation runbook, and this handoff. No runtime or interface changes.
+- Result: the README now introduces the current head pointer, mouth brake,
+  held-left/right-click controls and automatic dictation Return, with installation,
+  demo steps, architecture and build technologies. The technical overview covers
+  timing, algorithms, gestures, speech, persistence, tuning, verification and
+  limits. Obsolete preview-only and pupil-calibration claims were removed from
+  the README; older milestone documents remain explicitly historical.
+- Checks: 30 local links/anchors and seven shell blocks passed before this handoff;
+  App CLI help matches the documented flags. The documented compiled-driver dry
+  run accepted 490/490 captures, emitted 568 relative moves, one left down/up pair
+  and one right-click, then ended disabled with zero held keys and no error.
+  Diff and integration scope checks passed. No live camera/microphone/OS input
+  checks or full unit suites were repeated for this documentation-only task.
+- Handoff: start with the [README](../README.md) for the demo and the
+  [technical overview](TECHNICAL_OVERVIEW.md) for implementation discussion.
+  Prior test totals are attributed to their implementation commits; they are not
+  presented as new human-accuracy evidence. No remaining documentation dependency.
+
 ## Right-click and automatic dictation Return handoff
 
 - Behavior: Presentation right-eye close/reopen now sends one right-click through
