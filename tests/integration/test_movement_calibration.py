@@ -156,6 +156,76 @@ class MovementIntegrationTests(unittest.TestCase):
         self.assertIsNone(calibration["trace"][-1]["tongue_candidate_x"])
         self.assertIsNone(self.runtime.worker)
 
+    def test_tongue_reset_cancels_own_capture_and_guide_without_a_face(self):
+        self.core.eyes["left"] = EyeCalibration(.04,.25,.5)
+        self.assertTrue(self.guide("head").passed)
+        eyes, head = dict(self.core.eyes), self.core.head
+        self.session.detector_command("collect", "tongue_absent")
+        self.feed()
+        self.session.detector_command("reset_tongue")
+        self.assertIsNone(self.core.job)
+        self.assertFalse(self.core.negatives)
+        self.appearance()
+        self.session.detector_command("start_movement_guide", "tongue")
+        self.session.detector_command("reset_tongue")
+        self.assertIsNone(self.core.movement_guide)
+        self.assertIsNone(self.core.tongue_model)
+        self.assertIsNone(self.core.tongue_range)
+        self.assertIsNone(self.core.tongue.xy)
+        self.assertIsNone(self.core.tongue.mask)
+        self.assertFalse(self.core.positives or self.core.negatives or self.core.validation)
+        self.assertEqual(self.core.eyes, eyes)
+        self.assertEqual(self.core.head, head)
+        self.feed(blank=True)
+        self.session.detector_command("reset_tongue")
+        self.assertFalse(self.session.lab.processor.armed)
+
+    def test_bad_tongue_marks_can_be_cleared_while_background_is_kept(self):
+        self.collect("tongue_absent")
+        background = deepcopy(self.core.negatives)
+        self.feed(tongue=True)
+        self.session.detector_command("freeze_mouth")
+        self.session.detector_command("mark_tongue", .5, .6)
+        self.assertEqual(self.core.state()["tongue_marks"], [(.5,.6)])
+        self.session.detector_command("clear_tongue_marks")
+        self.assertEqual(self.core.negatives, background)
+        self.assertFalse(self.core.positives or self.core.tongue_marks)
+        self.session.detector_command("mark_tongue", .5, .6)
+        self.session.detector_command("fit_tongue")
+        self.assertIsNotNone(self.core.tongue_model)
+
+    def test_retry_failed_tongue_pose_preserves_previous_groups_and_appearance(self):
+        self.appearance()
+        model = self.core.tongue_model
+        self.session.detector_command("start_movement_guide", "tongue")
+        guide = self.core.movement_guide
+        def finish(fail=False):
+            for _ in range(250):
+                if not guide.active: return
+                state = guide.state(self.now)
+                if state["waiting"]:
+                    self.session.detector_command("present_movement_step", state["index"], state["phase"], self.core.generation)
+                controls = self.runtime.demo_input()
+                if fail and state["name"] == "right": controls["tongue"] = False
+                self.feed(**controls)
+            self.fail("Guide did not finish")
+        finish(fail=True)
+        self.assertFalse(guide.passed)
+        self.assertEqual(guide.steps[guide.index][1], "right")
+        groups = deepcopy(guide.groups)
+        self.assertEqual(set(groups), {"center", "left"})
+        old_generation = self.core.generation
+        self.session.detector_command("retry_tongue_step")
+        self.assertEqual(guide.groups, groups)
+        self.assertIs(self.core.tongue_model, model)
+        self.assertIsNone(self.core.tongue_range)
+        self.session.detector_command("present_movement_step", guide.index, "prepare", old_generation)
+        self.assertIsNone(guide.start_ms)
+        finish()
+        self.assertTrue(guide.passed, guide.report)
+        self.assertIsNotNone(self.core.tongue_range)
+        self.assertFalse(self.session.lab.processor.armed)
+
     def test_tongue_appearance_is_separate_from_personal_range_and_unknown(self):
         self.appearance()
         frame = self.feed(tongue=True, tongue_x=0.6)

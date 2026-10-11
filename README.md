@@ -125,8 +125,8 @@ CI runs component/integration tests without camera dependencies. The optional
 model test is enabled with `VISION_MODEL_PATH`; see Vision's README. Scope CI
 checks lane ownership separately. Driver files have not been changed by this MVP.
 
-The native app now learns **blinks versus intentional winks inside eye calibration**.
-Separate full-screen guides calibrate eye open/closed geometry and blinks/winks.
+The native app learns **closed-eye actions in a short six-pose wink guide**.
+Separate full-screen guides calibrate eye open/closed geometry and wink actions.
 Retrying the second retains the first. Rest screens show a large countdown and
 the upcoming instruction together. Recognized
 winks produce ON samples while held, with no duration threshold. Detection research

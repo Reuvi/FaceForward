@@ -10,6 +10,44 @@ training, require valid closed-eye geometry for action, retain independent sampl
 Fix reset during tongue capture and clarify all setup steps. Preserve other fits.
 Contracts land first: EYE_INTENT.md and TONGUE_TIP.md.
 
+Implementation handoff:
+
+- Wink action uses six captures (open/left/right to learn, then fresh checks),
+  about 32 seconds at defaults; four captures when only one eye has geometry.
+  Removed natural-blink prompts/counts, repeated attempts and mandatory muscle
+  contrast with blinks. The same small per-eye appearance model learns the action.
+  Valid closed geometry is now required for ON; uncertain geometry cannot be
+  overridden by a positive appearance score. No runtime duration or opposite-eye
+  gate. Existing geometry survives action-guide retries.
+- OFF samples can use `closed`, accepted by the Processing adapter alongside
+  historical `blink`. The new producer never claims to identify a natural blink.
+  Natural blinks may match the learned action. Saved model shapes and profile
+  formats are unchanged; minimum fresh-check counts follow the shorter guide.
+- Tongue position prompts wait for **I'm in position — capture** at every pose.
+  Rest stays timed. Live tip reason is visible beside instructions. **Retry this
+  pose** retains successful groups/appearance and rechecks only the failed pose;
+  a complete passing guide is still required for normalized output.
+- Reset stays visible above scrolling setup, works during tongue capture/guide
+  and without a face, clears stale mask/tip/marks/colors/range/checks, and retains
+  eye/head fits. Unrelated active calibration still blocks it. **Clear tongue
+  marks — keep background** recovers from a bad tissue click. Frozen overlays
+  show actual clicked patches; click coordinates account for image placement.
+  Numbered appearance controls enable as prerequisites are collected and show
+  preparation/capture countdowns. No color segmentation/tip algorithm was replaced.
+- Current instructions: [eye/action guide](EYE_CALIBRATION_GUIDE.md),
+  [movement guide](MOVEMENT_CALIBRATION_GUIDE.md), and
+  [tongue tip testing](TONGUE_TIP_TESTING.md). Actual camera accuracy remains to
+  be tested by the user; synthetic checks are software evidence.
+
+Validation: **253 unique tests passed**: 110 Vision (local-model smoke run
+separately), 73 integration (21 calibration, 14 movement, 10 native calibration
+window, 28 remaining) and 70 Processing. Native tests cover pause-before-capture,
+visible reset, failed-pose retry, actual marks/clear, button prerequisites and
+unchanged eye geometry. The headless 490-frame mouse demo accepted every frame,
+observed left/right/pointer/scroll and released at EOF. Changed Python files pass
+Ruff F checks; whitespace and integration scope checks pass against `8f13166`.
+Contracts landed first in `1bd209a` and `ad62462`.
+
 ## Previous head pitch range handoff (8f13166)
 
 Claim: Reuvi integration, `work/reuvi/integration/head-pitch-range`, base

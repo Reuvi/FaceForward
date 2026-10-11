@@ -1,39 +1,19 @@
-"""Separately started geometry and blink/wink guides with shared capture timing."""
+"""Separate geometry and short open/closed-action guides, timed by capture."""
 
 from .guided_eyes import GuidedEyes
 from .wink_model import fit, check
 
 
 def prompts():
-    result = []
-    for role, attempts in (("train", 3), ("check", 2)):
-        result.extend(
-            (
-                (
-                    role,
-                    "blinks",
-                    "Blink gently several times, as you normally would",
-                    6,
-                ),
-                (
-                    role,
-                    "relaxed",
-                    "Keep eyes relaxed; smile, talk and look slightly around",
-                    2,
-                ),
-            )
+    return tuple(
+        (role, kind, instruction, 1)
+        for role in ("train", "check")
+        for kind, instruction in (
+            ("relaxed", "Keep both eyes comfortably OPEN; look at the dot"),
+            ("left", "Close your LEFT eye with your usual wink movement; hold until the rest tone"),
+            ("right", "Close your RIGHT eye with your usual wink movement; hold until the rest tone"),
         )
-        for attempt in range(attempts):
-            for side in ("left", "right"):
-                result.append(
-                    (
-                        role,
-                        side,
-                        f"Wink your {side.upper()} eye once, then reopen naturally ({attempt + 1}/{attempts})",
-                        1.6,
-                    )
-                )
-    return tuple(result)
+    )
 
 
 PROMPTS = prompts()
@@ -42,12 +22,13 @@ PROMPTS = prompts()
 class EyeCalibrationFlow:
     def __init__(self, config, *, eyes=None):
         if eyes is not None and not eyes:
-            raise ValueError("Complete eye open/closed calibration before blinks and winks")
+            raise ValueError("Complete eye open/closed calibration before wink actions")
         self.config = config
         self.kind = "geometry" if eyes is None else "winks"
         self.geometry = GuidedEyes(config) if eyes is None else None
         self.calibrated_eyes = dict(eyes or {})
         self.wink_index = None if eyes is None else 0
+        self.prompts = tuple(p for p in PROMPTS if p[1] == "relaxed" or p[1] in self.calibrated_eyes)
         self.active = True
         self.start_ms = self.rest_end_ms = self.last_timestamp = None
         self.resting = False
@@ -61,8 +42,6 @@ class EyeCalibrationFlow:
         self.values = {s: [] for s in ("left", "right")}
         self.rejected = {s: 0 for s in self.values}
         self.seen = {s: 0 for s in self.values}
-        self.closures = {s: 0 for s in self.values}
-        self.was_closed = {s: None for s in self.values}
 
     @property
     def fits(self):
@@ -84,12 +63,12 @@ class EyeCalibrationFlow:
     def step(self):
         if self.wink_index is None:
             return self.geometry.step
-        role, kind, instruction, _ = PROMPTS[self.wink_index]
+        role, kind, instruction, _ = self.prompts[self.wink_index]
         return (kind, instruction, (0.5, 0.5))
 
     @property
     def collecting_ms(self):
-        return self.config.collect_ms * PROMPTS[self.wink_index][3]
+        return self.config.collect_ms * self.prompts[self.wink_index][3]
 
     def present(self, index, now, phase=None):
         if self.wink_index is None:
@@ -112,7 +91,7 @@ class EyeCalibrationFlow:
                 self.active = False
                 self.report = self.geometry.report
                 if self.fits:
-                    self.report += " · Eye open/closed ready. Start Blinks & winks when ready."
+                    self.report += " · Eye open/closed ready. Start Wink action when ready."
             return
         if not self.active:
             return
@@ -132,39 +111,35 @@ class EyeCalibrationFlow:
         if t >= self.start_ms + self.collecting_ms:
             self._finish_window()
             return
-        role, kind, _, _ = PROMPTS[self.wink_index]
+        role, kind, _, _ = self.prompts[self.wink_index]
         for side, geometry in self.fits.items():
-            if kind not in (side, "blinks", "relaxed"):
+            if kind not in (side, "relaxed"):
                 continue
             self.seen[side] += 1
             vector = vectors.get(side)
             feature = features.get(side)
             if vector is None or feature is None or feature.quality <= 0:
                 self.rejected[side] += 1
-                self.was_closed[side] = None
                 continue
-            closed = feature.value < (geometry.closed + geometry.opened) / 2
-            if closed and self.was_closed[side] is False:
-                self.closures[side] += 1
-            self.was_closed[side] = closed
-            # Natural blink/wink labels describe closed portions only. They never
-            # label the open time surrounding an attempt as an intentional wink.
-            if (closed or kind == "relaxed") and len(self.values[side]) < 512:
+            observed = geometry.classify(feature.value, feature.quality)
+            # Prompt labels apply only to the measured open/closed state. Starting
+            # a hold during preparation is fine; only capture frames can train.
+            wanted = 1 if kind == "relaxed" else 0
+            if observed["valid"] and observed["value"] == wanted and len(self.values[side]) < 512:
                 self.values[side].append(vector)
 
     def _finish_window(self):
-        role, kind, _, _ = PROMPTS[self.wink_index]
+        role, kind, _, _ = self.prompts[self.wink_index]
         self.windows.append(
             dict(
                 role=role,
                 kind=kind,
                 values=self.values,
-                closures=self.closures,
                 rejected=self.rejected,
                 seen=self.seen,
             )
         )
-        if self.wink_index == len(PROMPTS) - 1:
+        if self.wink_index == len(self.prompts) - 1:
             self.active = False
             self._fit()
         else:
@@ -184,30 +159,20 @@ class EyeCalibrationFlow:
                         w["seen"][side] == 0
                         or w["rejected"][side] > 0.2 * w["seen"][side]
                         for w in windows
-                        if w["kind"] in (side, "blinks", "relaxed")
+                        if w["kind"] in (side, "relaxed")
                     ):
                         raise ValueError(
                             f"Too many missing {role} facial measurements; retry with a clear camera view"
                         )
-                    blink = next(w for w in windows if w["kind"] == "blinks")
-                    needed = 3 if role == "train" else 2
-                    if (
-                        blink["closures"][side] < needed
-                        or len(blink["values"][side]) < 6
-                    ):
-                        raise ValueError(
-                            f"Too few {role} blinks; blink gently several times after the capture tone"
-                        )
+                    relevant = [w for w in windows if w["kind"] in (side, "relaxed")]
+                    if any(len(w["values"][side]) < self.config.min_samples for w in relevant):
+                        raise ValueError(f"Too few clear {role} open/closed action frames; follow the named eye prompt")
                     positive = [w for w in windows if w["kind"] == side]
-                    if any(w["closures"][side] < 1 for w in positive):
-                        raise ValueError(
-                            f"A {role} wink attempt needs visible open → wink samples; retry"
-                        )
                     sets[role] = (
                         [
                             w["values"][side]
                             for w in windows
-                            if w["kind"] in ("blinks", "relaxed")
+                            if w["kind"] == "relaxed"
                         ],
                         [w["values"][side] for w in positive],
                     )
@@ -233,7 +198,7 @@ class EyeCalibrationFlow:
                 report=self.report if not self.active else state["report"],
             )
             return state
-        role, kind, instruction, _ = PROMPTS[self.wink_index]
+        role, kind, instruction, _ = self.prompts[self.wink_index]
         waiting = self.rest_end_ms is None if self.resting else self.start_ms is None
         preparing = self.resting or self.start_ms is None or now < self.start_ms
         remaining = (
@@ -259,7 +224,7 @@ class EyeCalibrationFlow:
         return dict(
             active=self.active,
             index=self.index,
-            total=len(PROMPTS),
+            total=len(self.prompts),
             kind=self.kind,
             name=kind,
             instruction="Rest your eyes — no training samples"
@@ -281,6 +246,6 @@ class EyeCalibrationFlow:
             errors=dict(self.errors),
             report=self.report,
             passed=len(self.models) if not self.active else 0,
-            stage="Learn blink/wink" if role == "train" else "Check on new movements",
+            stage="Learn wink action" if role == "train" else "Check on new movements",
             wink_training=True,
         )

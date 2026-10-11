@@ -50,17 +50,20 @@ The requested FPS takes effect on source start; actual Hz and capture age are sh
    assumes one operator; it does not identify people.
 2. Open **Detection calibration → 1 Eyes**, set rest time, and try **Test sound**.
    Press **Start eye open/closed** for the seven geometry steps (about 40 seconds).
-   When it returns to the lab, press **Start blinks & winks** for fourteen separate
-   appearance/check steps (about two minutes). The rest screen shows a large
-   countdown and the next instruction. **Restart blinks & winks** keeps eye
+   When it returns to the lab, press **Start wink action** for six short
+   open/left/right learning/check poses (about 32 seconds). The rest screen shows a large
+   countdown and the next instruction. **Restart wink action** keeps eye
    geometry; **Restart eye open/closed** clears geometry and its dependent wink
    models. Head/tongue fits remain. Follow [the eye testing guide](../docs/EYE_CALIBRATION_GUIDE.md).
 3. In **2 Head Y**, press **Start head pitch guide**. Follow neutral/up/down and a
-   separate repeat for checking. The selector resets only head calibration.
+   separate repeat for checking. Starting its guide resets only head calibration.
 4. In **3 Tongue**, capture an EMPTY open mouth, freeze a visible tongue, click
    tongue-only tissue, and fit appearance. Then **Start tongue position guide**:
    tongue absent, center/left/right/up/down training, and fresh position checks.
-   Both appearance and personal range are required for valid tongue output.
+   Each pose waits for **I'm in position — capture**. **Retry this pose** keeps
+   earlier captures; **Reset tongue — start over** stays at the top and works
+   during tongue collection. **Clear tongue marks — keep background** fixes bad
+   positive clicks. Both appearance and personal range are required for valid output.
 5. On **Vision source & raw signals**, the default **Raw measurements** panel and
    graphs show detector units before calibration. **Calibrated signals** shows
    personal positions. Both tabs use the same captured samples as calibration.
@@ -82,13 +85,13 @@ value stay blank; source/subject resets start a new history.
 
 The preview is unmirrored: your left eye appears on the image's right. Both eye
 classifiers stay independent. A recognized wink is ON while held and OFF on
-reopening; recognized natural blinks stay OFF. There is no duration gate or release
+reopening. Natural blinks are no longer a separate class and may match the action. There is no duration gate or release
 delay in the calibrated camera path. Following arming or unknown, an actual open
 eye is required before that eye can activate. Both intentional winks can activate.
 
 | Channel | Detector measurement | Processing result |
 | --- | --- | --- |
-| Left/right eye | Anatomical `*_eye_open` unchanged; added `eye_intent` from independent calibrated facial appearance | Per-frame wink states: 1 while held, 0 for open/blink; no dwell |
+| Left/right eye | Anatomical `*_eye_open` unchanged; added `eye_intent` from independent calibrated facial appearance | Per-frame wink states: 1 while held, 0 for open/supported closed non-action; no dwell |
 | Head Y | Pitch degrees → full personal `[0,1]` range: comfortable up 0, neutral .5, down 1; no mode selector | Smoothed scroll velocity; .5 means stopped |
 | Tongue X/Y | Visible front-edge midpoint → personal movement range; center .5, X toward anatomical right, Y down | Relative pointer velocity; .5 means stopped per output axis |
 
@@ -101,7 +104,7 @@ in [the detector runbook](../Vision/DETECTION_LAB.md). Transfer functions are in
 
 ### Camera-free calibration exercise
 
-In `detector-demo`, run **Start eye open/closed** and then **Start blinks & winks**
+In `detector-demo`, run **Start eye open/closed** and then **Start wink action**
 in Detection calibration. The generated pixels and landmarks follow each stage
 without manual switches. The first stage closes its popup and waits for you to
 start the second. After completion the fixture cycles left, right and both
@@ -225,7 +228,7 @@ See [the adopted contract](../Contracts/MOUSE_MVP.md) and
 ## Current eye workflow
 
 The separate Detection research tab and its per-frame runtime are removed. Useful
-blink/wink learning and checking now live in Detection calibration. Its lower scope
+open/closed-action learning and checking now live in Detection calibration. Its lower scope
 selects wink samples, same-eye facial features or raw eyelid ratios; CSV export
 retains all eight features, model scores and capture timestamps. See the
 [eye testing guide](../docs/EYE_CALIBRATION_GUIDE.md) and

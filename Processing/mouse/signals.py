@@ -138,7 +138,7 @@ def decode(frame, config, subject_id):
             if not isinstance(item,dict) or set(item)!={"value","known","state"} or type(item["known"]) is not bool:
                 raise ValueError("Invalid wink sample")
             valid = (item["known"] and finite(item["value"]) and item["value"] in (0,1)
-                     and item["state"] in (("wink",) if item["value"] else ("open","blink")))
+                     and item["state"] in (("wink",) if item["value"] else ("open","closed","blink")))
             unknown = not item["known"] and item["value"] is None and item["state"]=="unknown"
             if not (valid or unknown):raise ValueError("Inconsistent wink sample")
             bits.append(bool(item["value"]) if valid else None)

@@ -129,7 +129,7 @@ class UnifiedCalibrationTests(unittest.TestCase):
         for sample in (self.lab.processor.eye_sample,):
             self.assertEqual(sample['left'],{'value':0.,'known':False})
 
-    def test_failed_blink_training_retries_without_changing_other_calibration(self):
+    def test_failed_action_training_retries_without_changing_other_calibration(self):
         self.calibrate()
         eyes = dict(self.core.eyes)
         head, tongue = self.core.head, self.core.tongue_model
@@ -140,16 +140,16 @@ class UnifiedCalibrationTests(unittest.TestCase):
         self.assertFalse(self.lab.processor.armed)
         self.assertIsNone(self.lab.processor.eye_sample)
         self.assertFalse(self.core.winks)
-        # Incorrect blink capture: never actually close either eye.
+        # Incorrect action capture: never actually close either eye.
         self.finish_eye_guide(left_closed=False, right_closed=False, natural_blink=False)
         self.assertFalse(self.core.winks)
-        self.assertIn("Too few train blinks", self.core.notice)
+        self.assertIn("Too few clear train open/closed action frames", self.core.notice)
         self.assertEqual(self.core.eyes, eyes)
         self.assertIs(self.core.head, head)
         self.assertIs(self.core.tongue_model, tongue)
         self.assertEqual(self.core.tongue_range, tongue_range)
         self.session.detector_command("start_wink_guide")
-        self.assertEqual(self.core.eye_guide.state(self.now)["total"], 14)
+        self.assertEqual(self.core.eye_guide.state(self.now)["total"], 6)
         self.finish_eye_guide()
         self.assertEqual(set(self.core.winks), {"left", "right"}, self.core.notice)
         self.assertEqual(self.core.eyes, eyes)
@@ -264,6 +264,19 @@ class UnifiedCalibrationTests(unittest.TestCase):
             self.assertFalse(fresh.detector_runtime.workbench.eyes)
             self.assertFalse(fresh.state()["profile_bound"])
 
+    def test_action_appearance_cannot_override_uncertain_or_open_eye_geometry(self):
+        from Vision.calibration import EyeCalibration
+        self.core.eyes["left"] = EyeCalibration(.04,.25,.5,closed_limit=.06,open_limit=.14)
+        self.core.winks["left"] = {"report": {}}
+        with patch("Vision.workbench.wink_score", return_value=.99), patch("Vision.workbench.classify_wink", return_value=1):
+            self.feed(left_ratio=.09)
+            self.assertFalse(self.core.frame["eye_intent"]["left"]["known"])
+            self.assertIsNone(self.core.frame["eye_intent"]["left"]["value"])
+            self.feed(left_ratio=.04)
+            self.assertEqual(self.core.frame["eye_intent"]["left"]["value"], 1)
+            self.feed(left_ratio=.25)
+            self.assertEqual(self.core.frame["eye_intent"]["left"], dict(value=0,known=True,state="open"))
+
     def test_guided_pixels_independence_unknown_and_profile_roundtrip(self):
         self.guided_eyes()
         self.assertEqual(set(self.core.eyes),{"left","right"})
@@ -275,10 +288,10 @@ class UnifiedCalibrationTests(unittest.TestCase):
         self.feed(left_ratio=.5)
         self.assertEqual(self.core.frame["faces"][0]["signals"]["left_eye_open"]["value"],1)
         self.lab.action({"action":"arm"});self.hold()
-        # Identical eyelid closure geometry: supporting features distinguish the
-        # natural blink from a wink, with no duration delay in either direction.
-        result=self.hold(count=50,natural_blink=True)
-        self.assertEqual((result["left_click"],result["right_click"]),(0,0))
+        # Blinks are not a distinct class. Every capture still yields an action
+        # sample, with no imposed duration delay or opposite-eye gate.
+        self.hold(count=5,natural_blink=True)
+        self.assertNotIn("blink", [self.core.frame["eye_intent"][s]["state"] for s in ("left", "right")])
         self.feed()
         self.assertEqual(self.feed(left_closed=True)["left_click"],1)
         self.assertEqual(self.feed()["left_click"],0)

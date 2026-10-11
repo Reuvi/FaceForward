@@ -26,12 +26,12 @@ the same samples across tabs. The simulated mouse remains downstream.
    their inner-mouth centroid measurements cannot be reused for the tip.
 2. Open **Detection calibration → 3 Tongue**. Frame your face so the whole tongue
    and surrounding lips/chin fit in the camera image. Open your mouth with the
-   tongue hidden. Press **Capture EMPTY open mouth** and hold for the capture.
+   tongue hidden. Press **Capture background — tongue hidden** and hold for the capture.
    The larger crop now learns lips, surrounding skin, teeth and mouth interior
    as negative examples.
-3. Show the tongue with its front end visible. Press **Freeze visible tongue**,
+3. Show the tongue with its front end visible. Press **Freeze / retake tongue photo**,
    then click an interior patch of tongue tissue, away from edges/lips/teeth.
-   Press **Fit appearance model**. The preview returns to live video.
+   Press **Fit and inspect tongue color**. The preview returns to live video.
 4. Inspect the crop before collecting a range. **Green** is the color mask,
    **orange** is the selected front boundary, **cyan** is its middle, and **purple**
    is the central-mouth attachment cue. The cyan point should sit on the front
@@ -46,11 +46,16 @@ the same samples across tabs. The simulated mouse remains downstream.
    New detector presets are v5 inside the same combined v3 profile. Loading or
    restarting requires **Recheck saved tongue range** before valid output.
 
-If a guide fails, its reason identifies the failed step. Short, partly hidden or
+Each pose waits for **I'm in position — capture**; get comfortable first, then
+hold until capture ends. If a guide fails, **Retry this pose** retains earlier
+successful captures and the appearance model. Its reason identifies the failed step. Short, partly hidden or
 ambiguous front ends are intentionally unavailable. Try a comfortable visible
 extension, improve lighting, or recenter the camera. Do not force an uncomfortable
-pose to make the calibration pass. **Reset tongue calibration** affects only
-tongue appearance/range. Changing the entire Settings JSON resets all fits.
+pose to make the calibration pass. **Reset tongue — start over** affects only
+tongue appearance/range, background and marks, and cancels active tongue work.
+The reset button stays at the top. **Clear tongue marks — keep background** lets
+you fix a bad click without recollecting background. Yellow boxes indicate actual
+clicked tissue. Changing the entire Settings JSON resets all fits.
 
 ## What to measure
 

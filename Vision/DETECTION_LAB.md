@@ -61,9 +61,9 @@ or relax your gaze naturally; these frames do not enter calibration. Set **Rest
 between steps (seconds)** before Start/Restart: the default is 3 seconds, with
 0–30 seconds supported (0 skips rest). The setting is saved with the active profile.
 The seven-step geometry guide now finishes and closes its popup (about 40 seconds).
-Press **Start blinks & winks** separately for fourteen appearance/check steps:
-natural blinks and relaxed face, three wink attempts per eye, then fresh checks
-with two new winks per eye (about two minutes). A failed or cancelled second stage
+Press **Start wink action** separately for six short poses: open/left/right to
+learn, then open/left/right to check (about 32 seconds with default rests).
+There are no prompted natural blinks or required transition counts. A failed or cancelled second stage
 keeps the completed geometry. During rest, a large central countdown and the next
 instruction are shown together; wait for capture tones before moving.
 See [current eye calibration instructions](../docs/EYE_CALIBRATION_GUIDE.md) before
@@ -100,11 +100,11 @@ There is no audio recording or speech service. If no reopen sound occurs, open y
 eyes after the displayed duration and inspect the screen; source loss cancels capture.
 
 **Restart eye open/closed** clears geometry and its dependent wink models.
-**Restart blinks & winks** clears only the blink/wink models and training; geometry,
+**Restart wink action** clears only the action models and training; geometry,
 head and tongue fits remain. **Cancel** closes the active popup. Cancelling geometry
 before its reopen check does not make provisional fits available for wink training.
 Leaving the Eyes tab or minimizing cancels an active guide; completed unrelated
-fits survive. Completed eye geometry can be saved before starting blink training.
+fits survive. Completed eye geometry can be saved before starting action training.
 Applying detector Settings or Reset all calibration clears fits. Preview stays
 disarmed during every guided phase. Late prompt acknowledgments from an earlier
 calibration generation cannot start a new guide's timer.
@@ -182,17 +182,17 @@ synthetic control samples. Stopping capture freezes its historical time axis.
 After calibration, look around while keeping eyes open, then test open/open,
 closed/open, open/closed and closed/closed. Both closures classify independently.
 Brief blinks appear as `1` pulses in the anatomical scope. The separate calibrated
-wink classifier uses surrounding facial features to keep recognized natural blinks
-OFF in the wink scope. Processing follows this per-frame intent without dwell or
+action classifier uses same-eye facial appearance plus valid closed geometry.
+Natural blinks are not separately classified or guaranteed OFF. Processing follows this per-frame intent without dwell or
 release debounce. Unknown intent releases only the affected button. No detector
 hysteresis or temporal wink feature is used.
 If an open pose still shows closed, export a trace and restart with representative
 comfortable poses; the learned ratio bands cannot resolve every occlusion or gaze angle.
 
-New detector presets use version 3 with geometry and independently checked wink
+New detector presets use version 5 with geometry and independently checked action
 models. Version 1/2 presets remain readable but need the new guide to enable wink
 buttons. The combined App saves `face_mouse_profile_v3` without research settings;
-v1/v2 files remain readable. See the [profile guide](../docs/EYE_CALIBRATION_GUIDE.md#save-load-and-maintain).
+v1/v2 files remain readable. See the [profile guide](../docs/EYE_CALIBRATION_GUIDE.md#cues-retry-and-saving).
 The legacy per-eye `collect()` API remains for developer regression tests, not UI use.
 
 ## 2. Vertical head calibration
@@ -237,14 +237,14 @@ head point for the tongue. It is calibrated classical image segmentation, **not 
 pretrained semantic tongue network**. A matching gum/lip patch can still fool it.
 Use the visible mask and a separate live validation exercise to identify that.
 
-1. Open the mouth with the tongue hidden. Click **Capture EMPTY open mouth** and
+1. Open the mouth with the tongue hidden. Click **Capture background — tongue hidden** and
    keep this pose. Teeth, dark interior, gums, and other visible non-tongue tissue
    form the negative class. A closed mouth is rejected, not accepted as training.
-2. Make the tongue visible, click **Freeze visible tongue**, and click a patch
+2. Make the tongue visible, click **Freeze / retake tongue photo**, and click a patch
    wholly inside actual tongue tissue. Avoid edges, teeth, gums, and lips.
    The frozen image is held only in memory.
 3. Repeat freeze/mark on another representative tongue patch if needed. Then click
-   **Fit appearance model**. A failed color-separation check requires recollection;
+   **Fit and inspect tongue color**. A failed color-separation check requires recollection;
    do not label non-tongue pixels just to make a fit pass.
 4. Press **Start tongue position guide**. Hide the tongue with the mouth open for
    the absence check, then hold center/your-left/your-right/up/down for training.

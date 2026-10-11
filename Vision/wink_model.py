@@ -80,32 +80,22 @@ def classify(model, vector):
 
 
 def fit(negative_groups, positive_groups):
-    """Equal group/class weight. First negative group is natural closed blinks."""
+    """Learn open versus closed-action appearance with equal group/class weight."""
     import numpy as np
 
     groups = [(0, g) for g in negative_groups] + [(1, g) for g in positive_groups]
     if (
-        len(positive_groups) < 3
-        or len(negative_groups) < 2
+        len(positive_groups) < 1
+        or len(negative_groups) < 1
         or any(len(g) < 3 for _, g in groups)
     ):
         raise ValueError(
-            "Need three clear wink attempts plus blink and relaxed-face samples"
+            "Need clear open and closed-action samples"
         )
     x = np.asarray([v for _, g in groups for v in g], float)
     y = np.asarray([label for label, g in groups for _ in g], float)
     if x.shape[1:] != (len(NAMES),) or not np.isfinite(x).all():
         raise ValueError("Incomplete facial measurements")
-    # Require some surrounding-eye evidence, rather than learning only lid closure.
-    # Compare with closed natural blinks specifically; a difference from relaxed
-    # open eyes alone is not supporting evidence for intentional winks.
-    separation = np.abs(
-        x[y == 1].mean(0) - np.asarray(negative_groups[0]).mean(0)
-    ) / np.asarray(FLOORS)
-    if max(separation[2:5].max(), separation[6:].max()) < 1:
-        raise ValueError(
-            "Surrounding-eye patterns overlap; retry with comfortable, distinct winks"
-        )
     weight = np.asarray(
         [
             0.5 / (len(positive_groups) if label else len(negative_groups)) / len(g)
@@ -136,7 +126,7 @@ def fit(negative_groups, positive_groups):
     low, high = max(negative), float(np.quantile(positive, 0.05))
     if high - low < 0.15:
         raise ValueError(
-            "Blink and wink appearances overlap; this eye needs another calibration"
+            "Open and closed-action appearances overlap; retry this eye"
         )
     model.update(off=low + (high - low) * 0.3, on=low + (high - low) * 0.7)
     return model
@@ -145,11 +135,11 @@ def fit(negative_groups, positive_groups):
 def check(model, negative_groups, positive_groups):
     """Fresh prompt windows only. Unknown counts against successful recognition."""
     if (
-        len(positive_groups) < 2
-        or len(negative_groups) < 2
+        len(positive_groups) < 1
+        or len(negative_groups) < 1
         or any(len(g) < 3 for g in positive_groups + negative_groups)
     ):
-        raise ValueError("Need two fresh wink attempts, blinks and relaxed-face checks")
+        raise ValueError("Need fresh open and closed-action checks")
     positive = [classify(model, v) for g in positive_groups for v in g]
     negative = [classify(model, v) for g in negative_groups for v in g]
     report = dict(
@@ -224,10 +214,10 @@ def validate_models(models):
         ):
             raise ValueError("Invalid wink validation report")
         if (
-            report["wink_attempts"] < 2
-            or report["negative_windows"] < 2
-            or report["wink_frames"] < 6
-            or report["nonwink_frames"] < 6
+            report["wink_attempts"] < 1
+            or report["negative_windows"] < 1
+            or report["wink_frames"] < 3
+            or report["nonwink_frames"] < 3
             or report["false_wink_frames"] != 0
             or not 0.9 * report["wink_frames"]
             <= report["wink_recognized"]

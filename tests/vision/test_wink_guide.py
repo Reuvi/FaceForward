@@ -27,7 +27,7 @@ class WinkGuideTests(unittest.TestCase):
                 self.assertFalse(guide.models)
                 self.assertEqual(guide.state(now)["total"], 7)
                 guide = EyeCalibrationFlow(guide.config, eyes=guide.fits)
-                self.assertEqual(guide.state(now)["total"], 14)
+                self.assertEqual(guide.state(now)["total"], 6)
             while guide.active:
                 state = guide.state(now)
                 if state["waiting"]:
@@ -37,28 +37,13 @@ class WinkGuideTests(unittest.TestCase):
                 vectors = {s: vector(opened=True) for s in ratios}
                 if state["wink_training"]:
                     if state["phase"] == "capture":
-                        fraction = (now - state["capture_start_ms"]) / (
-                            state["capture_end_ms"] - state["capture_start_ms"]
-                        )
-                        role, kind, _, _ = PROMPTS[guide.wink_index]
+                        role, kind, _, _ = guide.prompts[guide.wink_index]
                         for side in ratios:
-                            closed = (
-                                kind == "blinks" and 0.2 <= (fraction * 4) % 1 < 0.45
-                            ) or (kind == side and 0.2 <= fraction < 0.75)
+                            closed = kind == side and not (side == "right" and confuse_right)
                             ratios[side] = 0.04 if closed else 0.25
-                            wink = (
-                                kind == side
-                                and closed
-                                and not (side == "right" and confuse_right)
-                            )
-                            if (
-                                bad_check
-                                and role == "check"
-                                and kind == "blinks"
-                                and closed
-                            ):
-                                wink = True
-                            vectors[side] = vector(wink, opened=not closed)
+                            vectors[side] = vector(closed, opened=not closed)
+                            if bad_check and role == "check" and closed:
+                                vectors[side] = vector(opened=True)
                         if missing and kind == "relaxed":
                             vectors["left"] = None
                     else:
@@ -84,13 +69,24 @@ class WinkGuideTests(unittest.TestCase):
                 self.assertLess(now, 100000)
         return guide
 
+    def test_default_action_guide_has_six_short_poses_and_no_blink_prompt(self):
+        config = DetectionConfig()
+        self.assertEqual(len(PROMPTS), 6)
+        self.assertNotIn("blinks", [p[1] for p in PROMPTS])
+        duration = sum(config.collect_ms * p[3] + config.settle_ms for p in PROMPTS) + (len(PROMPTS)-1)*config.eye_rest_ms
+        self.assertLessEqual(duration, 33000)
+        from Vision.calibration import EyeCalibration
+        guide = EyeCalibrationFlow(config, eyes={"left": EyeCalibration(.04,.25,.5)})
+        self.assertEqual(guide.state(0)["total"], 4)
+        self.assertNotIn("right", [p[1] for p in guide.prompts])
+
     def test_full_flow_trains_checks_and_excludes_rest(self):
         guide = self.run_guide()
         self.assertEqual(set(guide.models), {"left", "right"}, guide.report)
         for model in guide.models.values():
-            self.assertEqual(classify(model, vector()), 0)
+            self.assertEqual(classify(model, vector(opened=True)), 0)
             self.assertEqual(classify(model, vector(True)), 1)
-            self.assertEqual(model["report"]["wink_attempts"], 2)
+            self.assertEqual(model["report"]["wink_attempts"], 1)
 
     def test_one_unreliable_eye_does_not_disable_the_other(self):
         guide = self.run_guide(confuse_right=True)
@@ -100,7 +96,7 @@ class WinkGuideTests(unittest.TestCase):
     def test_validation_movements_cannot_train_away_a_failure(self):
         guide = self.run_guide(bad_check=True)
         self.assertFalse(guide.models)
-        self.assertIn("false wink", guide.report)
+        self.assertIn("Check failed", guide.report)
 
     def test_missing_features_reject_only_the_affected_eye(self):
         guide = self.run_guide(missing=True)

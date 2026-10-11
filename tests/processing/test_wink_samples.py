@@ -76,6 +76,16 @@ class WinkSampleTests(unittest.TestCase):
         self.feed("open", "wink")
         self.assertEqual(self.feed("wink", "wink")["left_click"], 1)
 
+    def test_closed_nonaction_is_off_but_cannot_rearm_after_unknown(self):
+        self.feed()
+        self.assertEqual(self.feed("wink")["left_click"], 1)
+        self.assertEqual(self.feed("closed")["left_click"], 0)
+        self.feed("unknown")
+        self.feed("closed")
+        self.assertEqual(self.feed("wink")["left_click"], 0)
+        self.feed("open")
+        self.assertEqual(self.feed("wink")["left_click"], 1)
+
     def test_malformed_or_wrong_envelope_never_falls_back_to_raw_closed_eye(self):
         self.feed()
         frame = self.frame("wink")

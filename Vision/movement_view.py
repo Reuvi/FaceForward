@@ -409,6 +409,10 @@ class MovementPanel:
             side="left", padx=5
         )
         if kind == "tongue":
+            self.ready = ttk.Button(self.frame, text="I'm in position — capture", command=self.capture_pose)
+            self.ready.pack(fill="x", pady=3)
+            self.retry = ttk.Button(self.frame, text="Retry this pose", command=lambda: call("retry_tongue_step"))
+            self.retry.pack(fill="x", pady=3)
             self.recheck = ttk.Button(
                 self.frame,
                 text="Recheck saved tongue range",
@@ -424,6 +428,9 @@ class MovementPanel:
             else "normal"
         )
         if self.kind == "tongue":
+            ours = guide and guide["kind"] == "tongue"
+            self.ready.configure(state="normal" if ours and guide["active"] and guide["waiting"] and guide["phase"] == "prepare" else "disabled")
+            self.retry.configure(state="normal" if ours and not guide["active"] and not guide["passed"] and not state["calibrating"] else "disabled")
             self.recheck.configure(
                 state="normal"
                 if state.get("tongue_range") and not state["calibrating"]
@@ -434,7 +441,7 @@ class MovementPanel:
             self.instruction.set(
                 "Neutral → up → down, followed by new checks."
                 if self.kind == "head"
-                else "Train appearance below, then follow center/left/right/up/down targets. Later checks use new captures."
+                else "First complete the numbered appearance steps below. Then start this guide. Each pose waits for I'm in position — capture."
             )
             self.progress.set(
                 "Capture tones = hold the pose; low tones = rest. No device transfer functions are applied here."
@@ -463,12 +470,25 @@ class MovementPanel:
             if guide["active"] else guide["report"]
         )
         self.progress.set(
+            "Get into the pose, then press I'm in position — capture. No samples recorded yet."
+            if self.kind == "tongue" and guide["active"] and guide["waiting"] and guide["phase"] == "prepare" else
             f"{guide['phase'].upper()} · {guide['remaining_ms'] / 1000:.1f}s · {guide['samples']} usable / {guide['rejected']} unavailable"
             if guide["active"]
-            else "Raw and calibrated positions appear beside the camera. Output remains stopped."
+            else "Retry this pose to keep earlier captures, or Reset tongue to start over."
+            if self.kind == "tongue" and not guide["passed"] else
+            "Raw and calibrated positions appear beside the camera. Output remains stopped."
         )
-        if guide["active"] and guide["waiting"] and self.pending is None:
+        if self.kind == "tongue" and guide["active"]:
+            hint = ("Tongue should be hidden · color candidate: " + ("YES" if state.get("candidate_present") else "no")
+                    if guide["name"] == "absent" else "Live tip: " + state.get("tip_reason", "Waiting for camera"))
+            self.progress.set(self.progress.get() + "\n" + hint)
+        if (guide["active"] and guide["waiting"] and self.pending is None
+                and not (self.kind == "tongue" and guide["phase"] == "prepare")):
             self.pending = self.root.after_idle(lambda: self.present(event))
+
+    def capture_pose(self):
+        if self.event and self.event[2] == "prepare" and self.event[3]:
+            self.present(self.event)
 
     def present(self, event):
         self.pending = None

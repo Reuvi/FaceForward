@@ -39,7 +39,7 @@ Contracts/EYE_INTENT.md. Never feed a plotted hold into control.
 
 Guided eyes now have configurable rest intervals (default 3 seconds), separate rest,
 ready and capture cues, and phase-aware prompt acknowledgments. Rest/preparation
-frames never train eye geometry or blink coefficients; gate by the original capture
+frames never train eye geometry or facial coefficients; gate by the original capture
 timestamp and guide capture window. Camera/input sampling continues during rest.
 
 ## Start every task
@@ -116,13 +116,13 @@ can use an integration branch with the affected owners coordinated.
 Read `Contracts/EYE_INTENT.md` and `docs/EYE_CALIBRATION_GUIDE.md`. Detection research
 is removed from the unified App; its retained modules are legacy/developer code.
 Two separately started full-screen guides collect eye open/closed geometry and
-blink/wink appearances with fresh checks. Retrying/cancelling/failing blink training
+open/closed-action appearances with fresh checks. Retrying/cancelling/failing wink-action training
 retains completed eye geometry. New geometry clears dependent wink models, and
 provisional geometry cannot seed wink training before its reopen check. Rest screens
 show the countdown and upcoming instruction together. Same-eye facial features classify each
 captured frame. No duration/speed, opposite-eye gate, dwell or release delay may
-control the calibrated wink path. ON persists while a wink is recognized; open or
-recognized blink is OFF; unknown is held numeric input with known=false and released
+control the calibrated wink path. ON requires valid closed geometry and matching action appearance; open and
+supported closed non-actions are OFF; unknown is held numeric input with known=false and released
 output. Actual reopening re-arms an eye after unknown. Keep raw anatomical eye
 fields unchanged and emit the additive `eye_intent` sample for every capture.
 New combined profiles are v3, detector presets v5, with checked appearance models;
@@ -143,3 +143,9 @@ tips; never substitute the region centroid. v1-v4 profiles discard old tongue
 appearance/range and preserve compatible eye/wink/head fits. New tongue models/crops must version
 their coordinate space and invalidate incompatible fits; see Vision/TONGUE_MODEL_PLAN.md.
 Device-specific transfer functions and Drivers remain downstream.
+
+Current short guide: open/left/right training then fresh open/left/right checks,
+with no natural-blink class, blink counts, or mandatory surrounding-muscle contrast.
+The tongue guide waits for the user to acknowledge each pose, supports retrying a
+failed pose, and has an always-visible reset that cancels only tongue work.
+Clear tongue marks preserves background samples; frozen overlays show actual marks.

@@ -52,6 +52,7 @@ class DetectorWorkbench:
         self.head = None
         self.tongue_range = None
         self.positives, self.negatives = [], []
+        self.tongue_marks = []
         self.tongue_model = None
         self.validation = {}
         self.notice = "Single user: start a source, then calibrate or load a profile"
@@ -71,6 +72,7 @@ class DetectorWorkbench:
         self.movement_guide = None
         self.crop = self.frozen_crop = None
         self.positives, self.negatives = [], []
+        self.tongue_marks = []
         self.tongue_model = None
         self.validation.clear()
         self.tongue = TongueResult()
@@ -196,6 +198,9 @@ class DetectorWorkbench:
             self.tongue_model = None
             self.tongue_range = None
             self.validation.clear()
+            self.positives = []
+            self.tongue_marks = []
+            self.frozen_crop = None
         if target.startswith("validate_"):
             self._invalidate("tongue_x", "tongue_y")
             self.validation.pop(target, None)
@@ -234,18 +239,18 @@ class DetectorWorkbench:
         self._invalidate("left_eye_open", "right_eye_open")
         self.generation += 1
         self.eye_guide = EyeCalibrationFlow(self.config)
-        self.notice = "Eye open/closed calibration: follow the dot. Train blinks/winks separately afterward."
+        self.notice = "Eye open/closed calibration: follow the dot. Train wink actions separately afterward."
 
     def start_wink_guide(self, rest_seconds=None):
         config = self._eye_guide_config(rest_seconds, "winks")
         if not self.eyes:
-            raise ValueError("Complete eye open/closed calibration before starting Blinks & winks")
+            raise ValueError("Complete eye open/closed calibration before starting Wink action")
         self.config = config
         self.winks.clear()
         self._invalidate("left_eye_open", "right_eye_open")
         self.generation += 1
         self.eye_guide = EyeCalibrationFlow(self.config, eyes=self.eyes)
-        self.notice = "Blinks & winks: eye open/closed calibration retained. Retry this stage independently."
+        self.notice = "Wink action: eye open/closed calibration retained. Retry this stage independently."
 
     def present_eye_step(self, index, phase=None, generation=None):
         self.expire()
@@ -285,6 +290,16 @@ class DetectorWorkbench:
         if self.movement_guide:
             self.movement_guide.present(index,self.clock(),phase)
 
+    def retry_tongue_step(self):
+        self._require_subject()
+        self._require_idle()
+        guide = self.movement_guide
+        if guide is None or guide.kind != "tongue" or guide.passed:
+            raise ValueError("There is no failed tongue pose to retry")
+        guide.retry()
+        self.generation += 1
+        self.notice = "Retry this tongue pose. Get comfortable, then press I'm in position — capture."
+
     def _guide_movement(self, timestamp):
         guide=self.movement_guide
         if not guide or not guide.active:return
@@ -318,6 +333,7 @@ class DetectorWorkbench:
         if self.crop is None or self.features.get("face") is None or self.features["face"].quality == 0:
             raise ValueError("A visible, sufficiently open mouth is required")
         self.frozen_crop = self.crop
+        self.tongue_marks = []
         self.notice = "Mouth frozen in memory. Click a tongue-only patch, away from lips/teeth."
 
     def mark_tongue(self, x, y):
@@ -329,10 +345,22 @@ class DetectorWorkbench:
         self._invalidate("tongue_x", "tongue_y")
         self.positives.extend(colors.tolist())
         self.positives = self.positives[-4000:]
+        self.tongue_marks = (self.tongue_marks + [(x, y)])[-40:]
         self.tongue_model = None
         self.tongue_range = None
         self.validation.clear()
         self.notice = f"Added tongue patch ({len(self.positives)} positive pixels). Fit when both classes are collected."
+
+    def clear_tongue_marks(self):
+        self._require_idle()
+        self._invalidate("tongue_x", "tongue_y")
+        self.positives = []
+        self.tongue_marks = []
+        self.tongue_model = self.tongue_range = None
+        self.validation.clear()
+        self.tongue = TongueResult()
+        self.notice = "Tongue marks cleared; background kept. Freeze a visible tongue and mark tissue again."
+        self.generation += 1
 
     def fit_tongue(self):
         self._require_subject()
@@ -346,15 +374,27 @@ class DetectorWorkbench:
         self.notice = "Appearance model fitted. Inspect the mask, then start tongue position guide."
 
     def reset_tongue(self):
+        # Reset must work during this channel's collection, including failed or
+        # paused guides, without cancelling unrelated eye/head work.
+        if self.job and self.job.target in ("tongue_absent", "validate_absent", "validate_visible"):
+            self.job = None
+        if self.movement_guide and self.movement_guide.kind == "tongue":
+            self.movement_guide = None
         self._require_idle()
         self._invalidate("tongue_x", "tongue_y")
         self.job = None
         self.positives, self.negatives = [], []
+        self.tongue_marks = []
         self.tongue_model = None
         self.tongue_range = None
         self.validation.clear()
         self.frozen_crop = None
-        self.notice = "Tongue calibration cleared"
+        self.samples = {key: value for key, value in self.samples.items()
+                        if key not in ("tongue_absent", "validate_absent", "validate_visible")}
+        self.tongue = TongueResult()
+        self.generation += 1
+        self.notice = "Tongue reset. Start at 1: open your mouth with tongue hidden, then capture background."
+        self.reasons["tongue"] = "Tongue model uncalibrated"
 
     def _finish_collection(self):
         job, self.job = self.job, None
@@ -538,9 +578,10 @@ class DetectorWorkbench:
             model, vector = self.winks.get(side), self.wink_vectors.get(side)
             score = wink_score(model,vector) if model else None
             opened = raw.get("valid") and raw.get("value")==1
-            bit = 0 if opened else classify_wink(model,vector) if model else None
+            closed = raw.get("valid") and raw.get("value")==0
+            bit = 0 if opened else classify_wink(model,vector) if closed and model else None
             intent[side] = dict(value=bit,known=bit is not None,
-                                state="open" if opened else "wink" if bit==1 else "blink" if bit==0 else "unknown")
+                                state="open" if opened else "wink" if bit==1 else "closed" if bit==0 else "unknown")
             self.wink_readings[side] = dict(intent[side],score=score,features=vector,
                                            calibrated=model is not None)
         frame["eye_intent"] = intent
@@ -609,8 +650,11 @@ class DetectorWorkbench:
                 "movement_guide": self.movement_guide.state(self.clock()) if self.movement_guide else None,
                 "samples": {k: len(v) for k, v in self.samples.items()},
                 "tongue_pixels": {"positive": len(self.positives), "negative": len(self.negatives)},
+                "tongue_marks": list(self.tongue_marks),
                 "tongue_fit": self.tongue_model.report if self.tongue_model else None,
                 "validation": dict(self.validation), "collecting": self.job.target if self.job else None,
+                "collection_phase": ("prepare" if self.clock() < self.job.start_ms else "capture") if self.job else None,
+                "collection_remaining_ms": max(0, (self.job.start_ms if self.clock() < self.job.start_ms else self.job.end_ms) - self.clock()) if self.job else None,
                 "generation": self.generation, "config": self.config.to_dict(),
                 "eye_guide": self.eye_guide.state(self.clock()) if self.eye_guide else None,
                 "calibrating": self.calibrating}

@@ -224,11 +224,11 @@ Vision/.venv/bin/python -m App --source camera \
 2. Camera/Detector demo automatically attaches `single-user`. Confirm it is visible.
 3. Test **eyes first** in Detection calibration → 1 Eyes: **Test sound**, then
    **Start eye open/closed**. Follow the seven dot/closed/reopen steps. When the
-   popup closes, start **Blinks & winks** separately. Natural blinks should pulse
-   the anatomical closure trace but leave wink output at 0; held intentional winks
-   produce independent ON samples. The central rest countdown displays the next
-   instruction; rest/preparation frames never train. Use **Restart blinks & winks**
-   after a bad blink capture to keep geometry. Only **Restart eye open/closed**
+   popup closes, start **Wink action** separately. Six short open/left/right poses
+   learn and check the action; valid closed geometry plus matching appearance
+   produces independent ON samples. Natural blinks have no separate class. The central rest countdown displays the next
+   instruction; rest/preparation frames never train. Use **Restart wink action**
+   after a bad action capture to keep geometry. Only **Restart eye open/closed**
    discards geometry and dependent wink models. See [the current eye procedure](EYE_CALIBRATION_GUIDE.md).
    Escape/Cancel or leaving an active guide cancels unfinished work. Later test
    head targets and tongue training/checks using the same detector runbook.

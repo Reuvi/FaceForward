@@ -78,20 +78,22 @@ estimation can still drift with perspective, yaw, roll, blur or landmark errors.
 ## Calibrate tongue appearance and position
 
 1. Open **Detection calibration → 3 Tongue**. Appearance controls scroll below the always-visible guide.
-   Open your mouth with the tongue hidden, press **Capture EMPTY open mouth**,
+   Open your mouth with the tongue hidden, press **Capture background — tongue hidden**,
    and hold during its preparation/capture countdown.
-2. Show your tongue, press **Freeze visible tongue**, then click tissue wholly
+2. Show your tongue, press **Freeze / retake tongue photo**, then click tissue wholly
    inside the tongue in the frozen crop. Avoid lips, teeth, gums and borders.
    The frozen image stays only in memory.
-3. Press **Fit appearance model**. Inspect the live green candidate region:
+3. Press **Fit and inspect tongue color**. Inspect the live green candidate region:
    it should follow the visible tongue. If it follows other tissue, reset and
    recollect; a good-looking numerical position alone is insufficient.
 4. Press **Start tongue position guide**. First hide the tongue with the mouth
    still open for the absence check. Then follow comfortable center → your left
    → your right → up → down, keeping mouth opening fairly steady.
 5. Repeat those five positions for separate fresh checks. The 11-step guide takes
-   about 46 seconds after appearance setup. It stops early with a reason if a
-   collection or check fails. Recollect appearance if the absent check fails.
+   as long as you need: each pose waits for **I'm in position — capture**. It stops with a reason if a
+   collection or check fails. **Retry this pose** repeats only the failed pose,
+   retaining the appearance model and preceding successful groups. If the absent
+   check sees a green mask with the tongue hidden, recollect appearance instead.
 
 The left position plane shows the **raw tongue tip in mouth widths**. Its purple rectangle is
 the learned personal range once fitted. The right plane shows **personal position**,
@@ -107,6 +109,22 @@ but lips covering the front, similar tissue colors, saliva/reflections, blur and
 lighting can still cause misses or false tips. Comfortable positions must expose
 a distinct, repeatable front edge. Unknown intervals hold the last plot position
 in a darker color while the actual tongue signal stays null/invalid.
+
+At every pose, first read the instruction and position your tongue comfortably,
+then press **I'm in position — capture**. Hold through the capture countdown/tone,
+relax during REST, and take your time preparing the next pose. The first pose needs
+an open mouth with the tongue hidden. All following poses need the visible tongue
+front past the lip. Left/right are YOUR sides; keep head still and the other tongue
+axis near center. Checks repeat the same comfortable limits, not forced extremes.
+
+**Reset tongue — start over** is always visible at the top. It also works during
+tongue capture/position guidance or without a detected face. It clears background,
+marks, model, range and checks; eye/head calibration remains. For a bad tissue click,
+use **Clear tongue marks — keep background** instead. The yellow boxes mark your
+actual clicks. Freezing another photo lets you add another view's tissue samples.
+To redo all positions while keeping a good appearance model, use **Start tongue
+position guide** again after a failure or Cancel. The live tip status beside the
+guide explains missing detection without needing to scroll to the setup details.
 
 ## Inspect, retry, save
 

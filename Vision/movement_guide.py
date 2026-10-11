@@ -71,6 +71,23 @@ class MovementGuide:
         elif not self.resting and self.start_ms is None:
             self.start_ms = now + self.config.settle_ms
 
+    def retry(self):
+        if self.active or self.passed:
+            raise ValueError("Only a failed pose can be retried")
+        role, name, _ = self.steps[self.index]
+        if role == "train":
+            self.groups.pop(name, None)
+            self.fits = {}
+        elif role == "check":
+            self.checks.pop(name, None)
+        else:
+            self.absence = None
+        self.values = []
+        self.start_ms = self.rest_end_ms = None
+        self.resting = False
+        self.report = ""
+        self.active = True
+
     def feed(self, timestamp, value, usable):
         if not self.active:
             return
@@ -233,7 +250,7 @@ class MovementGuide:
             )
         if name == "absent":
             instruction = (
-                "Open your mouth with your tongue hidden; hold for the capture"
+                "Open your mouth but keep the tongue hidden behind your teeth. Keep your head still."
             )
         elif self.kind == "head":
             movement = (
@@ -252,7 +269,11 @@ class MovementGuide:
                 if name == "center"
                 else f"Move your tongue toward YOUR {name.upper()} comfortable limit"
             )
-            instruction += "; keep the front edge visible"
+            instruction += ". Keep the tip visible past your lip and your head still; move only as far as comfortable."
+            if name in ("left", "right"):
+                instruction += " YOUR side, even if the camera view looks reversed. Keep its height near center."
+            elif name in ("up", "down"):
+                instruction += " Keep it centered left-to-right."
         return dict(
             kind=self.kind,
             index=self.index,

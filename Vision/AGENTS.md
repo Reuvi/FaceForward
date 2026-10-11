@@ -38,7 +38,7 @@ lane documentation here. Put requests for shared changes in `interface-requests/
   independent per-frame wink appearance calibration/classification and the additive
   intent sample, while preserving raw anatomical openness. Do not map OS events or
   import Processing internals. Keep two independent guide stages in the same eye tab, preserving geometry on
-  blink/wink retry/cancel/failure. Show rest countdown and next instruction together.
+  wink-action retry/cancel/failure. Show rest countdown and next instruction together.
   Keep no time/opposite-eye features,
   separate validation windows, model uncertainty and per-eye failure visible.
 - Before handoff, check no face, one/two faces, identity loss/reacquisition, missing
@@ -56,3 +56,9 @@ require fresh saved-range rechecks, and preserve invalid observations. Read `../
 of the visible front boundary in mouth-width units. Invalid tips never fall back
 to a centroid. v1-v4 tongue appearance/ranges require retraining. Future model/crop
 changes also require a versioned contract and fresh calibration.
+
+Current short guide: open/left/right training then fresh open/left/right checks,
+with no natural-blink class, blink counts, or mandatory surrounding-muscle contrast.
+The tongue guide waits for the user to acknowledge each pose, supports retrying a
+failed pose, and has an always-visible reset that cancels only tongue work.
+Clear tongue marks preserves background samples; frozen overlays show actual marks.

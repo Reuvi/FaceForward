@@ -267,7 +267,7 @@ class IntegratedDesktop(DesktopLab):
             "demo": "SYNTHETIC: all four mouse actions. Click Start preview, then open Live lab. Cycle: short blink → left wink → right wink → both → tongue circle → head up/down. Neutral periods allow arming.",
             "replay": "REPLAY: select a subject explicitly, then Start preview with neutral input. Capture gaps are preserved. EOF stops output; restart the source and re-arm to repeat.",
             "camera": "LIVE CAMERA · ONE USER: face connects automatically → Detection calibration (or Load saved profile) → Start preview → Live lab. Calibration survives brief loss and camera restart; no OS mouse output.",
-            "detector-demo": "SYNTHETIC PIXELS · ONE USER: run Eye open/closed, then start Blinks & winks separately in Detection calibration. The fixture follows each guide, then cycles independent closures. No camera or ML.",
+            "detector-demo": "SYNTHETIC PIXELS · ONE USER: run Eye open/closed, then start Wink action separately in Detection calibration. The fixture follows each guide, then cycles independent closures. No camera or ML.",
         }
         set_var(self.source_detail, state["error"] or details[state["mode"]])
         single = state["mode"] in ("camera", "detector-demo")

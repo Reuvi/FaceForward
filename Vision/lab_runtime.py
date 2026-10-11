@@ -98,12 +98,8 @@ class LabRuntime:
                 if state.get("wink_training"):
                     controls.update(left_closed=False,right_closed=False,natural_blink=False)
                     if state["phase"]=="capture":
-                        elapsed=self.clock()-state["capture_start_ms"]
-                        duration=state["capture_end_ms"]-state["capture_start_ms"]
-                        if state["name"]=="blinks":
-                            controls["natural_blink"] = .2 <= (elapsed/(duration/4))%1 < .45
-                        elif state["name"] in ("left","right"):
-                            controls[state["name"]+"_closed"] = .2<=elapsed/duration<.75
+                        if state["name"] in ("left","right"):
+                            controls[state["name"]+"_closed"] = True
                 else:
                     ratio = .25 if state["resting"] else {"center": .25, "left": .21, "right": .22, "up": .28,
                              "down": .14, "closed": .04, "reopen": .25}[guide.step[0]]

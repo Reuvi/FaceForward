@@ -1,23 +1,9 @@
-# Eye calibration and testing
+# Eye geometry and short wink-action calibration
 
-Current head/tongue update: use the [movement calibration guide](MOVEMENT_CALIBRATION_GUIDE.md)
-for guided position fitting, raw graphs on camera setup and shared capture data.
-Detector presets are now v5 (combined profiles remain v3). The
-[tongue-tip guide](TONGUE_TIP_TESTING.md) covers the new visible front-boundary
-measurement. v1-v4 tongue appearance/ranges require retraining; compatible
-eye/wink/head fits survive. Saved v5 tongue ranges require **Recheck saved tongue
-range** after loading/restarting. Eye classification is unchanged.
-
-
-This is the current eye workflow in the local Python/Tk App. The separate
-Detection research tab has been removed. Two separately started guides learn
-eye open/closed geometry, then natural blinks versus intentional winks. The second
-stage can fail, be cancelled or restarted without repeating the first. Both stages
-include fresh checks. Existing saved eye geometry can seed blink/wink training.
-An intentional wink produces **1 while held**, and reopening produces **0**.
-A recognized natural blink stays **0**. There is no minimum wink duration,
-release delay, cooldown or opposite-eye gate in this calibrated camera path.
-Both intentional winks may be on together; neither eye requires the other to open.
+The native app learns two independent things: eye open/closed geometry, then the
+facial appearance you use for a closed-eye action. The action guide no longer
+collects or counts natural blinks or tries to distinguish their intent. A natural
+blink may activate if it matches your learned action. Each eye remains independent.
 
 ## Start
 
@@ -28,151 +14,90 @@ Vision/.venv/bin/python -m App --source camera \
   --model Vision/.local/face_landmarker.task --camera-id 0 --fps 30
 ```
 
-For a camera-free wiring check, substitute `--source detector-demo` and omit the
-model/camera arguments. Its generated face follows the guide automatically.
-It verifies the software connection, not accuracy on a real person.
+For a software-only check, use `--source detector-demo` without camera/model flags.
+Its generated face follows the prompts; this is not a test of real-person accuracy.
 
-1. In **Vision source & raw signals**, confirm the camera is running and
-   **single-user** is attached. The preview is unmirrored: your left eye is on
-   the image's right.
-2. Open **Detection calibration → 1 Eyes**. Set **Rest between steps** (default
-   3 seconds), try **Test sound**, then press **Start eye open/closed**.
-3. A temporary full-screen window opens. Follow the dot with comfortably open
-   eyes at five positions, gently close both eyes when instructed, then reopen.
-   This establishes a separate open/closed geometry range for each eye and checks
-   reopening on new frames. The popup closes. You may save this geometry-only
-   profile with **Save active profile** before continuing.
-4. Press **Start blinks & winks**. Follow the **Learn blink/wink** prompts: blink gently several times, then
-   keep a relaxed face while smiling/talking/looking slightly around. Perform
-   three separate left winks and three right winks when prompted.
-5. Follow **Check on new movements**: repeat natural blinks and relaxed movements,
-   then two new winks on each side. These frames test the fitted model; they do
-   not train or adjust it.
-6. The popup closes automatically. Read each eye's result and inspect its scopes.
-   Only an eye that passes is enabled for wink recognition.
+1. Confirm the camera is running in **Vision source & raw signals**. The sole face
+   attaches automatically. The preview is unmirrored: your left eye appears on the
+   image's right.
+2. Open **Detection calibration → 1 Eyes**. If good eye geometry is already loaded,
+   skip directly to **Start wink action**.
+3. Otherwise use **Start eye open/closed**. Follow the dot with comfortably open
+   eyes, gently close when prompted, then reopen. This unchanged seven-step guide
+   checks open poses and establishes each eye's open/closed range. The popup closes.
+   You can save this geometry before continuing.
+4. Press **Start wink action**. Its first pass has just three poses: comfortably
+   open → your left closed-eye action → your right closed-eye action. Use the
+   movement you actually want to use; no exaggerated squint or blink comparison
+   is required. Hold the named pose during capture, then relax at the rest tone.
+5. Repeat those three poses once for a fresh check. Check captures do not retrain
+   the model. With only one calibrated eye, the guide skips the other side.
+6. The popup closes. Read each eye's result and test the scopes.
 
-The first guide has seven steps (about 40 seconds); the second has fourteen
-(about two minutes), including rests at default timings. They do not start each
-other automatically. The blink/wink button requires at least one completed eye
-geometry fit. Each eye remains independently enabled only when its checks pass.
-During each wink prompt, begin with both eyes open, wait for the three high
-capture tones, wink the named eye once, briefly hold, then reopen naturally
-within that capture window. Holding briefly provides several training images;
-there is no runtime minimum hold time. Natural-blink windows need at least
-three observed blinks in training and two in checking. Do not force or exaggerate
-these blinks to imitate a wink.
+The action guide has **six captures, about 32 seconds** with default 1-second
+preparation, 1.8-second capture and 3-second rests. One eye uses four captures.
+**Rest between steps** stays adjustable. These durations schedule calibration
+samples; there is no minimum runtime wink hold time, release delay or cooldown.
 
-Four low tones mean **REST**: blink or relax freely; nothing is collected. A large
-central countdown shows the seconds left, with **Next:** and the upcoming movement
-directly beneath it. Read that instruction while resting; wait for preparation
-and capture cues before doing it. The same countdown also appears in the lab panel.
-A rising pair means prepare; three high tones mean capture. The geometry phase's
-descending cue means close gently, and two high tones mean reopen. Completion
-and retry have distinct cues. Read the next movement during preparation; the
-timer starts only after its instruction is displayed. Capture continues while
-resting, but rest/preparation images never enter training. Preview stays stopped.
-Escape/Cancel exits the active guide. If blink training went wrong, press
-**Restart blinks & winks**: it clears only wink models/training and keeps completed
-eye geometry, head and tongue fits. Cancel or face loss during that stage also
-keeps eye geometry. Failed wink models stay unavailable until their checks pass.
-**Restart eye open/closed** is for bad geometry; it clears both geometry and the
-wink models that depend on it. Cancelling incomplete geometry does not promote
-provisional fits before the fresh reopen check. Head/tongue fits remain.
-Both start actions stop preview and reset the Processing eye-input history.
+## Cues, retry and saving
 
-## Verify before enabling preview
+Four low tones mean REST. The large countdown and **Next:** instruction stay
+visible together. No rest/preparation frames enter training. A rising pair means
+prepare, three high tones mean capture. The geometry guide has separate close and
+reopen tones. Completion/retry also have distinct cues.
 
-The top scope shows anatomical eyelids: **1 closed, 0 open**. The lower scope
-defaults to **Wink samples**: **1 intentional wink, 0 open or recognized blink**.
-Use its selector for **Left/Right facial features** or **Eye ratios**. Facial
-graphs show blink, squint, cheek, brow and the learned wink score over eight
-seconds. The score is a model decision score, not a calibrated probability.
+**Escape/Cancel** stops the active guide. **Restart wink action** clears only the
+wink models/training, preserving completed eye geometry, head and tongue fits.
+**Restart eye open/closed** clears geometry and its dependent wink models.
+Loading or starting a guide leaves the mouse preview stopped.
+
+Use **Save active profile** on the source tab to keep detector fits with mouse
+settings. Geometry-only profiles work. Detector preset v5 / combined profile v3
+remain compatible: old appearance models still load, but use the new short guide
+if their recognition was poor. No video or calibration images are saved in a profile.
+
+## Verify the live signals
+
+The anatomical scope shows **1 closed, 0 open**. **Wink samples** shows the
+closed-eye action: **1** requires valid closed geometry and a matching appearance;
+**0** means open or a supported closed non-match. Uncertain geometry, unsupported
+appearance or missing evidence is unknown. A strong appearance score cannot turn
+an uncertain/open eye into an action.
 
 | Try | Expected |
 | --- | --- |
-| Several comfortable natural blinks | Eyelid traces pulse to 1; wink samples remain 0 |
-| Left wink, then reopen | Left wink becomes 1 while held, then 0; right stays independent |
-| Right wink, then reopen | Same behavior for the right eye |
-| Smile, speak and look around normally | No accidental wink ON samples |
-| Briefly cover one eye or leave the image | Unavailable readings are dark, and affected output releases |
+| Comfortable open eyes | Anatomical closed bits and action bits are 0 |
+| Left action held, then reopen | Left action is 1 while recognized, then 0 |
+| Right action held, then reopen | Right action responds independently |
+| Both learned actions together | Each eye may be on; neither gates the other |
+| Missing/covered eye | Dark held graph value, unknown sample; affected output releases |
+| Natural blink | No separate blink label or guaranteed rejection; observe whether it matches the action |
 
-Repeat these checks beyond the guided samples. A passed guide is only a small
-personal calibration check, not evidence of general accuracy. If blinks trigger
-ON, use **Restart blinks & winks** and repeat with comfortable, representative movements and clear
-lighting. If the appearances cannot be separated reliably, the eye should remain
-unavailable. Do not compensate by exaggerating movements beyond comfort.
+Select **Left/Right facial features** or **Eye ratios** to inspect the evidence.
+The `blink` feature name means MediaPipe's eye-closure coefficient; it is not a
+natural-blink classification. The model score is a decision score, not a verified
+probability or measurement of intent.
 
-Unknown graphs hold the preceding height in a darker version of their color.
-Processing also records the previous numeric eye input for every unknown capture,
-with **known=false** (startup value 0). This never holds the actual mouse button:
-unknown releases the affected output. After arming or unknown, an actual observed
-open eye is needed before that eye can activate again. A recognized blink's OFF
-state alone does not count as reopening. Total face loss/staleness stops preview;
-returning to the camera retains calibration but does not re-arm.
-
-When ready, open your eyes, go to **Live lab**, and press **Start preview**.
-Wink samples drive the existing simulated buttons directly. Holding does not
-generate repeated presses. This app still does not inject OS mouse input.
-Head/scroll and tongue/pointer behavior are unchanged; test them separately later.
-
-**Export trace CSV** stores captured scalar samples, including raw lid ratios,
-all eight model features, wink score/bit and capture timestamps, without images.
-The display uses interpolation for continuous features and steps for binary
-signals; classification uses actual captured frames only. Keep personal traces
-and profiles in ignored local directories.
+Every accepted camera capture still sends a sample. Unknown plots hold the previous
+height in a darker color. Processing also holds the previous numeric eye input
+with `known=false` (startup 0), while releasing actual output. After unknown or
+arming, a fresh anatomical open sample re-arms that eye; a closed non-action does
+not re-arm it. Independent source freshness/watchdogs still apply.
 
 ## What is learned
 
-Each eye has a small independent logistic classifier with eight inputs:
+Each eye uses its own lid gap/eye width, eye-closure/squint/cheek/brow/wide
+coefficients and brow/cheek landmark distances normalized by eye width. These
+are visible shape measurements, not direct muscle activity. A small local linear
+classifier learns open versus closed action. Valid open frames alone label the
+open prompt; valid closed frames alone label the action prompt. No open-to-closed
+transition count, opposite-eye feature, closure duration or blink comparison is
+required. Starting a hold before capture does not invalidate it.
 
-| Feature | Measurement |
-| --- | --- |
-| `lid_ratio` | Vertical eyelid gap divided by eye width; dimensionless |
-| `blink`, `squint`, `cheek`, `brow`, `wide` | Same-side MediaPipe eyeBlink, eyeSquint, cheekSquint, browDown and eyeWide scores, 0–1 |
-| `brow_gap`, `cheek_gap` | Landmark distance from the eye-corner midpoint divided by eye width; dimensionless |
+Each prompt needs clear, distinct-timestamp samples. Separate check windows must
+recognize at least 90% of action frames and 80% of open frames with no false action
+in the open check. An unreliable eye fails independently. Rejected windows explain
+missing evidence, too few matching open/closed frames or overlapping appearances.
+These small calibration checks establish software behavior, not broad human accuracy.
 
-These are visible shape estimates, not measured muscle force or proof of intent.
-No duration, closing speed, frame count, opposite-eye measurement or clock value
-is a classifier input. The two eyes can have different baselines and models.
-Open/closed geometry and all feature scales are personalized.
-
-The guide labels only closed portions of blink/wink attempts; open surrounding
-frames are not labeled winks. Each blink/wink window must contain observed open
-to closed transitions, adequate sample counts, and at least 80% available feature
-frames. Training uses equal class and prompt weights, a regularized linear model,
-300 bounded optimization steps, and at most 512 feature vectors per eye/window.
-The decision bands are fitted only on training windows. A surrounding-eye difference from closed natural blinks is required; differences
-from relaxed open eyes alone do not qualify. Overlapping patterns
-fail training instead of being forced into ON/OFF. Unsupported feature ranges
-or scores between the two decision bounds are unknown.
-
-The later check requires no false ON frames in either negative window, at least
-90% recognized wink frames in **each** wink attempt, and at least 80% recognized
-OFF frames in **each** negative window. Unknown counts against recognition.
-These are MVP acceptance rules, not clinically validated accuracy requirements.
-The small test set cannot exclude rare false activations. A frame-only model
-cannot distinguish intentions that look identical; do not claim it can.
-
-## Save, load and maintain
-
-Use **Save active profile**, then **Load saved profile** in the source tab.
-Completed models survive head motion, temporary loss and same-source restarts.
-Files can load while stopped or without a face; loading leaves preview stopped.
-New files use `face_mouse_profile_v3` and detector preset v5, storing per-eye
-geometry, model parameters and check counts, with Processing/head/tongue settings.
-They contain no images or raw training vectors. A geometry-only profile is valid;
-load it and start Blinks & winks without repeating the dot guide. Recheck under
-current lighting.
-Tongue validation still has to be repeated after loading.
-
-Old v1/v2 profiles remain readable, but they have no per-frame wink models.
-They restore their other settings; run the new eye guide before using wink
-buttons. Old research event models are not used. Legacy raw/mock/replay inputs
-without `eye_intent` retain their old Processing dwell behavior for compatibility;
-those timing controls are hidden in the unified App.
-
-Implementation: `Vision/wink_guide.py` owns the sequence, `wink_model.py` owns
-features/training/checking, `workbench.py` emits a sample per capture, and
-`Processing/mouse/signals.py` and `engine.py` consume those states.
-The additive [eye intent contract](../Contracts/EYE_INTENT.md) preserves the
-raw SignalFrame eye meaning and the existing driver serialization boundary.
+For head and tongue, use [the movement guide](MOVEMENT_CALIBRATION_GUIDE.md).

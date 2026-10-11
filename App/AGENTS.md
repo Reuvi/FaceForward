@@ -29,7 +29,7 @@ Collection also disarms preview. Preserve invalid controls until each detector i
 Do not report synthetic success as live detector accuracy or driver completion.
 
 The active App has one preview and no Detection research tab/session. Embed the
-separate Eye open/closed and Blinks & winks guides in Detection calibration.
+separate Eye open/closed and Wink action guides in Detection calibration.
 Blink retries must preserve completed geometry; both start commands disarm and
 reset Processing eye history. Persist geometry-only profiles without requiring winks. Read `../Contracts/EYE_INTENT.md`.
 Hide legacy eye timer controls in App; legacy component/replay formats retain them.
@@ -44,3 +44,9 @@ require fresh saved-range rechecks, and preserve invalid observations. Read `../
 of the visible front boundary in mouth-width units. Invalid tips never fall back
 to a centroid. v1-v4 tongue appearance/ranges require retraining. Future model/crop
 changes also require a versioned contract and fresh calibration.
+
+Current short guide: open/left/right training then fresh open/left/right checks,
+with no natural-blink class, blink counts, or mandatory surrounding-muscle contrast.
+The tongue guide waits for the user to acknowledge each pose, supports retrying a
+failed pose, and has an always-visible reset that cancels only tongue work.
+Clear tongue marks preserves background samples; frozen overlays show actual marks.
