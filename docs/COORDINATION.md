@@ -1211,3 +1211,59 @@ Remaining: restart App after updating the compiled driver and evaluate with the
 user's camera. Real-person gaze accuracy and live target movement were not measured
 in this task. A screen-dot fit would be separate work for actual screen alignment;
 this release changes destination control while keeping raw pupil detection.
+
+## Downward pointer reach and lighter filtering — user-requested integration
+
+Lane / task / branch: Reuvi integration / pupil-reach-response /
+`codex/integration/pupil-reach-response`, based on `cf75ab2`.
+Changed paths: Processing mapping/filter/settings UI, App profile application and
+diagnostics, component/integration tests, current agent notes and runbooks.
+Contract-first commits: `11363ba` and `bcbe20e`; the second reflects the user's
+follow-up that Mouse test also needs improved downward control. Drivers/Vision
+source and personal calibration files are unchanged.
+
+Gaming defaults now use 2× pointer gain, a further 4× downward boost, 20 ms position
+smoothing, zero interpolation delay and .002 fixation dead band. Position axes
+saturate independently and settle exactly at edges, avoiding a fixation hold just
+short of a corner. Mouse test has separate 3× downward boost, 20 ms smoothing,
+zero delay, .10 dead zone / .02 activation margin, exponent 1.2, acceleration 10/s
+and deceleration 14/s. Downward scaling precedes inversion; raw values and independent
+head-key/eye actions stay intact. Missing input still immediately stops movement.
+
+Mapping format is now v4; strict v1–v3 migration preserves previous gains, mode,
+smoothing/delay and dead band. Target smoothing/delay are mapping settings, so a
+face-profile load cannot restore old filtering. Mouse test similarly retains its
+pointer response. Mapping settings exposes the boost and mode-specific filters;
+logs record the effective smoothing, delay, downward gain and fixation band.
+Incoming profile freshness is validated against target delay before detector fits
+are replaced. No C ABI or SignalFrame changes; face/detector versions remain v3/v13.
+
+Verification:
+- `python3 -m unittest discover -s tests/processing -q`: **120 passed**.
+- `RUN_TK_TESTS=1 FID_LIBRARY=<main Drivers/build/libface_input_driver.dylib>` with
+  the Vision venv, each integration test module in a fresh process: **147 passed**
+  across the full run and focused reruns of the three subsequently updated modules.
+  No skips. Includes native Tk controls, version migration, gain/inversion,
+  unknown/stale stops, independent actions, profile persistence and atomic failure.
+- Synthetic raw iris → Processing → compiled dry-run target backend reaches all
+  four exact corners and emits no further moves on fixed input. Small downward
+  head input (.53) now emits positive-Y movement events through the compiled
+  velocity driver, with no X movement/clicks/keys/scroll. Dry-run velocity does not
+  update its simulated absolute position, so that test checks emitted deltas.
+- Four existing local face profiles loaded read-only in both mappings (**8 loads**),
+  keeping 20 ms smoothing and their independent downward gains; all stayed paused,
+  opened no camera and retained identical file hashes.
+- `Vision/.venv/bin/python -m App --source demo --headless --frames 490 --output
+  dry-run --driver-library <main library>`: **490 accepted**, no errors, 987 mouse
+  moves, 3 clicks per side, 4 key downs/ups; final disabled, held keys 0, target speed 0.
+- `python3 -m Processing.mouse.benchmark`: 10,000 ticks, mean **47.69 µs**, p95
+  **67.75 µs**; synthetic CPU measurement only.
+- Ruff F checks, `git diff --check` and integration scope check against `cf75ab2`
+  passed. Driver binary did not require rebuilding.
+
+Handoff: restart App to use the new built-in defaults. Mapping settings can tune
+the gains/filters further; export custom mappings to persist them across restarts.
+Old imported mappings intentionally keep their tuning. No human-camera accuracy
+or native OS cursor injection was measured in this follow-up. Stronger gain also
+amplifies noise; these are adjustable starting values based on the user's report
+and the compressed downward range in existing scalar logs, not a gaze calibration.

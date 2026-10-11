@@ -1,6 +1,7 @@
 """Vision fixtures → Processing → actual C driver in dry-run mode."""
 
 import os
+import time
 from pathlib import Path
 from types import SimpleNamespace
 import unittest
@@ -81,6 +82,22 @@ class DriverConnectionTests(unittest.TestCase):
         snap=self.lab.state()["snapshot"]
         self.assertEqual((snap["pointer_x"],snap["pointer_y"]),(.5,.5))
 
+    def test_small_downward_head_input_produces_compiled_movement_without_other_actions(self):
+        self.lab.select_mapping('mouse-test')
+        self.lab.action({'action':'arm'});self.deliver(gaze_x=None,gaze_y=None)
+        start=len(self.lab.output.events)
+        for _ in range(25):
+            time.sleep(.01);self.deliver(head_y=.53,gaze_x=None,gaze_y=None)
+        output=self.lab.output.snapshot()
+        self.assertIsNone(output['error'])
+        # Dry-run integrates target positions only; velocity is verified through
+        # the same movement events that the native backend sends to the OS.
+        events=list(self.lab.output.events)[start:]
+        self.assertGreater(sum(event['y'] for event in events),0)
+        self.assertTrue(all(event['type']==1 and event['x']==0 and event['y']>0 for event in events))
+        self.deliver(head_y=None)
+        self.assertEqual(self.lab.state()['message']['pointer'],dict(mode='velocity',x=.5,y=.5))
+
     def test_centering_after_start_discards_pre_enable_interpolation(self):
         settings=self.lab.state()['mapping'];settings['pointer_mode']='velocity'
         self.lab.update_mapping(settings)
@@ -122,7 +139,7 @@ class DriverConnectionTests(unittest.TestCase):
         output=self.deliver(gaze_x=.8,left_eye_open=1)
         self.assertTrue(output['enabled'])
         self.assertEqual(output['event_counts'].get(3,0),0)
-        self.assertEqual(self.lab.state()['message']['pointer']['x'],.8)
+        self.assertEqual(self.lab.state()['message']['pointer']['x'],1)
         self.assertEqual(self.deliver(gaze_x=.8,left_eye_open=0)['event_counts'].get(3),1)
 
     def test_key_combo_loss_mapping_change_and_profile_settings_release(self):

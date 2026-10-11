@@ -26,13 +26,48 @@ class TargetPointerTests(unittest.TestCase):
         return self.core.tick(self.now)
 
     def test_start_at_any_fresh_destination_and_steady_input_never_integrates(self):
-        snap = self.feed(x=.8, y=.2)
+        snap = self.feed(x=.6, y=.53)
         self.assertTrue(snap['enabled'])
-        self.assertEqual(control_message(snap)['pointer'], dict(mode='target', x=.8, y=.2, speed=1))
+        self.assertAlmostEqual(snap['pointer_x'], .7)
+        self.assertAlmostEqual(snap['pointer_y'], .74)
+        destination = control_message(snap)['pointer']
         for _ in range(150):
-            snap = self.feed(x=.8, y=.2)
-            self.assertEqual((snap['pointer_x'], snap['pointer_y']), (.8, .2))
-        self.assertIn('screen X 80.0%', snap['instructions'][-2]['instruction'])
+            snap = self.feed(x=.6, y=.53)
+            self.assertEqual(control_message(snap)['pointer'], destination)
+        self.assertIn('screen X 70.0%', snap['instructions'][-2]['instruction'])
+
+    def test_compressed_downward_range_reaches_every_corner_after_moving(self):
+        for adaptive in (True, False):
+            self.core = GamingProcessor(replace(Mapping(), adaptive_pointer=adaptive), subject_id='person')
+            self.core.arm(); self.feed()
+            for x,y,expected in ((.25,.5625,(0,1)),(.75,.5625,(1,1)),(.75,.25,(1,0)),(.25,.25,(0,0))):
+                for _ in range(30):
+                    snap = self.feed(x=x,y=y)
+                    self.assertTrue(0 <= snap['pointer_x'] <= 1 and 0 <= snap['pointer_y'] <= 1)
+                self.assertEqual((snap['pointer_x'],snap['pointer_y']),expected)
+                # Raw inputs are evidence; only destination coordinates expand.
+                self.assertEqual(snap['diagnostics']['raw_pointer'],[x,y])
+
+    def test_default_filter_responds_without_old_interpolation_delay(self):
+        self.feed()
+        snap = self.feed(x=.6, y=.53)
+        self.assertGreater(snap['pointer_x'], .55)
+        self.assertGreater(snap['pointer_y'], .55)
+        self.assertEqual(snap['diagnostics']['pointer_interpolation_ms'],0)
+        self.assertEqual(snap['diagnostics']['pointer_smoothing_ms'],20)
+
+    def test_downward_boost_precedes_inversion_and_preserves_up_and_center(self):
+        for inverted, expected in ((False,(.5,.74)),(True,(.5,.26))):
+            mapping = Mapping(target_smoothing_ms=0, target_jitter=0)
+            mapping = replace(mapping,response=replace(mapping.response,
+                              pointer=replace(mapping.response.pointer,invert_y=inverted)))
+            self.core=GamingProcessor(mapping,subject_id='person');self.core.arm()
+            snap=self.feed()
+            self.assertEqual((snap['pointer_x'],snap['pointer_y']),(.5,.5))
+            snap=self.feed(y=.53)
+            self.assertAlmostEqual(snap['pointer_y'],expected[1])
+            snap=self.feed(y=.47)
+            self.assertAlmostEqual(snap['pointer_y'],.56 if inverted else .44)
 
     def test_fixation_dead_band_is_around_each_destination_not_screen_center(self):
         for center in ((.1,.2),(.8,.9),(.5,.5)):
@@ -90,11 +125,24 @@ class TargetPointerTests(unittest.TestCase):
         current=Mapping().to_dict()
         for version in ('input_mapping_v1','input_mapping_v2'):
             old=deepcopy(current);old['format']=version
+            for key in ('pointer_down_gain','target_smoothing_ms','target_interpolation_ms'):del old[key]
             del old['pointer_mode'];del old['target_jitter']
             if version.endswith('v1'):
                 del old['input_mode'];del old['adaptive_pointer']
             self.assertEqual(Mapping.from_dict(old).pointer_mode,'velocity')
-        for key,value in (('pointer_mode','absolute'),('target_jitter',True),('target_jitter',float('nan')),('target_jitter',.2)):
+        old=deepcopy(current);old['format']='input_mapping_v3'
+        for key in ('pointer_down_gain','target_smoothing_ms','target_interpolation_ms'):del old[key]
+        old.update(pointer_gain=1,target_jitter=.01)
+        migrated=Mapping.from_dict(old)
+        self.assertEqual((migrated.pointer_down_gain,migrated.target_smoothing_ms,migrated.target_interpolation_ms),(1,90,50))
+        self.assertEqual(Mapping.from_dict(migrated.to_dict()),migrated)
+        self.core=GamingProcessor(migrated,subject_id='person');self.core.arm()
+        snap=self.feed(x=.8,y=.9)
+        self.assertEqual((snap['pointer_x'],snap['pointer_y']),(.8,.9))
+        for key,value in (('pointer_mode','absolute'),('target_jitter',True),('target_jitter',float('nan')),('target_jitter',.2),
+                          ('pointer_down_gain',0),('pointer_down_gain',True),('pointer_down_gain',float('inf')),
+                          ('target_smoothing_ms',-1),('target_smoothing_ms',float('nan')),
+                          ('target_interpolation_ms',250),('target_interpolation_ms',True)):
             bad=deepcopy(current);bad[key]=value
             with self.assertRaises(ValueError):Mapping.from_dict(bad)
         self.assertEqual(mouse_test_mapping().pointer_mode,'velocity')

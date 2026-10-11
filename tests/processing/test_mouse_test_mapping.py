@@ -62,7 +62,7 @@ class MouseTestMappingTests(unittest.TestCase):
 
     def test_tiny_nudges_stale_stop_and_no_automatic_rearming(self):
         self.lab.action({'action':'arm'});self.feed()
-        for _ in range(25):snap=self.feed(head_x=.53,head_y=.53)
+        for _ in range(25):snap=self.feed(head_x=.51,head_y=.51)
         self.assertEqual((snap['pointer_x'],snap['pointer_y']),(.5,.5))
         self.now += 300;self.lab.step(self.now)
         self.assertFalse(self.lab.processor.armed)
@@ -93,11 +93,13 @@ class MouseTestMappingTests(unittest.TestCase):
         self.assertTrue(self.feed(x=None,y=None,left='unknown',right='unknown')['enabled'])
 
     def test_mapping_versions_and_invalid_head_keyboard_bindings(self):
-        current=Mapping().to_dict();self.assertEqual(current['format'],'input_mapping_v3')
+        current=Mapping().to_dict();self.assertEqual(current['format'],'input_mapping_v4')
         legacy=deepcopy(current);legacy['format']='input_mapping_v1'
+        for key in ('pointer_down_gain','target_smoothing_ms','target_interpolation_ms'):del legacy[key]
         del legacy['input_mode'];del legacy['adaptive_pointer']
         del legacy['pointer_mode'];del legacy['target_jitter']
-        self.assertEqual(Mapping.from_dict(legacy).to_dict(),Mapping(pointer_mode='velocity').to_dict())
+        self.assertEqual(Mapping.from_dict(legacy),Mapping(pointer_mode='velocity',pointer_down_gain=1,
+                          target_jitter=.01,target_smoothing_ms=90,target_interpolation_ms=50))
         head=mouse_test_mapping().to_dict()
         self.assertEqual(Mapping.from_dict(head),mouse_test_mapping())
         for key,value in (('input_mode','unknown'),('adaptive_pointer',1)):
@@ -105,3 +107,15 @@ class MouseTestMappingTests(unittest.TestCase):
             with self.assertRaises(ValueError):Mapping.from_dict(broken)
         head['bindings']['left']='w'
         with self.assertRaises(ValueError):Mapping.from_dict(head)
+
+    def test_small_downward_head_signal_now_moves_and_releases_on_loss(self):
+        self.lab.action({'action':'arm'});self.feed()
+        # Previously .06 signed motion was entirely inside the .19 start gate.
+        for _ in range(15):snap=self.feed(head_y=.53)
+        self.assertGreater(snap['pointer_y'],.52)
+        self.assertAlmostEqual(snap['pointer_x'],.5)
+        self.assertEqual(snap['diagnostics']['raw_pointer'],[.5,.53])
+        self.assert_pointer_only(snap)
+        snap=self.feed(head_y=None)
+        self.assertEqual((snap['pointer_x'],snap['pointer_y']),(.5,.5))
+        self.assertFalse(snap['known']['pointer'])

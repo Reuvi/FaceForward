@@ -3,8 +3,10 @@
 **Current screen pointer:** read `../Contracts/SCREEN_POINTER.md`.
 Gaming defaults to target position filtering and a fixation dead band, without
 the velocity center gate/curve/acceleration. Target and velocity commands must
-remain explicitly tagged; unknown targets have speed 0. Map files v3 retain v1/v2
-as velocity. Mouse test stays head-only velocity, face profiles stay v3.
+remain explicitly tagged; unknown targets have speed 0. Map files v4 retain v1/v2
+as velocity and preserve v3 tuning. Both gaming and Mouse test have separate
+downward boosts and lighter filters. Face profiles cannot restore old target
+filtering or overwrite Mouse test pointer tuning. Face profiles stay v3.
 
 **Current user decision — tongue retired:** read [../Contracts/TONGUE_RETIREMENT.md](../Contracts/TONGUE_RETIREMENT.md).
 App and Vision lab have no tongue detection, worker, calibration, graphs or input

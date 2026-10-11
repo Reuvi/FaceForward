@@ -12,9 +12,10 @@ class TargetFilter(AxisFilter):
     target mode on every serialized command determines their meaning downstream.
     """
 
-    def __init__(self, config, *, gain=1, adaptive=True, jitter=.01):
+    def __init__(self, config, *, gain=1, adaptive=True, jitter=.01, down_gain=1, delay_ms=None):
         self.jitter = jitter
-        super().__init__(config, 2, gain=gain, adaptive=adaptive)
+        self.delay_ms = delay_ms
+        super().__init__(config, 2, gain=gain, adaptive=adaptive, down_gain=down_gain)
 
     def reset_motion(self):
         super().reset_motion()
@@ -39,7 +40,7 @@ class TargetFilter(AxisFilter):
         self.valid = True
 
     def step(self, now, delay_ms, dt):
-        self.position = self.interpolate(now - delay_ms)
+        self.position = self.interpolate(now - (delay_ms if self.delay_ms is None else self.delay_ms))
         if self.position is None:
             self.reset_motion()
             return self.velocity
@@ -53,9 +54,15 @@ class TargetFilter(AxisFilter):
         else:
             alpha = 1 if not self.config.smoothing_ms else -math.expm1(-dt*1000/self.config.smoothing_ms)
             self.filtered = tuple(p+alpha*(v-p) for p,v in zip(self.filtered,self.target))
+        # Smoothing approaches endpoints asymptotically; the fixation hold must
+        # not strand a saturated destination a few pixels short of the border.
+        edges = tuple(abs(t) == 1 and abs(t-v) <= .004 for t,v in zip(self.target,self.filtered))
+        self.filtered = tuple(t if edge else v for t,v,edge in zip(self.target,self.filtered,edges))
         self.active = (self.anchor is None or
                        length(tuple(v-p for v,p in zip(self.filtered,self.anchor))) > 2*self.jitter)
         if self.active:
             self.anchor = self.filtered
+        else:
+            self.anchor = tuple(v if edge else p for v,p,edge in zip(self.filtered,self.anchor,edges))
         self.velocity = self.anchor
         return self.velocity

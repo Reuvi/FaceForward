@@ -80,11 +80,13 @@ class GamingProcessor(MouseProcessor):
         self.head_y = HeadGate(self.mapping.head_y)
         self.output_session_id = str(uuid.uuid4())
         super().__init__(self.mapping.response, subject_id)
-        self.pointer = (TargetFilter(self.config.pointer, gain=self.mapping.pointer_gain,
-                                    adaptive=self.mapping.adaptive_pointer, jitter=self.mapping.target_jitter)
+        self.pointer = (TargetFilter(replace(self.config.pointer, smoothing_ms=self.mapping.target_smoothing_ms),
+                                    gain=self.mapping.pointer_gain, down_gain=self.mapping.pointer_down_gain,
+                                    adaptive=self.mapping.adaptive_pointer, jitter=self.mapping.target_jitter,
+                                    delay_ms=self.mapping.target_interpolation_ms)
                         if self.mapping.pointer_mode == "target" else
                         AxisFilter(self.config.pointer, 2, gain=self.mapping.pointer_gain,
-                                   adaptive=self.mapping.adaptive_pointer))
+                                   adaptive=self.mapping.adaptive_pointer, down_gain=self.mapping.pointer_down_gain))
 
     def decode_sample(self, frame):
         sample = super().decode_sample(frame)
@@ -135,6 +137,11 @@ class GamingProcessor(MouseProcessor):
                     target_speed=int(self.mapping.pointer_mode == "target" and snap["enabled"] and diag["raw_pointer"] is not None),
                     output_session_id=self.output_session_id)
         diag.update(scroll_target=0, scroll_boost=0, interpolated_scroll=None,
+                    pointer_smoothing_ms=self.pointer.config.smoothing_ms,
+                    pointer_interpolation_ms=(self.mapping.target_interpolation_ms
+                                              if self.mapping.pointer_mode == "target" else self.config.interpolation_ms),
+                    pointer_down_gain=self.mapping.pointer_down_gain,
+                    target_jitter=self.mapping.target_jitter if self.mapping.pointer_mode == "target" else None,
                     head_x=self.head_diagnostic(self.head_x), head_y=self.head_diagnostic(self.head_y))
         snap["known"] = {"left_click": diag["left_closed"] is not None,
                          "right_click": diag["right_closed"] is not None,

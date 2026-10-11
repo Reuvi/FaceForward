@@ -1,6 +1,7 @@
 """Raw pupils replace the retired live pupil guide; old fits remain inert."""
 from copy import deepcopy
 import importlib.util
+import json
 import os
 from pathlib import Path
 import tempfile
@@ -127,20 +128,20 @@ class RawPupilControlTests(unittest.TestCase):
         self.session.lab.select_mapping('gaming-keyboard-mouse-1')
         self.session.configure_output('dry-run',library)
         self.session.lab.action({'action':'arm'})
-        self.feed(missing_pose=True,pupil_x=.8,pupil_y=.25)
+        self.feed(missing_pose=True,pupil_x=.65,pupil_y=.375)
         pointer=self.session.lab.state()['message']['pointer']
         self.assertEqual((pointer['mode'],pointer['speed']),('target',1))
         self.assertAlmostEqual(pointer['x'],.8);self.assertAlmostEqual(pointer['y'],.25)
         expected=[pointer['x'],pointer['y']]
         deadline=time.monotonic()+3
         while not self.session.lab.output.status().target_reached and time.monotonic()<deadline:
-            time.sleep(.01);self.feed(missing_pose=True,pupil_x=.8,pupil_y=.25)
+            time.sleep(.01);self.feed(missing_pose=True,pupil_x=.65,pupil_y=.375)
         self.assertTrue(self.session.lab.output.status().target_reached)
         self.session.lab.output.collect()
         count=self.session.lab.output.counts[1]
         for i in range(25):
             time.sleep(.01)
-            self.feed(missing_pose=True,pupil_x=.8+(.002 if i%2 else -.002),pupil_y=.25)
+            self.feed(missing_pose=True,pupil_x=.65+(.0005 if i%2 else -.0005),pupil_y=.375)
         output=self.session.lab.state()['output']
         self.assertEqual(output['pointer_position'],expected)
         self.assertEqual(output['event_counts'][1],count)
@@ -149,6 +150,73 @@ class RawPupilControlTests(unittest.TestCase):
         self.assertEqual(self.session.lab.state()['message']['pointer']['speed'],0)
         time.sleep(.04)
         self.assertEqual(self.session.lab.output.snapshot()['pointer_position'],expected)
+
+    def test_default_pupils_reach_all_four_compiled_driver_corners(self):
+        from Drivers.output import default_library
+        library=Path(os.environ.get('FID_LIBRARY',default_library()))
+        if not library.is_file():self.skipTest('Build Drivers or set FID_LIBRARY')
+        self.session.lab.select_mapping('gaming-keyboard-mouse-1')
+        self.session.lab.settings({'runtime':{'pointer_speed':2500}})
+        self.session.configure_output('dry-run',library)
+        self.session.lab.action({'action':'arm'});self.feed()
+        # Synthetic downward iris movement is only .009 eye widths here. No
+        # detector re-fit, head pose, or extreme eyelid movement is required.
+        for x,y,expected in ((.2,.545,(0,1)),(.8,.545,(1,1)),(.8,.2,(1,0)),(.2,.2,(0,0))):
+            deadline=time.monotonic()+3
+            while time.monotonic()<deadline:
+                self.feed(missing_pose=True,pupil_x=x,pupil_y=y)
+                output=self.session.lab.output.snapshot()
+                if output['target_reached'] and output['pointer_position']==list(expected):break
+                time.sleep(.01)
+            self.assertEqual(output['pointer_position'],list(expected))
+            self.assertTrue(output['target_reached'])
+            self.assertIsNone(output['error'])
+            count=output['event_counts'][1]
+            for _ in range(8):
+                time.sleep(.01);self.feed(missing_pose=True,pupil_x=x,pupil_y=y)
+            self.assertEqual(self.session.lab.output.snapshot()['event_counts'][1],count)
+
+    def test_face_profile_cannot_restore_old_pointer_filters_in_either_mapping(self):
+        self.core.head=AxisCalibration(-12,0,12,endpoint_tolerance=.05)
+        before=self.core.export_calibration()
+        with tempfile.TemporaryDirectory() as folder:
+            path=Path(folder)/'old-response.json';self.session.save_profile(path)
+            data=json.loads(path.read_text())
+            data['processing']['pointer']['smoothing_ms']=200
+            data['processing']['interpolation_ms']=100
+            path.write_text(json.dumps(data))
+            for identity in ('gaming-keyboard-mouse-1','mouse-test'):
+                self.session.lab.select_mapping(identity)
+                selected=self.session.lab.state()['mapping']
+                selected['pointer_down_gain']=5
+                selected['target_smoothing_ms']=12
+                selected['response']['pointer']['smoothing_ms']=17
+                self.session.lab.update_mapping(selected)
+                self.session.lab.action({'action':'arm'});self.feed()
+                self.session.load_profile(path)
+                pointer=self.session.lab.processor.pointer
+                self.assertEqual(pointer.config.smoothing_ms,12 if identity.startswith('gaming') else 17)
+                self.assertEqual(pointer.down_gain,5)
+                state=self.session.lab.state()
+                self.assertEqual(state['snapshot']['diagnostics']['pointer_interpolation_ms'],0)
+                self.assertFalse(state['snapshot']['armed'])
+                self.assertEqual(self.core.export_calibration(),before)
+
+    def test_incompatible_profile_freshness_cannot_partially_replace_detector(self):
+        self.session.lab.select_mapping('gaming-keyboard-mouse-1')
+        with tempfile.TemporaryDirectory() as folder:
+            path=Path(folder)/'short-age.json';self.session.save_profile(path)
+            data=json.loads(path.read_text())
+            data['processing'].update(stale_ms=80,interpolation_ms=0)
+            path.write_text(json.dumps(data))
+            self.core.head=AxisCalibration(-12,0,12,endpoint_tolerance=.05)
+            before=self.core.export_calibration()
+            mapping=self.session.lab.state()['mapping'];mapping['target_interpolation_ms']=100
+            self.session.lab.update_mapping(mapping)
+            with self.assertRaisesRegex(ValueError,'Target interpolation'):
+                self.session.load_profile(path)
+            self.assertEqual(self.core.export_calibration(),before)
+            self.assertFalse(self.session.lab.processor.armed)
 
     @unittest.skipUnless(os.environ.get('RUN_TK_TESTS')=='1','native Tk check')
     def test_native_pupil_panel_displays_raw_values_without_guide_controls(self):

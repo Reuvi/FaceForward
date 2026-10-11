@@ -3,7 +3,9 @@
 **Current screen pointer:** follow `Contracts/SCREEN_POINTER.md` (repository root).
 Default gaming sends approximate primary-display targets from raw pupils, not
 velocity. Label destination and arrival clearly, retain no pupil calibration,
-and keep Mouse test head-only velocity. Mapping v3 reads old v1/v2 as velocity.
+and keep Mouse test head-only velocity. Mapping v4 reads old v1/v2 as velocity and preserves v3 response.
+Keep mapping target filtering and head-only pointer response when loading face
+profiles; both built-ins now amplify downward pointer motion.
 
 **Current raw pupil decision:** follow `Contracts/RAW_PUPIL_CONTROL.md` (repository root).
 Pupils use fixed-scale raw iris X/Y with no pupil guide, learned endpoints or

@@ -76,8 +76,8 @@ default is a labeled synthetic demo; choose **Camera** to open your camera.
    This has not been calibrated to the actual point you are looking at;
    [behavior and accuracy limits](../docs/SCREEN_POINTER_GUIDE.md).
 7. **Mapping settings… → Pointer behavior** chooses Screen destination or Velocity.
-   Destination mode exposes smoothing and a fixation dead band around the last
-   destination (.01 by default). Velocity exposes the original central dead zone,
+   Destination mode exposes position smoothing (20 ms), delay (0 ms), downward
+   boost (4×), pointer gain (2×) and a fixation dead band (.002). Velocity exposes the original central dead zone,
    activation margin, response curve, acceleration and deceleration. Applying changes
    stops output. The pointer uses pupils in gaming or head X/Y in Mouse test. **Adaptive pointer smoothing (1€)** reduces stationary jitter and responds faster to deliberate motion; uncheck it to compare the fixed filter. In Mouse test, unused eye/key settings are hidden. Detector setup remains
    independent in Calibration.
@@ -131,10 +131,12 @@ Save the migrated profile to preserve the new format. Existing files are not
 rewritten automatically.
 
 Gaming names, head thresholds, key bindings and pointer gain use separate
-`input_mapping_v3` files (v1/v2 import as velocity) exported from **Signals → Mapping settings…**. Mode and fixation dead band belong to the mapping. Face profiles continue
+`input_mapping_v4` files (v1/v2 import as velocity; v3 retains its response) exported from **Signals → Mapping settings…**. Mode, gains and target filtering belong to the mapping. Face profiles continue
 to contain detector fits and the existing mouse response settings. Loading a face
 profile applies its response to the selected mapping and stops output; it keeps
-that mapping's name, head settings and bindings. Export mapping settings separately
+that mapping's name, head settings, bindings, gains and target filtering. Mouse test
+also retains its pointer response and delay, including the new 3× downward boost
+and 20 ms smoothing. Export mapping settings separately
 after tuning them; named copies are otherwise held only for the current app session.
 
 Brief face loss and same-source restarts keep completed fits. Switching source

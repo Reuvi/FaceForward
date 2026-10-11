@@ -92,11 +92,29 @@ class MappingPanel(ttk.Frame):
         self.jitter_label.grid(row=4, column=0, sticky="w", pady=3)
         self.jitter_widget = ttk.Entry(group, textvariable=self.target_jitter, width=8)
         self.jitter_widget.grid(row=4, column=1, sticky="w", padx=5)
+        self.down_gain = tk.StringVar()
+        label(group, "Downward boost (1–8×)").grid(row=5, column=0, sticky="w", pady=3)
+        down_entry = ttk.Entry(group, textvariable=self.down_gain, width=8)
+        down_entry.grid(row=5, column=1, sticky="w", padx=5)
+        self.edit_widgets.append(down_entry)
+        self.target_fields = {}
+        self.target_widgets = []
+        for row, (key, title) in enumerate((("target_smoothing_ms", "Position smoothing ms"),
+                                           ("target_interpolation_ms", "Position delay ms")), start=6):
+            var = tk.StringVar()
+            self.target_fields[key] = var
+            title_widget = label(group, title)
+            title_widget.grid(row=row, column=0, sticky="w", pady=3)
+            widget = ttk.Entry(group, textvariable=var, width=8)
+            widget.grid(row=row, column=1, sticky="w", padx=5)
+            self.target_widgets.extend((title_widget, widget))
         self.adaptive = tk.BooleanVar(value=True)
         self.adaptive_widget = ttk.Checkbutton(settings_parent, text="Adaptive pointer smoothing (1€)", variable=self.adaptive)
         self.adaptive_widget.pack(anchor="w", pady=5)
+        self.pointer_group = None
         if compact:
             pointer = ttk.LabelFrame(settings_parent, text="Pointer response", padding=8)
+            self.pointer_group = pointer
             pointer.pack(fill="x", pady=(10,0))
             for i, (key, title) in enumerate((("deadzone", "Dead zone"), ("hysteresis", "Activation margin"),
                     ("smoothing_ms", "Smoothing ms"), ("exponent", "Response curve"),
@@ -154,10 +172,15 @@ class MappingPanel(ttk.Frame):
 
     def pointer_controls(self):
         target = self.pointer_mode.get() == "Screen destination"
-        for widget in (self.jitter_label, self.jitter_widget):
+        if self.pointer_group is not None:
+            if target:
+                self.pointer_group.pack_forget()
+            else:
+                self.pointer_group.pack(fill="x", pady=(10,0), before=self.apply_button)
+        for widget in (self.jitter_label, self.jitter_widget, *self.target_widgets):
             widget.grid() if target else widget.grid_remove()
         visible = [(key, widgets) for key, widgets in self.pointer_widgets.items()
-                   if not target or key == "smoothing_ms"]
+                   if not target]
         for widgets in self.pointer_widgets.values():
             for widget in widgets:
                 widget.grid_remove()
@@ -196,6 +219,8 @@ class MappingPanel(ttk.Frame):
         data["adaptive_pointer"] = self.adaptive.get()
         data["pointer_mode"] = "target" if self.pointer_mode.get() == "Screen destination" else "velocity"
         data["target_jitter"] = float(self.target_jitter.get())
+        data["pointer_down_gain"] = float(self.down_gain.get())
+        data.update({key:float(var.get()) for key,var in self.target_fields.items()})
         data["revision"] += 1
         for (axis, key), var in self.fields.items():
             data[axis][key] = float(var.get())
@@ -254,13 +279,17 @@ class MappingPanel(ttk.Frame):
             self.adaptive.set(mapping.get("adaptive_pointer", True) if mapping else False)
             self.pointer_mode.set("Screen destination" if mapping and mapping["pointer_mode"] == "target" else "Velocity")
             self.target_jitter.set(mapping["target_jitter"] if mapping else .01)
+            self.down_gain.set(mapping["pointer_down_gain"] if mapping else 1)
+            for key, var in self.target_fields.items():
+                var.set(mapping[key] if mapping else 0)
             self.mode_widget.configure(state="disabled" if head_only or not mapping else "readonly")
             self.pointer_controls()
-            self.help_text.set("Head X + Head Y move the pointer together. Both head axes need calibration. Eyes and pupils are ignored; no clicks, keys or scroll."
-                               if head_only else "Head thresholds use the fraction of your calibrated range from neutral. Eyes use calibrated actions without a dwell timer."
-                               + (" Screen destination moves to a point and stops; without screen calibration its alignment is approximate. Fixation dead band 0.01 means 1% of the screen. Velocity keeps moving while off-center."
+            self.help_text.set(("Head X + Head Y move the pointer together. Both head axes need calibration. Eyes and pupils are ignored; no clicks, keys or scroll."
+                               if head_only else "Head thresholds use the fraction of your calibrated range from neutral. Eyes use calibrated actions without a dwell timer.")
+                               + (" Screen destination moves to a point and stops; without screen calibration its alignment is approximate. Fixation dead band 0.002 means 0.2% of the screen. Position smoothing/delay belong to this mapping. Velocity keeps moving while off-center."
                                   if not head_only else "")
-                               + ("" if self.compact else " Pointer smoothing and velocity response are in Transfer settings."))
+                               + " Downward boost multiplies movement below center before inversion; pointer gain scales overall response."
+                               + ("" if self.compact else " Velocity smoothing and response are in Transfer settings."))
             for widget in self.edit_widgets:
                 widget.configure(state="disabled" if mapping is None else "readonly" if isinstance(widget, ttk.Combobox) else "normal")
             self.apply_button.configure(state="disabled" if mapping is None and not self.compact else "normal")

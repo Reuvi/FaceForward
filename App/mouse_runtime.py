@@ -7,6 +7,7 @@ import threading
 import time
 
 from Processing.mouse.controller import Lab
+from Processing.mappings.config import Mapping
 from Vision.mouse_demo import SUBJECT, mouse_demo_records
 from Vision.signals import SINGLE_SUBJECT, monotonic_ms, validate_frame
 from Vision.sources import read_ndjson, replay
@@ -183,6 +184,16 @@ class MouseSession:
                 raise ValueError("Profile source does not match. Camera and synthetic profiles are separate.")
             core = self.ensure_detector_runtime().workbench
             self._expire_detector()
+            mapping = self.lab.state()["mapping"]
+            if mapping and mapping["input_mode"] == "head-mouse":
+                # A face profile supplies detector calibration, not another
+                # mapping's pointer tuning. Keep the head-only response intact.
+                data["processing"]["pointer"] = mapping["response"]["pointer"]
+                data["processing"]["interpolation_ms"] = mapping["response"]["interpolation_ms"]
+            if mapping:
+                # Check target delay against the incoming freshness limit before
+                # replacing detector fits. App's source lock migrates to gaze.
+                Mapping.from_dict(dict(mapping, response=dict(data["processing"], pointer_source="gaze")))
             # Validate fully and require idle collection; loading needs no face.
             core.load_calibration(data["detector"])
             self.lab.settings({"config": data["processing"],

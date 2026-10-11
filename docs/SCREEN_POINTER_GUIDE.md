@@ -1,7 +1,7 @@
 # Screen destination pointer
 
 Gaming now sends a destination to the existing driver. If pupil readings settle
-at X=.8, Y=.25, the cursor travels toward 80% across and 25% down the primary
+at X=.65, Y=.375, the default mapping travels toward 80% across and 25% down the primary
 display, then stops. It does not keep moving right/up. Small changes around the
 last accepted destination are ignored; the rest of the screen has no central
 dead zone. A missing pupil stops travel immediately without returning to center.
@@ -33,16 +33,29 @@ Vision/.venv/bin/python -m App --source camera --output native
    estimated destination. Signals reports the destination and driver arrival.
    Stop/Escape, tracking loss or staleness releases output; restart explicitly.
 
-**Fixation dead band** defaults to .01 (1% of normalized screen dimensions).
-Increase it slightly if small jitter moves the destination, or reduce it for
-finer changes. **Smoothing ms** and **Adaptive pointer smoothing** filter position.
-**Pointer gain** scales the available pupil range around its center; it is not
-travel speed. Excessive gain also magnifies measurement noise. The driver's
-configured pointer speed limits travel speed, without overshooting the target.
+The new pupil defaults are **Pointer gain 2**, **Downward boost 4**, **Position
+smoothing 20 ms**, **Position delay 0 ms**, and **Fixation dead band .002** (0.2%
+of screen dimensions). Downward boost multiplies overall gain: positive pupil Y
+movement below its center gets 8× total response. X and upward motion get 2×.
+For example, raw Y=.53 requests screen Y=.74; Y=.5625 reaches the bottom. X=.25
+or .75 reaches the left or right edge. Each axis clips independently, so all four
+corners are reachable. Filtering settles exactly at a saturated edge.
+
+Adjust these in **Mapping settings…**. Raising smoothing or fixation dead band
+reduces jitter; lowering them responds to smaller changes. Gain also amplifies
+noise. Downward boost applies before inversion, preserving the chosen direction.
+The driver's pointer speed controls travel speed without overshooting. Loading a
+face profile keeps these target settings; export the mapping to save custom tuning
+across app restarts. Older imported mapping files preserve their saved response;
+set the values above to opt into the new tuning.
 
 **Velocity** remains available for joystick-style movement. It uses the original
 center dead zone, response curve and acceleration settings. **Mouse test** remains
-head X/Y velocity only, ignoring every eye/pupil/click/key/scroll input.
+head X/Y velocity only, ignoring every eye/pupil/click/key/scroll input. Its separate
+defaults are downward boost 3, gain 1, smoothing 20 ms, zero interpolation delay,
+dead zone .10 plus .02 activation margin, curve 1.2, acceleration 10/s and
+deceleration 14/s. Tiny head jitter still has a neutral zone. Loading a face
+profile keeps the chosen Mouse test pointer tuning.
 
 Targets refer to the primary display. Native target support uses macOS or Linux
 X11 with the driver's display dependencies; pure Wayland target support is not
@@ -61,5 +74,5 @@ would be a separate step toward matching the actual location being viewed.
 Synthetic checks cover destination arrival, repeated-target stability, jitter,
 unknown/stale input, profile/mapping compatibility and key/button release. They
 do not measure a person's gaze accuracy. The C ABI stays v3; mapping files are
-v3 (v1/v2 import as velocity), detector presets v13 and face profiles v3 stay intact.
+v4 (v1/v2 import as velocity; v3 preserves its response), detector presets v13 and face profiles v3 stay intact.
 See [the adopted interface](../Contracts/SCREEN_POINTER.md).

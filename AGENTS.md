@@ -2,8 +2,10 @@
 
 **Current screen pointer decision:** read `Contracts/SCREEN_POINTER.md`.
 Gaming defaults to an approximate primary-display destination from raw pupils;
-it arrives and stops. No pupil calibration is added. Mapping v3 supports target
-and velocity; older mappings import as velocity, Mouse test stays head velocity.
+it arrives and stops. No pupil calibration is added. Mapping v4 supports target
+and velocity; v1/v2 import as velocity and v3 retains its saved mode. Mouse test
+stays head velocity. Both mappings have independent downward boosts and lighter
+filters; preserve mapping pointer tuning when loading face calibration.
 Keep target position filtering/dead band separate from velocity shaping, with
 zero-speed holds on unknown input. Driver ABI stays v3; face/detector files stay v3/v13.
 

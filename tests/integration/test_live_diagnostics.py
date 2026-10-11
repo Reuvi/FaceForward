@@ -96,7 +96,7 @@ class LiveDiagnosticsTests(unittest.TestCase):
         source,lab=self.feed(.8)
         message=pointer_status(source,lab)
         self.assertIn('screen destination',message)
-        self.assertIn('80.0%',message)
+        self.assertIn('100.0%',message)
         self.assertNotIn('dead zone',message)
         lab['output'].update(mode='dry-run',target_reached=True,pointer_position=[.8,.5])
         self.assertIn('arrived',pointer_status(source,lab))
@@ -107,6 +107,10 @@ class LiveDiagnosticsTests(unittest.TestCase):
             self.assertEqual(row['pointer_mode'],'target')
             self.assertEqual(row['driver_position'],[.8,.5])
             self.assertTrue(row['target_reached'])
+            self.assertEqual(row['pointer_filter']['smoothing_ms'],20)
+            self.assertEqual(row['pointer_interpolation_ms'],0)
+            self.assertEqual(row['pointer_down_gain'],4)
+            self.assertEqual(row['target_jitter'],.002)
 
     def test_logs_rotate_and_logging_failure_is_nonfatal(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -33,7 +33,7 @@ pupils stop travel immediately while independent actions can continue; face loss
 staleness, stop, source/mapping/profile/settings changes disarm/release output and
 never auto-arm. A stale target cannot be kept alive by repeated output ticks.
 
-Mapping files are `input_mapping_v3`, adding `pointer_mode` and `target_jitter`.
+Mapping files are `input_mapping_v4` (details below); v3 introduced `pointer_mode` and `target_jitter`.
 Validate v1/v2 and preserve them as velocity on import. Face-profile loading keeps
 the chosen mapping's mode and target dead band. Changing either stops output.
 Signals/diagnostics identify destinations, driver position and arrival instead of
@@ -60,7 +60,7 @@ is within .002 normalized units, even if the fixation dead band would hold it
 short. This permits every corner without radial normalization or ongoing drift.
 
 Mapping files become `input_mapping_v4`, adding `pointer_down_gain` (1–8),
-`target_smoothing_ms` (0–500) and `target_interpolation_ms` (0–250). Fully validate
+`target_smoothing_ms` (0–1000) and `target_interpolation_ms` (0–250). Fully validate
 v1–v3 files and preserve their response: downward gain 1, prior response smoothing
 and interpolation, prior pointer gain and fixation band; v1/v2 remain velocity.
 Target smoothing/delay now belong to the mapping. Loading a face profile keeps

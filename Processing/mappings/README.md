@@ -74,9 +74,11 @@ return to actual neutral before another activation.
 
 The gaming default is **Screen destination**: smooth the bounded pupil-derived
 position, then keep the last accepted destination until the change exceeds
-`target_jitter` (.01 normalized screen dimensions by default). Holding an
-off-center input does not integrate movement. Gain scales position around its
-configured center; inversion still applies. Driver speed controls travel toward
+`target_jitter` (.002 normalized screen dimensions by default). Holding an
+off-center input does not integrate movement. Default gain 2 scales position around its configured center; a separate downward
+boost 4 makes positive Y displacement 8× overall. Inversion applies after the
+boost. Target smoothing is 20 ms with zero interpolation delay. Saturated axes
+settle exactly at the screen border, including every corner. Driver speed controls travel toward
 the point. Invalid input clears history and emits speed 0 immediately. Raw pupil
 values provide approximate positioning, not calibrated gaze; see
 [screen pointer setup](../../docs/SCREEN_POINTER_GUIDE.md).
@@ -85,7 +87,7 @@ values provide approximate positioning, not calibrated gaze; see
 release at .16 with default settings. **Signals → Mapping settings…** exposes the response
 curve, smoothing and acceleration limits; standalone **Transfer settings** also
 exposes interpolation (50 ms by default) and other developer settings.
-Velocity mappings default to adaptive **1€** velocity smoothing, followed by acceleration/deceleration limits. Screen destination uses the same adaptive filter on position, without velocity curves/acceleration. Uncheck **Adaptive pointer smoothing (1€)** for fixed smoothing. Mouse test stays velocity and defaults to zero interpolation delay; imported face-profile response settings retain their values. See [method, benchmark and limitations](../../docs/PUPIL_QUALITY_GUIDE.md).
+Velocity mappings default to adaptive **1€** velocity smoothing, followed by acceleration/deceleration limits. Screen destination uses an independent position smoothing/delay setting, without velocity curves/acceleration. Uncheck **Adaptive pointer smoothing (1€)** for fixed smoothing. Mouse test stays velocity: downward boost 3, gain 1, smoothing 20 ms, zero interpolation delay, dead zone .10 / activation margin .02, exponent 1.2, acceleration 10/s and deceleration 14/s. Loading face profiles preserves target filtering and the Mouse test pointer response. See [method, benchmark and limitations](../../docs/PUPIL_QUALITY_GUIDE.md).
 
 In velocity mode, **Mapping settings… → Pointer gain** scales only the motion beyond the dead zone
 (.1–4×, capped at full velocity). A gain increase cannot amplify neutral jitter
@@ -112,7 +114,7 @@ combined as a held state. Pointer and independent mouse-button bindings remain
 fixed within each mapping family. Mouse test always has all key bindings set to none. Apply increments the mapping revision and
 requires a new Start preview.
 
-**Export mapping / Import mapping** writes strict `input_mapping_v3` JSON (v1/v2 read as velocity), including pointer mode, fixation dead band, input mode and adaptive-filter selection alongside
+**Export mapping / Import mapping** writes strict `input_mapping_v4` JSON (v1/v2 read as velocity; v3 retains its saved response), including pointer mode, downward boost, position smoothing/delay, fixation dead band, input mode and adaptive-filter selection alongside
 name, stable ID, revision, response settings, pointer gain, head thresholds and
 bindings. Import validates the whole file before replacing/selecting it. Files
 contain no detector fits, observations or armed state. Export uses an atomic
@@ -121,7 +123,7 @@ ID replaces that mapping; use Copy as… first to preserve another variant.
 
 The separate face profile format remains `face_mouse_profile_v3` with detector
 v13. Its existing mouse response settings apply to the active mapping on load;
-head settings, bindings, pointer mode and fixation dead band stay with the mapping. The Mouse and scroll mode
+head settings, bindings, gains, pointer mode and target filtering stay with the mapping. Mouse test also preserves its complete pointer response and interpolation delay on face-profile loading. The Mouse and scroll mode
 keeps its own independent response settings.
 
 ## Python boundary

@@ -66,9 +66,10 @@ class EyeGate:
 class AxisFilter:
     """Buffered interpolation → radial dead zone → curve → boost → limited velocity."""
 
-    def __init__(self, config, dimensions, *, gain=1, adaptive=False):
+    def __init__(self, config, dimensions, *, gain=1, adaptive=False, down_gain=1):
         self.config = config
         self.gain = gain
+        self.down_gain = down_gain
         self.dimensions = dimensions
         self.history = deque(maxlen=512)
         self.valid = False
@@ -96,8 +97,11 @@ class AxisFilter:
         config = self.config
         if self.dimensions == 1:
             return (centered(position[0], config.center_y) * (-1 if config.invert_y else 1),)
+        y = centered(position[1], config.center_y)
+        # Amplify measured down before inversion. Raw observations stay untouched.
+        y = min(1, y*self.down_gain) if y > 0 else y
         return (centered(position[0], config.center_x) * (-1 if config.invert_x else 1),
-                centered(position[1], config.center_y) * (-1 if config.invert_y else 1))
+                y * (-1 if config.invert_y else 1))
 
     def push(self, value, timestamp):
         if value is None:
