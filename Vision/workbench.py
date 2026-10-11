@@ -11,6 +11,7 @@ from .pupil import PupilReading, measure as measure_pupils, pose_supported, MEAS
 from .pipeline import VisionPipeline
 from .signals import SINGLE_SUBJECT, invalid, make_face, measurement, monotonic_ms
 from .tongue import TONGUE_MEASUREMENT, TongueModel, TongueResult, mouth_crop, sample_colors
+from .tongue_async import AsyncTongue
 
 
 TARGETS = ("left_open", "left_closed", "right_open", "right_closed",
@@ -63,8 +64,17 @@ class DetectorWorkbench:
         self.reasons = {}
         self.trace = deque(maxlen=9000)
         self.generation = 0
+        self.async_tongue = AsyncTongue()
+
+    @property
+    def neural_tongue(self):
+        return hasattr(self.tongue_model, "measurement")
+
+    def close(self):
+        self.async_tongue.worker.close()
 
     def _clear_calibration(self):
+        self.async_tongue.invalidate()
         self.samples.clear()
         self.eyes.clear()
         self.winks.clear()
@@ -87,6 +97,7 @@ class DetectorWorkbench:
 
     def disconnect(self, reason="Source stopped; calibration retained"):
         """Drop live evidence and unfinished capture, retaining the user's fits."""
+        self.async_tongue.invalidate()
         self.job = None
         self.eye_guide = None
         self.movement_guide = None
@@ -279,6 +290,7 @@ class DetectorWorkbench:
             self.eye_guide.present(index, self.clock(), phase)
 
     def cancel(self):
+        self.async_tongue.invalidate()
         self.job = None
         self.eye_guide = None
         self.movement_guide = None
@@ -342,8 +354,15 @@ class DetectorWorkbench:
             value=self.tongue.xy
             if guide.steps[guide.index][0]=="absence":
                 value=(1,) if self.tongue.candidate_present else None
-            guide.feed(timestamp,value,self.crop is not None and self.features["face"].quality>0
-                       and not (self.tongue_model and self.tongue_model.report.get("error")))
+            usable = self.crop is not None and self.features["face"].quality > 0
+            usable = usable and not (self.tongue_model and self.tongue_model.report.get("error"))
+            if self.neural_tongue:
+                if self.async_tongue.new:
+                    guide.feed(self.async_tongue.latest.job.timestamp_ms, value, usable, finish=False)
+                # Grace admits late evidence from this window, never later poses.
+                guide.advance(timestamp, grace_ms=self.config.stale_ms)
+            else:
+                guide.feed(timestamp, value, usable)
         if not guide.active:
             self.notice=guide.report
             if guide.passed:
@@ -429,6 +448,7 @@ class DetectorWorkbench:
         self.notice = "Appearance model fitted. Inspect the mask, then start tongue position guide."
 
     def reset_tongue(self):
+        self.async_tongue.invalidate()
         segment = self.tongue_model if hasattr(self.tongue_model, "measurement") else None
         # Reset must work during this channel's collection, including failed or
         # paused guides, without cancelling unrelated eye/head work.
@@ -496,6 +516,15 @@ class DetectorWorkbench:
         job = self.job
         if job is None:
             return
+        if self.neural_tongue and job.target.startswith(("tongue_", "validate_")):
+            if timestamp >= job.end_ms + self.config.stale_ms:
+                self._finish_collection()
+                return
+            if not self.async_tongue.new:
+                return
+            timestamp = self.async_tongue.latest.job.timestamp_ms
+            if timestamp >= job.end_ms:
+                return
         if timestamp < job.start_ms:
             self.notice = f"Prepare {job.target.replace('_', ' ')}: {(job.start_ms - timestamp) / 1000:.1f}s"
             return
@@ -508,7 +537,8 @@ class DetectorWorkbench:
         target = job.target
         feature = self.features.get(target.split("_")[0])
         if target.startswith(("tongue_", "validate_")):
-            if self.crop is not None and self.features["face"].quality > 0:
+            if (self.crop is not None and self.features["face"].quality > 0
+                    and not (self.neural_tongue and self.tongue_model.report.get("error"))):
                 if len(job.values) < 512:
                     job.values.append(int(self.tongue.candidate_present if target=="validate_absent" else self.tongue.xy is not None))
                 if target == "tongue_absent" and len(job.colors) < 12000:
@@ -564,8 +594,6 @@ class DetectorWorkbench:
         self.wink_readings = {}
         self.crop = None
         self.tongue = TongueResult()
-        if hasattr(self.tongue_model, "measurement"):
-            self.tongue_model.report.update(confidence=None, inference_ms=None)
         self.reasons = {}
         if self.selected:
             observation = self.observations[self.selected]
@@ -573,7 +601,11 @@ class DetectorWorkbench:
             self.wink_vectors = measure_winks(observation,self.features)
             self.pupil = measure_pupils(observation, self.features, self.eyes)
             self.crop, mouth_reason = mouth_crop(captured.bgr, observation, self.config)
-            if self.crop is not None and self.features["face"].quality > 0 and self.tongue_model is not None:
+            if self.neural_tongue:
+                self.tongue = self.async_tongue.update(
+                    frame, self.crop, self.features["face"].quality, self.tongue_model,
+                    self.config, self.generation, self.clock())
+            elif self.crop is not None and self.features["face"].quality > 0 and self.tongue_model is not None:
                 self.tongue = self.tongue_model.detect(self.crop, self.config, timestamp_ms=frame["timestamp_ms"])
             elif self.crop is None:
                 self.tongue.reason = mouth_reason
@@ -632,6 +664,8 @@ class DetectorWorkbench:
             if self.tongue.xy is not None:
                 if passed and self.tongue_range:
                     quality = min(self.tongue.quality, self.features["face"].quality)
+                    if self.neural_tongue and self.async_tongue.latest:
+                        quality = min(quality, self.async_tongue.latest.job.face_quality)
                     xy=[self.tongue_range[key].normalize(value) for key,value in zip(("x","y"),self.tongue.xy)]
                     if all(value is not None for value in xy):
                         values["tongue_x"] = measurement(xy[0], quality)
@@ -647,6 +681,8 @@ class DetectorWorkbench:
         frame["position_space"] = "personal_tongue_tip_v1"
         frame["tongue_measurement"] = getattr(self.tongue_model, "measurement", TONGUE_MEASUREMENT)
         frame["gaze_measurement"] = PUPIL_MEASUREMENT
+        if self.neural_tongue:
+            frame["tongue_sample"] = self.async_tongue.sample(frame, SINGLE_SUBJECT)
         intent = dict(format="eye_intent_v1",subject_id=SINGLE_SUBJECT,
                       **{key:frame[key] for key in ("session_id","sequence","timestamp_ms")})
         signals = frame["faces"][0]["signals"] if frame["faces"] else {}
@@ -722,6 +758,17 @@ class DetectorWorkbench:
         for name in ("validate_absent", "validate_visible"):
             row[name + "_passed"] = self.validation.get(name, {}).get("passed", False)
         row["tongue_reason"] = self.reasons.get("tongue", "No selected subject")
+        source = frame.get("tongue_sample", frame)
+        row.update(tongue_sequence=source["sequence"], tongue_timestamp_ms=source["timestamp_ms"],
+                   tongue_age_ms=(frame["timestamp_ms"]-source["timestamp_ms"] if source["timestamp_ms"] is not None else None),
+                   tongue_new=not self.neural_tongue or self.async_tongue.new)
+        if self.neural_tongue and not self.async_tongue.new:
+            # The plot's existing dark-hold renderer supplies the previous height.
+            # Keep numeric held control values only in the timestamped SignalFrame.
+            for key in ("tongue_tip_x", "tongue_tip_y", "tongue_x", "tongue_y",
+                        "tongue_candidate_x", "tongue_candidate_y", "tongue_region_x", "tongue_region_y"):
+                row[key] = None
+            row.update(tongue_x_valid=False, tongue_y_valid=False, tongue_quality=0)
         self.trace.append(row)
 
     def state(self):
@@ -729,6 +776,7 @@ class DetectorWorkbench:
         return {"frame": self.frame, "selected": self.selected, "notice": self.notice,
                 "scope_subject": SINGLE_SUBJECT,
                 "pupil": asdict(self.pupil), "pupil_ready": self.pupil_ready,
+                "tongue_worker": self.async_tongue.state(self.clock()) if self.neural_tongue else None,
                 "pupil_range": {k:asdict(v) for k,v in self.pupil_range.items()} if self.pupil_range else None,
                 "tongue_backend": "segmentation" if hasattr(self.tongue_model, "measurement") else "color",
                 "wink_readings": dict(self.wink_readings),

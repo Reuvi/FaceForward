@@ -665,3 +665,35 @@ Writable paths: Vision worker/workbench/calibration/UI, App lifecycle, Processin
 channel freshness, corresponding tests, contracts and documentation.
 Contract: `Contracts/ASYNC_DETECTION.md`, landed before implementation.
 Head/eye/pupil measurements and Drivers behavior remain otherwise unchanged.
+
+### Independent detector workers handoff
+
+- Contract landed first as `492da72`. Neural tongue loading, ONNX inference, mask
+  decoding and front-edge extraction now run in a spawned local process with one
+  inference thread. Camera/Tk use a short-lock handoff: one active crop, one
+  replaceable pending crop, and the latest completed reply. No camera wait on tongue.
+- Eye/head/pupil features still share MediaPipe and every fast capture emits its
+  own sample. Tongue results retain source session/sequence/capture time through
+  additive `tongue_sample_v1`; Processing deduplicates history and expires only
+  that pointer channel on its own clock. Transfer functions/driver format unchanged.
+- Reset/load/loss/restart discard old jobs. Calibration counts unique inference
+  results inside the original capture window with bounded delivery grace; a hung
+  model cannot keep a pose pending forever. Masks overlay their original crop,
+  never the newer full-camera image. Shared scopes use dark holds between results.
+- Runtime displays fast Hz, tongue Hz, result age and pending replacements. Worker
+  timeouts/crashes remain tongue-only errors, recoverable by source restart.
+  Stop drops queued evidence; close reaps the process with bounded waits.
+- Verification: 284 tests pass: 122 Vision (including real local MediaPipe, direct
+  tongue and spawned tongue inference), 87 integration (native Tk enabled),
+  75 Processing. New tests cover blocked/crashed/timed-out workers, lifecycle,
+  capture identity/freshness, calibration windows/rests and matching overlays.
+  The 490-frame mouse demo accepted all captures, observed all four actions and
+  ended disabled with buttons released. Ruff F, whitespace and scope checks pass.
+- Generated-input scheduling benchmark (3 seconds/run, target30 Hz): baseline
+  29.99 Hz; artificial500 ms tongue inference29.94 Hz; local ONNX29.96 Hz. Each
+  produced90 fast samples. Tongue itself completed about2 Hz/6.74 Hz respectively.
+  This measures scheduling, not live camera/MediaPipe FPS or recognition accuracy.
+- Runbook/architecture/benchmark commands: `docs/INDEPENDENT_DETECTOR_TESTING.md`.
+  Profiles remain detectorv6/combinedv3. Shared CPU/memory/thermal contention can
+  still influence rates; independent processes remove the blocking dependency.
+  Live user testing and emulator integration remain separate next steps.

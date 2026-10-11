@@ -284,7 +284,15 @@ class DetectionLab:
         self.pupil_details.set("Raw position (eye widths): "+str(pupil.get("xy"))+"\n"+state["reasons"].get("pupil",pupil.get("reason","Waiting"))+"\n"+
             "\n".join(f"{side.title()}: {v.get('xy')} · {v.get('reason')}" for side,v in pupil.get("eyes",{}).items()))
         val=state["validation"]
-        self.tongue_details.set(f"{'FROZEN — click tissue' if state['frozen'] else 'LIVE crop / green candidate mask'}\n{state['reasons'].get('tongue','Waiting for face')}\nRaw tip (mouth widths): {state['candidate']}\nPixels: {state['tongue_pixels']}\n" + "\n".join(f"{k}: {'PASS' if v['passed'] else 'FAIL'} ({v['detected_fraction']:.0%}, n={v['samples']})" for k,v in val.items()))
+        worker = state.get("tongue_worker")
+        crop_label = 'FROZEN — click tissue' if state['frozen'] else 'LIVE crop / green candidate mask'
+        if worker:
+            age = worker["age_ms"]
+            rate = worker["hz"]
+            crop_label = f"Tongue worker: {rate:.1f} Hz | result age: {self.fmt(age)} ms\nOverlay uses its original captured crop"
+            if worker["error"]:
+                crop_label += "\n" + worker["error"]
+        self.tongue_details.set(f"{crop_label}\n{state['reasons'].get('tongue','Waiting for face')}\nRaw tip (mouth widths): {state['candidate']}\n" + "\n".join(f"{k}: {'PASS' if v['passed'] else 'FAIL'} ({v['detected_fraction']:.0%}, n={v['samples']})" for k,v in val.items()))
         self.metrics.set("\n".join(f"{k:16} {self.fmt(signals.get(k,{}).get('value'))}   {'valid' if signals.get(k,{}).get('valid') else 'unavailable'}" for k in ("left_eye_open","right_eye_open","head_y","tongue_x","tongue_y","gaze_x","gaze_y")))
         if self.calibration_tabs.select()==str(self.eye_tab):
             draw_eye_scope(self.eye_scope,state)

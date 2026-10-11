@@ -1,4 +1,4 @@
-"""One camera/inference worker and one latest snapshot; no frame queue or UI calls."""
+"""One fast camera/face worker, independent tongue process, shared latest snapshot."""
 
 from contextlib import ExitStack
 from copy import deepcopy
@@ -148,6 +148,12 @@ class LabRuntime:
                 "features_ms": (perf_counter()-started)*1000,
                 "age_ms": self.clock()-timestamp,
             }
+            if self.workbench.neural_tongue:
+                tongue = self.workbench.async_tongue.state(self.clock())
+                age = tongue["age_ms"]
+                self.timing.update(tongue_hz=tongue["hz"],
+                                   tongue_age_ms=age if age is not None else -1,
+                                   tongue_replaced=tongue["replaced"])
             self.previous_timestamp = timestamp
             if preview and self.clock() >= self.preview_due:
                 self.preview = self._preview(captured.bgr, observations, frame)
@@ -169,7 +175,8 @@ class LabRuntime:
                 if index < len(obs.points):
                     cv2.circle(image, tuple(round(v) for v in obs.points[index]), 2, color, -1)
         core = self.workbench
-        if core.crop is not None:
+        # Delayed results belong only on their captured mouth crop, below.
+        if core.crop is not None and not core.neural_tongue:
             if core.tongue.edge is not None:
                 for pixel in core.tongue.edge:
                     cv2.circle(image,tuple(round(v) for v in core.crop.image_point(core.crop.raw_point(pixel))),1,(0,180,255),-1)
@@ -191,6 +198,7 @@ class LabRuntime:
         self.stop()
         if self.worker is not None:
             self.worker.join(timeout=2)
+        self.workbench.close()
 
     def command(self, name, *args):
         with self.lock:
@@ -225,7 +233,8 @@ class LabRuntime:
                     needed -= available
             state.update(source=self.source, timing=dict(self.timing), preview=self.preview,
                          trace=list(reversed(rows)))
-            crop = self.workbench.frozen_crop or self.workbench.crop
+            core = self.workbench
+            crop = core.frozen_crop or (core.async_tongue.crop if core.neural_tongue else None) or core.crop
             state["mouth"] = crop.bgr.copy() if crop else None
             state["frozen"] = self.workbench.frozen_crop is not None
             if crop and not state["frozen"] and self.workbench.tongue.mask is not None:

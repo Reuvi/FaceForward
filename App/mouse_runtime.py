@@ -401,3 +401,5 @@ class MouseSession:
             self.closed = True
             self.preview = None
         self.lab.close()
+        if self.detector_runtime is not None:
+            self.detector_runtime.close()

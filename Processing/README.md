@@ -1,5 +1,10 @@
 # Mouse processing prototype
 
+Async neural tongue frames now preserve their original capture time. Repeated
+origins do not add interpolation samples; stale tongue releases pointer motion
+without stopping fresh eye/head inputs. See
+[the scheduling contract](../Contracts/ASYNC_DETECTION.md).
+
 A playable, mouse-only prototype with synthetic detector input, independent eye
 click filters, smooth pointer/scroll velocities, and five live oscilloscope traces.
 It is a **native Python/Tk desktop app**, with no JavaScript, browser, web server,

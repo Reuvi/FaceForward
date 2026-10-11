@@ -111,8 +111,9 @@ holds retain their separate established semantics.
   includes loading/warmup. Do not equate a high score or passing synthetic tests
   with measured accuracy on your face.
 
-Measured on this machine: 20 warmed local neural calls on a generated mouth crop,
-median 43.74 ms, p95 46.60 ms (ONNX Runtime 1.31.0, CPU, four threads). This includes
-resize and mask decoding but excludes MediaPipe, camera and UI. End-to-end FPS will
-be lower than its ~23 FPS inference ceiling. The model correctly ran on those
-inputs; this timing exercise does not validate tongue recognition.
+Tongue inference now runs in a separate process with one CPU inference thread.
+It no longer limits the camera/eye/head/pupil cadence. Read
+[independent detector sampling](INDEPENDENT_DETECTOR_TESTING.md) for the timing
+displays, capture-time expiry, calibration delivery grace, current measured rates
+and a reproducible slow-model test. The earlier four-thread synchronous timing
+is historical, not the current runtime architecture.

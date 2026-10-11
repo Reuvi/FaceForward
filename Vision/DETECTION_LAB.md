@@ -363,7 +363,9 @@ There is no claimed calibrated confidence probability.
 
 ## Timing, diagnostics, and data
 
-One worker owns capture and synchronous CPU inference; Tk runs on the main thread.
+One worker owns capture and MediaPipe inference; neural tongue inference runs
+in a separate bounded process. Tk runs on the main thread. See
+[the independent-worker guide](../docs/INDEPENDENT_DETECTOR_TESTING.md).
 There is no Python frame backlog. The camera requests 640×480 and the selected FPS;
 backends may decline those requests. The capture timestamp is taken immediately
 after the read, before inference. It approximates acquisition and does not account
@@ -375,7 +377,10 @@ eye scopes, the camera setup view now shows raw eye ratios, raw head measurement
 and raw tongue candidates. Calibration shares these capture rows and adds head
 bars/tongue planes plus a calibrated-position time graph. Select the relevant
 graph in either view; UI redraws never add samples.
-X uses actual monotonic capture time; lines between samples are display-only.
+X uses the fast monotonic capture/delivery timeline; lines are display-only.
+Async tongue rows additionally retain their original crop capture time, sequence,
+result age and new-result flag. Bright tongue points indicate newly delivered
+evidence; repeated/unknown intervals are dark display holds.
 There is no detector interpolation, fabricated new sample, or Processing filter.
 The shared raw scope ranges are 0–0.5 for eyes, −45–45 degrees for uncalibrated
 pitch (learned min/max after calibration), and −.8–.8 mouth widths for tongue.

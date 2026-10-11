@@ -37,7 +37,8 @@ def decode_mask(outputs, size=160, threshold=.55):
     if len(keep) > 1:
         return None, float(candidates[keep[0], 4]), "Multiple tongue detections; keep one visible tip"
     row = candidates[keep[0]]
-    logits = row[5:] @ prototypes[0].reshape(32, -1)
+    # Avoid a second implicit BLAS thread pool competing with the face model.
+    logits = np.einsum("i,ijk->jk", row[5:], prototypes[0], optimize=False)
     mask = (logits.reshape(160, 160) > 0).astype(np.uint8)*255
     x, y, w, h = boxes[keep[0]]/4
     support = np.zeros_like(mask)
@@ -73,11 +74,12 @@ def mask_result(mask, crop, config, confidence):
 
 
 class SegmentedTongueModel(TongueModel):
-    """Lazy CPU inference on the capture worker, one result per current image."""
+    """Lazy local inference; the live lab owns this model in a separate process."""
     measurement = MEASUREMENT
 
-    def __init__(self, path=None):
+    def __init__(self, path=None, *, threads=1):
         self.path = Path(path or DEFAULT_MODEL).expanduser().resolve()
+        self.threads = threads
         self.session = None
         self.load_error = None
         self.report = {"backend": "YOLOv8n-seg · local CPU", "model_sha256": MODEL_SHA256,
@@ -97,7 +99,7 @@ class SegmentedTongueModel(TongueModel):
         except ImportError as exc:
             raise ValueError("Install Vision/requirements-tongue.txt in the app's Python environment") from exc
         options = ort.SessionOptions()
-        options.intra_op_num_threads = 4
+        options.intra_op_num_threads = self.threads
         options.inter_op_num_threads = 1
         options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
         self.session = ort.InferenceSession(str(self.path), sess_options=options, providers=["CPUExecutionProvider"])

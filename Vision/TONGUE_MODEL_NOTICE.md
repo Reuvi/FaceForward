@@ -25,8 +25,9 @@ Vision/.venv/bin/python -m Vision.setup_tongue_model
 
 The setup command downloads the release archive and verifies the extracted ONNX
 hash before replacing the local file. Runtime never downloads anything. Model
-loading/inference runs on the capture worker, not Tk. It uses CPU execution,
-4 intra-op threads and 1 inter-op thread. A loading error stays visible until
+loading/inference runs in an independent spawned process, outside the capture
+worker and Tk. It uses CPU execution with 1 intra-op and 1 inter-op thread;
+OpenCV is limited to 1 thread and prototype decoding avoids a BLAS thread pool. A loading error stays visible until
 reload/restart; it does not retry an expensive load every frame or use a color fallback.
 A missing model disables tongue only; eyes, pupils and head remain available.
 

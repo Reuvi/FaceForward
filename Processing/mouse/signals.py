@@ -64,6 +64,9 @@ class Sample:
     appearance_intent: bool = False
     left_reopened: bool = False
     right_reopened: bool = False
+    pointer_async: bool = False
+    pointer_timestamp_ms: object = None
+    pointer_sequence: object = None
 
     def __post_init__(self):
         for side in ("left", "right"):
@@ -124,6 +127,18 @@ def decode(frame, config, subject_id):
         return value == 0 if value in (0, 1) else None
 
     x, y = measurement(config.pointer_source + "_x"), measurement(config.pointer_source + "_y")
+    pointer_source = {}
+    if config.pointer_source == "tongue" and "tongue_sample" in frame:
+        origin = frame["tongue_sample"]
+        valid = (isinstance(origin, dict) and origin.get("format") == "tongue_sample_v1"
+                 and origin.get("session_id") == session and origin.get("subject_id") == subject_id
+                 and type(origin.get("sequence")) is int and 0 <= origin["sequence"] <= sequence
+                 and finite(origin.get("timestamp_ms")) and 0 <= origin["timestamp_ms"] <= timestamp)
+        pointer_source = dict(pointer_async=True,
+                              pointer_timestamp_ms=origin["timestamp_ms"] if valid else None,
+                              pointer_sequence=origin["sequence"] if valid else None)
+        if not valid:
+            x = y = None  # A broken tongue channel must not discard eye/head input.
     if "eye_intent" in frame:
         intent=frame["eye_intent"]
         if (not isinstance(intent,dict) or set(intent)!={"format","session_id","sequence","timestamp_ms","subject_id","left","right"}
@@ -145,6 +160,6 @@ def decode(frame, config, subject_id):
         return Sample(session,sequence,timestamp,subject_id,*bits,
                       (x,y) if x is not None and y is not None else None,measurement("head_y"),
                       appearance_intent=True,left_reopened=measurement("left_eye_open")==1,
-                      right_reopened=measurement("right_eye_open")==1)
+                      right_reopened=measurement("right_eye_open")==1, **pointer_source)
     return Sample(session, sequence, timestamp, subject_id, eye("left_eye_open"), eye("right_eye_open"),
-                  (x, y) if x is not None and y is not None else None, measurement("head_y"))
+                  (x, y) if x is not None and y is not None else None, measurement("head_y"), **pointer_source)

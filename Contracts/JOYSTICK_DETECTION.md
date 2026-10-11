@@ -6,15 +6,16 @@ segmentation and adds a calibrated pupil-direction joystick. This supersedes the
 color-only requirement in TONGUE_TIP.md for the camera backend. Head pitch and
 independent eye/wink semantics are unchanged. Drivers remain simulated.
 
-Tongue: a pinned local YOLOv8n-seg model predicts a mask on each usable mouth crop.
+Tongue: a pinned local YOLOv8n-seg model predicts masks on the latest usable mouth
+crops in an independent process.
 No background color training or tissue clicking is required. Reuse the 160px,
 1.6-mouth-width crop and visible front-boundary midpoint estimator. Missing,
 ambiguous, clipped or unsupported masks/tips remain invalid. Emit
 `onnx_tip_mouth_width_v1`; changing backend/model hash invalidates only tongue
 range/checks. Retain the legacy color backend for synthetic/developer fixtures;
 never silently fall back to color on a failed model. Show backend, mask, confidence,
-reason and inference time. Native capture worker runs bounded inference; every
-capture emits one fresh frame, with no cached prediction relabeled as fresh.
+reason and inference time. Every fast capture emits a frame; independent tongue
+results retain their original capture identity, never relabeled as fresh.
 There is no runtime download or remote inference. Model license/provenance and
 setup instructions must be documented; weights stay ignored outside Git.
 

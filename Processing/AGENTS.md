@@ -41,3 +41,7 @@ and lane documentation here. Put shared-change requests in `interface-requests/`
 - Check threshold crossings, dwell/release, neutral dead zones, variable frame rate,
   out-of-order samples, missing signals, subject switching, and profile round trips.
   Add exact setup/run/test commands when implementation exists.
+
+Read ../Contracts/ASYNC_DETECTION.md for neural tongue sample origins. Never
+refresh a tongue observation using an enclosing fast frame's timestamp; accept
+distinct origins once and expire the pointer independently of eye/head samples.

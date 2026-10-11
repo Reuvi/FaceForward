@@ -88,7 +88,8 @@ class JoystickIntegration(unittest.TestCase):
         self.core.reset_tongue();self.assertIs(self.core.tongue_model,model)
         self.session.detector_command('start_movement_guide','tongue')
         self.core.present_movement_step(0,'prepare')
-        for _ in range(15):self.feed()
+        # Async inference admits at most stale_ms delivery grace after capture.
+        for _ in range(25):self.feed()
         self.assertFalse(self.core.movement_guide.passed)
         self.assertIn('too few',self.core.movement_guide.report)
         self.assertIsNotNone(self.core.head)

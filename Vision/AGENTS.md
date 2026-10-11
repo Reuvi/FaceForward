@@ -51,7 +51,7 @@ The lab is pitch-only for head Y, with learned up/neutral/down mapped to 0/.5/1.
 Do not reintroduce a position/pitch choice. Validated legacy position fits are
 dropped on load; compatible other fits survive. Raw degree plots use learned limits.
 Use the same workbench trace in camera setup and calibration. No UI-sampled history
-or second worker. Keep tongue raw mouth coordinates separate from personal ranges,
+or second camera owner. Keep tongue raw mouth coordinates separate from personal ranges,
 require fresh saved-range rechecks, and preserve invalid observations. Read `../Contracts/TONGUE_TIP.md`: the current expanded crop reports the middle
 of the visible front boundary in mouth-width units. Invalid tips never fall back
 to a centroid. v1-v4 tongue appearance/ranges require retraining. Future model/crop
@@ -71,8 +71,9 @@ no color calibration; synthetic/developer fixtures retain the legacy color path.
 Pupil calibration produces eye-relative direction, not screen gaze; both eyes
 must be usable. Head pitch remains unchanged and known to work for the user.
 Detector v6 stores neural model identity/pupil range/head reference; v1–v5 remain
-readable. Tongue and pupil loaded/restarted ranges require fresh checks. Keep all
-sources in the same worker/trace, no runtime downloads, no stale mask reuse, and
+readable. Tongue and pupil loaded/restarted ranges require fresh checks. Keep one
+camera and a shared trace with independent neural model scheduling, no runtime
+downloads, no stale mask reuse, and
 no fallback from neural detection to color. Pointer source is explicitly chosen
 in App and changing it stops preview. See Vision/TONGUE_MODEL_NOTICE.md for license.
 

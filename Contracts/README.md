@@ -1,5 +1,8 @@
 # Shared contracts — initial v1
 
+Current async camera scheduling and tongue sample origin fields are defined in
+[ASYNC_DETECTION.md](ASYNC_DETECTION.md).
+
 Current calibrated camera tongue semantics are defined in [TONGUE_TIP.md](TONGUE_TIP.md):
 visible front-edge midpoint, raw mouth-width units, personal 0–1 output, detector
 preset v5. The legacy generic v1 table below is unchanged for replay.

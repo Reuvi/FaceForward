@@ -88,13 +88,23 @@ class MovementGuide:
         self.report = ""
         self.active = True
 
-    def feed(self, timestamp, value, usable):
+    def advance(self, now, *, grace_ms=0):
+        """Advance wall-clock phases without inventing detector observations."""
         if not self.active:
             return
         if self.resting:
-            if self.rest_end_ms is not None and timestamp >= self.rest_end_ms:
+            if self.rest_end_ms is not None and now >= self.rest_end_ms:
                 self.resting = False
                 self.rest_end_ms = None
+        elif self.start_ms is not None and now >= self.start_ms + self.config.collect_ms + grace_ms:
+            self._finish()
+
+    def feed(self, timestamp, value, usable, *, finish=True):
+        if not self.active:
+            return
+        if self.resting:
+            if finish:
+                self.advance(timestamp)
             return
         if (
             self.start_ms is None
@@ -105,7 +115,8 @@ class MovementGuide:
             return
         self.last_timestamp = timestamp
         if timestamp >= self.start_ms + self.config.collect_ms:
-            self._finish()
+            if finish:
+                self._finish()
             return
         if len(self.values) >= 512:
             return

@@ -187,6 +187,7 @@ class MouseProcessor:
         self.reason = "Preview stopped"
         self.accepted = 0
         self.rejected = 0
+        self.pointer_origin = None
 
     def arm(self):
         self.armed = True
@@ -256,7 +257,23 @@ class MouseProcessor:
         self.sample = sample
         self.received_ms = received_ms
         self.accepted += 1
-        self.pointer.push(sample.pointer, sample.timestamp_ms)
+        if sample.pointer_async:
+            timestamp = sample.pointer_timestamp_ms
+            origin = (sample.session_id, sample.pointer_sequence, timestamp)
+            previous = self.pointer_origin
+            fresh_pointer = timestamp is not None and 0 <= received_ms - timestamp <= self.config.stale_ms
+            newer = (sample.pointer_sequence is not None and
+                     (previous is None or previous[0] != sample.session_id
+                      or (sample.pointer_sequence > previous[1] and timestamp >= previous[2])))
+            if newer:
+                self.pointer_origin = origin
+                self.pointer.push(sample.pointer if fresh_pointer else None, timestamp)
+            elif origin != previous or sample.pointer is None or not fresh_pointer:
+                self.pointer.clear()
+            # Identical origin: retain history without forging a fresh sample.
+        else:
+            self.pointer_origin = None
+            self.pointer.push(sample.pointer, sample.timestamp_ms)
         self.scroll.push(sample.scroll, sample.timestamp_ms)
         if self.armed:
             self.left.sample(sample.left_closed, sample.timestamp_ms, known=sample.left_known,
@@ -274,6 +291,8 @@ class MouseProcessor:
                 self.disarm("Output clock gap; start preview again")
             dt = 0.0
         self.last_tick = now_ms
+        if self.pointer.history and not 0 <= now_ms - self.pointer.history[-1][0] <= self.config.stale_ms:
+            self.pointer.clear()
         fresh = (self.sample is not None and self.received_ms is not None
                  and 0 <= now_ms - self.sample.timestamp_ms <= self.config.stale_ms
                  and 0 <= now_ms - self.received_ms <= self.config.stale_ms)
@@ -303,7 +322,8 @@ class MouseProcessor:
             "left_click": int(self.enabled and self.left.down),
             "right_click": int(self.enabled and self.right.down),
             "diagnostics": {
-                "raw_pointer": list(sample.pointer) if sample and fresh and sample.pointer is not None else None,
+                "raw_pointer": list(sample.pointer) if sample and fresh and self.pointer.valid and sample.pointer is not None else None,
+                "pointer_timestamp_ms": self.pointer.history[-1][0] if self.pointer.history else None,
                 "raw_scroll": sample.scroll if sample and fresh else None,
                 "left_closed": sample.left_closed if sample and fresh and sample.left_known else None,
                 "right_closed": sample.right_closed if sample and fresh and sample.right_known else None,

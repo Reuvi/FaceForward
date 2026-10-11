@@ -1,5 +1,8 @@
 # One native lab: detection calibration + mouse processing
 
+Current scheduling: [independent detector workers and testing](../docs/INDEPENDENT_DETECTOR_TESTING.md).
+Tongue latency no longer blocks eye/head/pupil samples; original capture times are preserved.
+
 Current update: [tongue segmentation + pupil joystick testing](../docs/TONGUE_PUPIL_TESTING.md).
 Camera tongue uses local neural masks; pupils have a full-screen range guide.
 Choose **Pointer joystick input** on the source tab. Detector preset v6 stores
@@ -7,8 +10,9 @@ these fits; combined profile v3 is unchanged. Head pitch remains unchanged.
 
 
 Run **one `App` window** for the complete testing workflow. The original Processing
-lab now contains **Detection calibration** as another tab. One camera/inference
-worker supplies the calibrated measurements to both the detector view and the
+lab now contains **Detection calibration** as another tab. One camera/face worker
+plus an independent tongue process supply calibrated measurements to the detector
+view and the
 existing input/output scopes and simulated desktop. Switching tabs keeps the source
 and completed calibration. Leaving an active eye/head/tongue guide cancels it, because
 its instructions would no longer be visible.
@@ -178,14 +182,16 @@ Close the window to shut down the source and Processing workers.
 ```text
 One App worker: camera → MediaPipe OR synthetic image generator
     ↓ image + landmarks + original capture timestamp
-Vision.LabRuntime.ingest → DetectorWorkbench: measurements/calibration
+Vision.LabRuntime.ingest → DetectorWorkbench: eyes/head/pupils + calibration
+    ├─ latest mouth crop → independent tongue process → timestamped result
     ├─ latest image + shared raw features/trace → camera setup + calibration tabs
     └─ calibrated SignalFrame v1 → App → Lab.ingest
                                          ↓ independent 100 Hz Processing clock
                                      existing Live lab / scopes / simulated mouse
 ```
 
-The embedded runtime never starts its own worker or camera. The Tk thread reads
+The embedded runtime never starts a second camera/face worker. Its tongue process
+starts lazily and independently; the capture path never waits for it. The Tk thread reads
 bounded snapshots; inference stays off Tk. Preview is capped near 10 Hz; Processing
 keeps its own clock and stale-input watchdog. Locks are acquired session → lab.
 There is no growing frame queue or JSON serialization in the sample handoff.
