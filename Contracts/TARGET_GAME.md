@@ -29,6 +29,16 @@ explicit; retry that condition from home. Stop/Escape/close stops output and sav
 partial work. Practice data and interrupted attempts remain labeled and excluded
 from tuning. Unknown values stay null; plotted holds are never input.
 
+Continuation recovery: explicit Start/Resume may adopt a changed resting center
+without discarding saved rounds. Recenter & continue requests a fresh center
+capture using the existing control action; it never resumes automatically after
+loss. Record center/layout changes in additive `setup_changes` report entries and
+trace events, keeping original round profiles unchanged. Layout changes between
+rounds may continue collecting data; movement during a round still pauses it.
+Changed centers/layouts are not matched A/B pairs, and a round recentered during
+collection is not eligible for automatic tuning. Other response/calibration/source
+changes still require a new session. Persist game UI errors in the session trace.
+
 After a complete, usable baseline, offer at most one bounded response adjustment
 supported by observed re-entry/overshoot, direction asymmetry, travel time or
 roughness. The rules are experimental hypotheses, not guarantees. Compare in
@@ -41,6 +51,8 @@ Otherwise keep A. Results show component metrics and the decision rationale.
 Speed comparisons remove the fixed hold and normalize by each trial's actual
 departure-distance/target-width difficulty. Remember rejected candidate settings
 for a matching baseline so later sessions can test another supported hypothesis.
+If no candidate is supported, allow additional baseline rounds instead of blocking
+continuation. Label these A throughout and never claim an untested B won.
 
 A completed comparison saves the selected profile as the local personal default;
 an incomplete comparison never promotes a candidate. Restore A on cancel only
@@ -53,6 +65,12 @@ offers separate Personal default and Factory defaults actions. No selection occu
 until user data exists. Mapping v7, tuning profile v1, face v3, detector v13 and
 driver ABI are unchanged. Keep a machine-readable analysis command so later
 iterations can inspect local results without rerunning the game.
+
+An explicit user request may adopt a data-guided provisional trial from existing
+baseline observations without completing the automatic comparison. Save its
+evidence, unverified status and rollback profile privately; preserve the latest
+user-selected resting center. This is distinct from an automatic verified winner
+and does not change automatic promotion rules or arm a running controller.
 
 Reference: MacKenzie, Kauppinen & Silfverberg (CHI 2001), target re-entry and path
 accuracy measures: https://www.yorku.ca/mack/CHI01.htm . Our resampled velocity roughness
