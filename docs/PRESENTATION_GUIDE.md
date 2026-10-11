@@ -26,6 +26,12 @@ eye does not cancel a valid left press. Stop, tracking loss and stale input rele
 and require Start again. Missing mouth evidence stops pointer movement in this
 mapping; it does not invent a closed-mouth value.
 
+Unknown eye readings do not block starting valid head movement. Eye clicks and
+dictation remain unavailable until their required eyes have actually been seen
+open; unknown readings never count as an open baseline. A detected closed eye
+still waits for release before startup. If the eyes remain unknown, use Calibration
+to check the saved eye geometry rather than changing pointer sensitivity.
+
 With **Require calibrated wink for eye actions** enabled, the left button presses
 as soon as a valid wink is recognized. With it unchecked, a valid anatomical left
 closure presses instead. Open the left eye once to prepare each press. Uncertain

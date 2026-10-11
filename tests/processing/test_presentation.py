@@ -24,6 +24,47 @@ class PresentationTests(unittest.TestCase):
     def hold(self, count=30, **values):
         return [self.feed(**values) for _ in range(count)]
 
+    def test_unknown_eyes_do_not_block_fresh_head_start_or_create_actions(self):
+        for wink in (False, True):
+            for center in (False, True):
+                with self.subTest(wink=wink, center=center):
+                    mapping=replace(presentation_mapping(),require_wink=wink)
+                    self.core=PresentationProcessor(mapping,'person')
+                    self.core.arm(center=center)
+                    pose=dict(head_x=.4,head_y=.6) if center else {}
+                    snap=self.feed(left='unknown',right='unknown',**pose)
+                    self.assertTrue(snap['enabled'])
+                    self.assertEqual((snap['pointer_x'],snap['pointer_y']),(.5,.5))
+                    self.assertFalse(snap['diagnostics']['head_center_pending'])
+                    snaps=self.hold(20,left='unknown',right='unknown',head_x=.7)
+                    self.assertGreater(snaps[-1]['pointer_x'],.5)
+                    self.assertFalse(any(s['presentation']['drag_left'] or s['right_click'] for s in snaps))
+                    self.assertEqual(self.core.dictation_toggle,0)
+                    # Unknown startup never supplies an open baseline, even
+                    # when valid closed/wink evidence appears later.
+                    action='wink' if wink else 'closed'
+                    snaps=self.hold(30,left=action,right=action)
+                    self.assertFalse(any(s['presentation']['drag_left'] or s['right_click'] for s in snaps))
+                    self.assertEqual(self.core.dictation_toggle,0)
+                    self.feed()
+                    self.assertTrue(self.feed(left=action)['presentation']['drag_left'])
+                    self.assertFalse(self.feed()['presentation']['drag_left'])
+
+    def test_known_closed_eye_still_blocks_start_with_other_eye_unknown(self):
+        for center in (False,True):
+            for side in ('left','right'):
+                with self.subTest(center=center,side=side):
+                    self.core=PresentationProcessor(subject_id='person')
+                    self.core.arm(center=center)
+                    eyes=dict(left='unknown',right='unknown')
+                    eyes[side]='closed'
+                    snap=self.feed(**eyes)
+                    self.assertFalse(snap['enabled'])
+                    self.assertFalse(snap['presentation']['drag_left'])
+                    self.assertFalse(snap['right_click'])
+                    eyes[side]='open'
+                    self.assertTrue(self.feed(**eyes)['enabled'])
+
     def test_left_down_on_closure_up_on_open_right_click_on_reopen(self):
         self.assertTrue(self.core.enabled)
         snaps=self.hold(10,left='closed')

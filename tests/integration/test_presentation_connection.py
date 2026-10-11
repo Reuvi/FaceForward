@@ -66,6 +66,28 @@ class PresentationConnectionTests(unittest.TestCase):
         self.speech.emit('final',text)
         return self.feed()
 
+    def test_unknown_eyes_allow_centered_start_and_compiled_pointer_only(self):
+        self.lab.action({'action':'stop'})
+        self.lab.action({'action':'center_head_start'})
+        state=self.feed(left='unknown',right='unknown',head_x=.4,head_y=.6)
+        self.assertTrue(state['snapshot']['enabled'])
+        self.assertEqual(state['message']['pointer']['x'],.5)
+        self.assertEqual(state['message']['pointer']['y'],.5)
+        for _ in range(12):
+            time.sleep(.01)
+            state=self.feed(left='unknown',right='unknown',head_x=.7,head_y=.6)
+        self.assertGreater(state['output']['event_counts'].get(1,0),0)
+        for event in (3,4,9,10,12):
+            self.assertEqual(state['output']['event_counts'].get(event,0),0)
+        self.assertEqual(self.speech.starts,0)
+        # Tracking loss still disarms; usable head input cannot auto-restart.
+        self.now+=20;self.seq+=1
+        lost=frame(self.seq,self.now);lost['faces']=[]
+        self.session.deliver(lost)
+        state=self.feed(left='unknown',right='unknown')
+        self.assertFalse(state['snapshot']['armed'])
+        self.assertFalse(state['snapshot']['enabled'])
+
     def test_compiled_left_down_hold_up_right_click_and_relative_movement(self):
         state=self.feed(left='closed')
         self.assertEqual(state['output']['event_counts'].get(10),1)

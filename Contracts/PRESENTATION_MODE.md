@@ -6,6 +6,13 @@ right-eye closure for right-click, and both eyes for speech-to-text dictation. E
 mappings retain their assignments. The saved `require_wink` option remains; this
 preset defaults to plain open/closed eyes. Eye geometry still needs calibration.
 
+Head startup does not require usable eye measurements: after an explicit Start
+or Center head & start, fresh neutral head input can enable the pointer while
+unknown eyes remain released. Known closed eyes still block startup. Unknown is
+never an open baseline; eye actions and dictation require actual reopening before
+their first activation. Missing head input, face loss and stale samples retain
+their existing stop/disarm behavior. Mouth validity/braking is unchanged.
+
 Vision adds optional continuous `mouth_openness` in [0,1] from the same validated
 MediaPipe jawOpen sample as binary `mouth_open`. It needs no additional model or
 calibration. Missing evidence stays invalid. The bit remains unchanged for old

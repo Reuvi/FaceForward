@@ -1,5 +1,28 @@
 # Main chat and agent coordination hub
 
+## Local Presentation startup recovery
+
+- Lane/task/branch: Reuvi integration, local input-debugging fix in owned
+  `codex/integration/presentation-wink-fix`, base `68f2aeb`. Keep local; no push.
+- Evidence: fresh camera/head samples and no driver error, but repeated
+  `Center head: open your eyes and close your mouth before starting` while eye
+  geometry was unknown. Presentation's both-known-open startup gate coupled the
+  pointer to eye availability; Mouse test already permits unknown eyes.
+- Fix: unknown eyes no longer block an explicit Presentation Start or center
+  request with fresh neutral head input. Known closed eyes still block startup.
+  Gesture state machines still need real open evidence before the first action;
+  no fabricated open values, click/dictation activation or automatic rearming.
+- Paths: Processing presentation gate, Processing and compiled-driver integration
+  regressions, presentation contract/runbook, and this handoff. No ABI/profile
+  change, detector tuning, personal-profile rewrite or native driver modification.
+- Checks: regression failed in all four plain/wink and Start/center combinations
+  before the fix. Full Processing **227 passed**; compiled-driver Presentation
+  **29 passed**, including relative movement without eye actions and no restart
+  after face loss. These are synthetic/dry-run checks, not live accuracy evidence.
+- Handoff: restart App from local main and use Center head & start. If eyes stay
+  unknown, inspect the saved eye geometry in Calibration; this fix separates head
+  startup from that detection limitation. Existing loss/stale/mouth gates remain.
+
 ## Presentation documentation handoff
 
 - Lane/task/branch: Reuvi integration, presentation README cleanup and one final

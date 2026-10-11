@@ -187,7 +187,11 @@ class PresentationProcessor(HeadMouseProcessor):
 
     def buttons_released(self):
         sample = self.sample
-        return bool(sample and sample.anatomical_left is False and sample.anatomical_right is False)
+        # Unknown eyes have no action to release. They must not prevent a
+        # fresh, neutral head from starting; the gesture state machines still
+        # require actual open evidence before any press or dictation toggle.
+        # A known closed eye continues to block startup.
+        return bool(sample and sample.anatomical_left is not True and sample.anatomical_right is not True)
 
     def accept(self, frame, received_ms):
         result = super().accept(frame, received_ms)
