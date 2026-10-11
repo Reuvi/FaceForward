@@ -39,3 +39,5 @@ segmentation ranges. Combined profile v3 and existing Processing pointer_source
 choices (`tongue`, `gaze`) remain: App exposes an explicit source selector that
 stops preview before switching and preserves separate input measurements.
 Calibration remains detection-only; downstream transfer functions are unchanged.
+
+Scheduling and delayed-sample semantics are superseded by ASYNC_DETECTION.md.

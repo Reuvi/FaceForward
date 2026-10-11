@@ -656,3 +656,12 @@ Contract: JOYSTICK_DETECTION.md, landed before implementation. No Drivers change
 - Testing instructions: docs/TONGUE_PUPIL_TESTING.md. Remaining: actual camera
   tongue precision/tip quality, pupil drift under head motion, end-to-end FPS and
   personal usability; no synthetic-test claim of live human accuracy.
+
+## Independent detector workers — active October 10
+
+Reuvi integration, branch `work/reuvi/integration/independent-detector-workers`,
+base `0d1db08`. User requires tongue latency to stop blocking other detectors.
+Writable paths: Vision worker/workbench/calibration/UI, App lifecycle, Processing
+channel freshness, corresponding tests, contracts and documentation.
+Contract: `Contracts/ASYNC_DETECTION.md`, landed before implementation.
+Head/eye/pupil measurements and Drivers behavior remain otherwise unchanged.

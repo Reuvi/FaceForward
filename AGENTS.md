@@ -162,3 +162,10 @@ readable. Tongue and pupil loaded/restarted ranges require fresh checks. Keep al
 sources in the same worker/trace, no runtime downloads, no stale mask reuse, and
 no fallback from neural detection to color. Pointer source is explicitly chosen
 in App and changing it stops preview. See Vision/TONGUE_MODEL_NOTICE.md for license.
+
+## Independent scheduling update
+
+Read Contracts/ASYNC_DETECTION.md relative to the repository root. It supersedes
+older same-worker/no-second-worker instructions for neural tongue inference.
+Keep one camera and shared trace; isolate independent models in bounded workers,
+preserve original sample timestamps, and never wait for tongue on the fast path.
