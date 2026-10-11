@@ -2,7 +2,7 @@
 
 Current user decision: a separate Presentation mapping uses calibrated head X/Y
 for relative pointer velocity, anatomical left-eye closure for click/drag,
-right-eye closure for Return, and both eyes for speech-to-text dictation. Existing
+right-eye closure for right-click, and both eyes for speech-to-text dictation. Existing
 mappings retain their assignments. The saved `require_wink` option remains; this
 preset defaults to plain open/closed eyes. Eye geometry still needs calibration.
 
@@ -29,14 +29,14 @@ After a press, invalid/nonmatching left evidence releases and consumes that cycl
 only an actual left reopen permits another press. Stop/loss/staleness clear all
 baselines and never auto-arm. No held numeric/display value is action evidence.
 
-Right-eye Return retains release timing (120 ms in plain mode; no extra minimum
+Right-eye right-click retains release timing (120 ms in plain mode; no extra minimum
 for a recognized wink). Both known closed 450 ms toggles dictation once, releases
 the mouse and suppresses solo actions until both reopen. Short simultaneous blinks
 do not toggle dictation. An immediate left press can already have occurred if the
 second eye closes later; subsequent chord detection releases it but cannot undo
 events already sent. This is the requested immediate press/release behavior.
 The old saved drag timing field remains readable but is not applied or shown;
-plain-mode solo timing now describes right-eye Return only.
+plain-mode solo timing now describes right-eye right-click only.
 Signals exposes the current gesture blocker and capture-level eye/action counts.
 The bounded scalar diagnostic log retains these counts so a brief wink is visible
 even between UI observations. No face features, calibration or transcripts are logged.
@@ -59,8 +59,12 @@ helper with explicit microphone and Speech permissions and required
 on-device recognition. No network fallback, runtime model download, clipboard,
 stored audio or transcript log. Starting/recording/finalizing/sending freezes the
 pointer and other actions. A second deliberate both-eye gesture ends recording;
-the completed text is sent through Drivers one scalar per step. No automatic
-Enter is appended. The right eye can submit afterward. Stop, face loss, stale
+the completed nonempty text is sent through Drivers one scalar per step, followed
+by exactly one main Return press/release. The explicit finish gesture authorizes
+that submission; it occurs only after the last character and another fresh enabled
+output tick. Empty/whitespace-only recognition, errors, cancellation, face loss,
+stale input, or switching profiles/source/output must never submit. A stop between
+the last character and Return cancels the pending Return as well. Stop, face loss, stale
 capture, profile/source/output changes or speech error discard unsent text and
 cancel recording. A failed provider never silently sends partial text. Synthetic
 tests use an injected provider and dry-run output, never camera, mic or live keys.
@@ -88,5 +92,17 @@ partial results never replay the cues. No sound on a failed start before listeni
 
 Preserve the observed both-open baseline across uncertain closing frames so a
 subsequent fully known both-closed hold can start. Unknown input cancels any pending
-solo Return and resets the chord duration; it never counts toward the 450 ms hold
+solo right-click and resets the chord duration; it never counts toward the 450 ms hold
 or rearms a consumed chord. Both eyes must reopen after a successful toggle.
+
+## Right-click and dictation submission update
+
+The right-eye gesture now emits the existing `buttons.right_click` pulse with
+matching `known.right_click` validity, using the same closure/wink qualification
+and release timing as before. It no longer requests `presentation.enter`.
+The driver API/ABI, mapping/profile formats and other mappings are unchanged.
+The existing Return auxiliary API is called by App only after successful finalized
+text delivery. Pointer and solo gestures remain frozen through the submission tick;
+unknown eyes do not veto explicit finalized dictation while the session itself is
+fresh and enabled. Listening/stopped sounds retain their meaning: stopped means
+recording ended, while typing/submission may still be in progress.
