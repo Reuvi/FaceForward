@@ -1,5 +1,12 @@
 # Native detection lab: calibration, measurements, and test procedure
 
+> Current MVP: tongue has been removed from App and Vision lab. Use
+> [App's current testing/profile guide](../App/README.md) and
+> [pupil matrix testing](../docs/DIRECT_PUPIL_TESTING.md). Eyes and head axes remain;
+> pupils are the pointer input, with no pupil calibration or sensitivity controls.
+> Detector presets are v11; old tongue state is discarded on load. Any tongue
+> setup, backend, recheck or mapping instructions below are historical.
+
 Latest pupil update: [fixed direction and 11×11 matrix](../docs/DIRECT_PUPIL_TESTING.md).
 No pupil sensitivity controls or calibration remain. Downward detection has a
 supported narrow-eye exception and a stronger fixed positive-Y mapping. Presets

@@ -1,5 +1,12 @@
 # Mouse MVP testing companion
 
+> Current MVP: tongue has been removed from App and Vision lab. Use
+> [App's current testing/profile guide](../App/README.md) and
+> [pupil matrix testing](../docs/DIRECT_PUPIL_TESTING.md). Eyes and head axes remain;
+> pupils are the pointer input, with no pupil calibration or sensitivity controls.
+> Detector presets are v11; old tongue state is discarded on load. Any tongue
+> setup, backend, recheck or mapping instructions below are historical.
+
 Current head/tongue update: use the [movement calibration guide](MOVEMENT_CALIBRATION_GUIDE.md)
 for guided position fitting, raw graphs on camera setup and shared capture data.
 Detector presets are now v5 (combined profiles remain v3). The

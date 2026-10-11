@@ -842,7 +842,7 @@ Contract: PUPIL_MATRIX.md, landed before implementation.
   experimental engineering defaults; generated fixtures do not measure human accuracy.
   No camera or personal recordings/profile data used for verification.
 
-## Tongue retirement — active
+## Tongue retirement — complete
 
 Reuvi integration, branch `work/reuvi/integration/remove-tongue`, base `d36cb18`.
 User authorizes removing tongue from the MVP. Writable paths: App, Vision,
@@ -850,3 +850,27 @@ shared contracts/docs and integration tests; narrowly scoped Processing UI wirin
 if needed to prevent the embedded App selecting a retired input. Drivers untouched.
 Contract: `Contracts/TONGUE_RETIREMENT.md`. Preserve eyes/winks and head axes;
 use fixed pupils for pointer. Validate legacy files then discard tongue state.
+
+
+Handoff:
+- Contract landed first as `af37f20`. App/Vision runtime now samples only eyes,
+  head axes and pupils; removed tongue methods/crops/worker setup, UI, graphs,
+  settings, CSV fields and obsolete tongue setup/worker-benchmark entry points.
+- App fixes pointer source to gaze, including imported settings and old profiles.
+  Processing's standalone library/legacy replay support is retained. Continuous
+  pupil coordinates drive its pointer; the 11×11 matrix stays diagnostic.
+- New detector v11 omits tongue data. Read-only v1–v10 validation keeps compatible
+  eye/wink/head fits, discards tongue and old pupil fits/settings, and never starts
+  a retired model. Required SignalFrame v1 tongue slots remain null/invalid.
+- Verified: 139 Vision tests (137 passed, 2 optional retired tongue model smoke
+  tests skipped; real local MediaPipe smoke passed); 83 existing integration tests
+  passed with native Tk; 7 new removal/migration/native UI tests passed separately;
+  75 Processing tests passed. Total: 302 passed, 2 optional skips.
+- 490-frame headless demo accepted all 490 at ~30 Hz, observed left/right clicks,
+  pupil pointer and head scroll, ended disabled with released buttons and neutral
+  velocity. Ruff F, whitespace and integration scope checks passed.
+- Obsolete active-tongue integration cases were removed; remaining eye/head/pupil
+  regressions were adapted to the new pointer and preset contract. Isolated legacy
+  algorithm tests remain. No live camera or human accuracy claim; Drivers pending.
+- User runbook: `App/README.md`. Restart the app; Detection calibration now has
+  1 Eyes, 2 Head Y, 3 Head X, 4 Pupils, Settings. No pupil setup is required.

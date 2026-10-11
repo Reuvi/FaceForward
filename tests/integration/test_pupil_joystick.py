@@ -13,7 +13,6 @@ if AVAILABLE:
     from Vision.demo_detection import demo_image
     from Vision.signals import Envelope
     from Vision.calibration import AxisCalibration
-    from Vision.tongue_segment import SegmentedTongueModel
     from Processing.mouse.config import MouseConfig
     from Processing.mouse.signals import decode
 
@@ -106,7 +105,7 @@ class JoystickIntegration(unittest.TestCase):
         self.assertIsNone(self.runtime.snapshot()['frame']['pupil_matrix']['values'])
 
     def test_profile_roundtrip_without_training_and_atomic_validation(self):
-        data=self.core.export_calibration();self.assertEqual(data['version'],10)
+        data=self.core.export_calibration();self.assertEqual(data['version'],11)
         self.assertEqual(data['eyes'],{});self.assertIsNone(data['head'])
         self.core.disconnect();self.core.load_calibration(data)
         values=self.feed(pupil_x=.75,pupil_y=1)['faces'][0]['signals']
@@ -122,11 +121,11 @@ class JoystickIntegration(unittest.TestCase):
         self.core.head=AxisCalibration(-12,0,12,endpoint_tolerance=.05)
         original=self.core.export_calibration()
         for version,algorithm in ((6,'tongue-segmentation-pupil-joystick-v6'),(7,'independent-head-axes-v7')):
-            old=deepcopy(original);old.update(version=version,algorithm=algorithm)
+            old=deepcopy(original);old.update(version=version,algorithm=algorithm,tongue=None,tongue_range=None,tongue_measurement="color_tip_mouth_width_v1")
             if version==6:old.pop('head_x')
             old['pupil']={'range':{axis:dict(low=-.05,center=.05,high=.15,endpoint_tolerance=.05) for axis in ('x','y')},'pose':[30,25,20]}
             self.core.load_calibration(old)
-            self.assertIn('Old pupil fit removed',self.core.notice)
+            self.assertIn('old pupil settings discarded',self.core.notice)
             values=self.feed()['faces'][0]['signals']
             self.assertEqual(values['gaze_x']['value'],.5)
             self.assertEqual(values['gaze_y']['value'],.5)
@@ -158,14 +157,14 @@ class JoystickIntegration(unittest.TestCase):
         self.core.head_x=AxisCalibration(-15,0,20,endpoint_tolerance=.05)
         data=self.core.export_calibration()
         for version,algorithm in ((8,'direct-mediapipe-pupils-v8'),(9,'lip-boundary-head-reliability-v9')):
-            old=deepcopy(data);old.update(version=version,algorithm=algorithm)
+            old=deepcopy(data);old.update(version=version,algorithm=algorithm,tongue=None,tongue_range=None,tongue_measurement="color_tip_mouth_width_v1")
             old['pupil']=dict(measurement='mediapipe_iris_direction_v2',x_sensitivity=4,y_sensitivity=.25)
             self.core.load_calibration(old)
             values=self.feed(pupil_x=.75,pupil_y=.825)['faces'][0]['signals']
             self.assertAlmostEqual(values['gaze_x']['value'],.75)
             self.assertAlmostEqual(values['gaze_y']['value'],1)
             self.assertEqual(self.core.head.low,-12);self.assertEqual(self.core.head_x.high,20)
-            self.assertIn('Old pupil sensitivity removed',self.core.notice)
+            self.assertIn('old pupil settings discarded',self.core.notice)
             self.assertEqual(self.core.export_calibration()['pupil'],data['pupil'])
             saved=self.core.export_calibration()
             for value in (float('nan'),0,5,True):
@@ -176,53 +175,19 @@ class JoystickIntegration(unittest.TestCase):
             self.session.detector_command('set_pupil_sensitivity',2,2)
         self.assertFalse(hasattr(self.core,'set_pupil_sensitivity'))
 
-    def test_neural_reset_identity_and_unavailable_cannot_pass_absence(self):
-        self.core.tongue_model=SegmentedTongueModel('/not/installed.onnx')
-        self.core.head=AxisCalibration(-12,0,12,endpoint_tolerance=.05)
-        model=self.core.tongue_model
-        data=self.core.export_calibration();self.assertEqual(data['version'],10)
-        bad=deepcopy(data);bad['tongue']['sha256']='0'*64
-        with self.assertRaises(ValueError):self.core.load_calibration(bad)
-        self.core.reset_tongue();self.assertIs(self.core.tongue_model,model)
-        self.session.detector_command('start_movement_guide','tongue')
-        self.core.present_movement_step(0,'prepare')
-        # Async inference admits at most stale_ms delivery grace after capture.
-        for _ in range(25):self.feed()
-        self.assertFalse(self.core.movement_guide.passed)
-        self.assertIn('too few',self.core.movement_guide.report)
-        self.assertIsNotNone(self.core.head)
 
-    def test_source_selection_stops_preview_and_saves(self):
+    def test_pupil_source_saves_with_transfer_settings(self):
         config=self.session.lab.state()["config"];config["pointer"]["smoothing_ms"]=135
         self.session.lab.settings({"config":config})
-        self.session.set_pointer_source('gaze')
         self.assertEqual(self.session.lab.state()["config"]["pointer"]["smoothing_ms"],135)
         self.assertEqual(self.session.lab.state()['config']['pointer_source'],'gaze')
         self.assertFalse(self.session.lab.processor.armed)
         with tempfile.TemporaryDirectory() as folder:
             path=folder+'/profile.json';self.session.save_profile(path)
-            self.session.set_pointer_source('tongue');self.session.load_profile(path)
+            self.session.load_profile(path)
             self.assertEqual(self.session.lab.state()['config']['pointer_source'],'gaze')
             self.assertTrue(self.feed()['faces'][0]['signals']['gaze_x']['valid'])
 
-    def test_color_profile_migrates_without_reusing_range_or_losing_head(self):
-        import numpy as np
-        from Vision.tongue import TongueModel
-        self.core.head=AxisCalibration(-12,0,12,endpoint_tolerance=.05)
-        self.core.tongue_model=TongueModel(np.array([[40,160,140]],dtype=np.float32),
-                                          np.array([[20,100,100]],dtype=np.float32),6,4,{})
-        self.core.tongue_range={k:AxisCalibration(-.2,0,.2,endpoint_tolerance=.05) for k in ("x","y")}
-        legacy=self.core.export_calibration()
-        legacy.update(version=5,algorithm="color-tongue-tip-v5")
-        legacy.pop("head_x");legacy.pop("pupil")
-        legacy["settings"].pop("head_yaw_separation")
-        model=SegmentedTongueModel()
-        self.core.tongue_model=model
-        self.core.load_calibration(legacy)
-        self.assertIs(self.core.tongue_model,model)
-        self.assertIsNone(self.core.tongue_range)
-        self.assertEqual(self.core.head.center,0)
-        self.assertIn("Incompatible tongue range removed",self.core.notice)
 
     def test_long_unknown_pupil_trace_keeps_display_seed_only(self):
         frame=self.feed(pupil_x=1)
@@ -235,7 +200,7 @@ class JoystickIntegration(unittest.TestCase):
         self.assertIsNone(state["pupil"]["xy"])
 
     @unittest.skipUnless(os.environ.get('RUN_TK_TESTS')=='1','native Tk check')
-    def test_native_direct_pupil_controls_and_neural_setup(self):
+    def test_native_direct_pupil_controls_and_matrix(self):
         import tkinter as tk
         from types import SimpleNamespace
         from Vision.lab import DetectionLab
@@ -274,8 +239,6 @@ class JoystickIntegration(unittest.TestCase):
             ui.visible=lambda:False;ui.tick();root.update()
             ui.visible=lambda:True;ui.tick();root.update()
             self.assertFalse(callback_errors)
-            self.core.tongue_model=SegmentedTongueModel()
-            ui.calibration_tabs.select(ui.tongue_tab);ui.tick();root.update()
-            self.assertTrue(ui.tongue_setup.neural.winfo_ismapped())
-            self.assertFalse(ui.tongue_setup.background.winfo_ismapped())
-            self.assertTrue(ui.mouth.winfo_ismapped())
+            self.assertEqual([ui.calibration_tabs.tab(tab, 'text') for tab in ui.calibration_tabs.tabs()],
+                             ['1 Eyes', '2 Head Y', '3 Head X', '4 Pupils', 'Settings'])
+            self.assertFalse(hasattr(ui, 'tongue_setup'))

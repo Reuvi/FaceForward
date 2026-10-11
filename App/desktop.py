@@ -8,9 +8,12 @@ from tkinter import filedialog, ttk
 
 from Processing.mouse.desktop import DesktopLab, label, set_var, BG, TEXT, MUTED, GREEN
 from Vision.signals import SIGNALS
+
 from Vision.movement_view import draw_raw_scopes
 from Vision.eye_scope import draw_feature_scope
 
+
+ACTIVE_SIGNALS = tuple(key for key in SIGNALS if not key.startswith("tongue_"))
 
 SOURCES = {"Vision demo (synthetic)": "demo", "Vision replay (NDJSON)": "replay",
            "Camera (live calibration)": "camera",
@@ -110,12 +113,7 @@ class IntegratedDesktop(DesktopLab):
 
         pointer_row = ttk.Frame(self.vision_page)
         pointer_row.pack(fill="x", pady=(0,6))
-        label(pointer_row,"Pointer joystick input").pack(side="left",padx=(0,8))
-        self.pointer_choice = tk.StringVar(value="Tongue tip")
-        self.pointer_picker = ttk.Combobox(pointer_row,textvariable=self.pointer_choice,values=("Tongue tip","Pupil direction"),state="readonly",width=20)
-        self.pointer_picker.pack(side="left")
-        self.pointer_picker.bind("<<ComboboxSelected>>",lambda event:self.guarded(lambda:self.session.set_pointer_source("gaze" if self.pointer_choice.get()=="Pupil direction" else "tongue")))
-        label(pointer_row,"Changing input stops preview. Calibrate that input before starting it.",foreground=MUTED).pack(side="left",padx=8)
+        label(pointer_row,"Pointer input: Pupil direction · no calibration or sensitivity settings",foreground=MUTED).pack(side="left")
         self.profile_text = tk.StringVar()
         label(self.vision_page, textvariable=self.profile_text, foreground=MUTED).pack(anchor="w", pady=(0,8))
 
@@ -131,7 +129,7 @@ class IntegratedDesktop(DesktopLab):
         self.raw_ratios = tk.StringVar(value="No camera landmarks received")
         label(raw_page, "Raw camera measurements / single user", style="Heading.TLabel").pack(anchor="w",pady=(0,8))
         label(raw_page, textvariable=self.raw_ratios, style="Panel.TLabel", font=("Menlo", 10), justify="left", wraplength=480).pack(anchor="w")
-        label(raw_page, "Raw graphs below use every captured sample. Calibrate in Detection calibration; device mappings come afterward.\nTongue uses color beyond the lip boundary and needs a position guide. Pupils use direct MediaPipe direction without calibration.",
+        label(raw_page, "Raw graphs below use every captured sample. Calibrate in Detection calibration; device mappings come afterward.\nPupils use direct MediaPipe direction without calibration.",
               style="Small.TLabel", wraplength=470).pack(anchor="w", pady=12)
         self.input_result = tk.StringVar()
         label(raw_page, textvariable=self.input_result, style="Small.TLabel", wraplength=470).pack(anchor="w")
@@ -141,7 +139,7 @@ class IntegratedDesktop(DesktopLab):
         for name, width in zip(columns, (155, 75, 80, 120)):
             self.signal_table.heading(name, text=name.title())
             self.signal_table.column(name, width=width, minwidth=60, stretch=True)
-        for name in SIGNALS:
+        for name in ACTIVE_SIGNALS:
             self.signal_table.insert("", "end", iid=name, values=(name, "—", "—", "Unavailable"))
         self.signal_table.pack(fill="both",expand=True)
 
@@ -272,7 +270,7 @@ class IntegratedDesktop(DesktopLab):
         age = "—" if state["age_ms"] is None else f"{state['age_ms']:.0f}"
         set_var(self.source_status, f"{state['status']}  |  actual {state['actual_hz']:.1f} Hz  |  received {state['received']} / accepted {state['accepted']}  |  age {age} ms")
         details = {
-            "demo": "SYNTHETIC: all four mouse actions. Click Start preview, then open Live lab. Cycle: short blink → left wink → right wink → both → tongue circle → head up/down. Neutral periods allow arming.",
+            "demo": "SYNTHETIC: all four mouse actions. Click Start preview, then open Live lab. Cycle: short blink → left wink → right wink → both → pupil circle → head up/down. Neutral periods allow arming.",
             "replay": "REPLAY: select a subject explicitly, then Start preview with neutral input. Capture gaps are preserved. EOF stops output; restart the source and re-arm to repeat.",
             "camera": "LIVE CAMERA · ONE USER: face connects automatically → Detection calibration (or Load saved profile) → Start preview → Live lab. Calibration survives brief loss and camera restart; no OS mouse output.",
             "detector-demo": "SYNTHETIC PIXELS · ONE USER: run Eye open/closed, then start Wink action separately in Detection calibration. The fixture follows each guide, then cycles independent closures. No camera or ML.",
@@ -280,10 +278,9 @@ class IntegratedDesktop(DesktopLab):
         set_var(self.source_detail, state["error"] or details[state["mode"]])
         single = state["mode"] in ("camera", "detector-demo")
         set_var(self.selected_text, ("Single user: " + ("face detected" if ids and fresh else "tracking paused")) if single else "Processing subject: " + selected)
-        set_var(self.pointer_choice, "Pupil direction" if self.session.lab.state()["config"]["pointer_source"]=="gaze" else "Tongue tip")
         set_var(self.profile_text, "Profile: " + state["profile_label"] + (" | saved calibration active; retained while tracking pauses" if state["profile_bound"] else " | Save active profile to keep calibration after closing the app"))
         face = next((face for face in faces if face["subject_id"] == selected), None)
-        for name in SIGNALS:
+        for name in ACTIVE_SIGNALS:
             item = face["signals"][name] if face else None
             valid = item and item["valid"]
             status = "Valid" if valid and fresh else "Stale / stopped" if valid else "Unavailable"
@@ -310,8 +307,6 @@ class IntegratedDesktop(DesktopLab):
             lines.append("Head X: " + detector_state["reasons"].get("head_x", "Waiting for face"))
             matrix=(detector_state.get("frame") or {}).get("pupil_matrix", {})
             lines.append("Pupil matrix 11×11: " + (f"row {matrix['row']}, column {matrix['column']}" if matrix.get("valid") else "unavailable"))
-            candidate=detector_state.get("candidate")
-            lines.append("Tongue raw tip X/Y (mouth widths): "+(f"{candidate[0]:.3f}, {candidate[1]:.3f}" if candidate else "unavailable; inspect Tongue calibration"))
             lines.append(detector_state["notice"])
         ref = raw.get("head_reference")
         if ref and state["mode"] not in ("camera", "detector-demo"):

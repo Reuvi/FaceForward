@@ -1,5 +1,12 @@
 # Test the new tongue and pupil joysticks
 
+> Current MVP: tongue has been removed from App and Vision lab. Use
+> [App's current testing/profile guide](../App/README.md) and
+> [pupil matrix testing](../docs/DIRECT_PUPIL_TESTING.md). Eyes and head axes remain;
+> pupils are the pointer input, with no pupil calibration or sensitivity controls.
+> Detector presets are v11; old tongue state is discarded on load. Any tongue
+> setup, backend, recheck or mapping instructions below are historical.
+
 **Current tongue workflow:** use [lip-boundary testing](LIP_BOUNDARY_HEAD_TESTING.md).
 It supersedes the default neural backend described below. ONNX remains an explicit
 comparison option; direct pupils remain current. New detector saves use v9.

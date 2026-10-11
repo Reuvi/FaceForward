@@ -1,5 +1,11 @@
 # Processing lane
 
+**Current user decision — tongue retired:** read [../Contracts/TONGUE_RETIREMENT.md](../Contracts/TONGUE_RETIREMENT.md).
+App and Vision lab have no tongue detection, worker, calibration, graphs or input
+choice. App uses fixed pupils for pointer movement; preserve independent eyes and
+head axes. Detector presets v11 migrate older files without restoring tongue.
+This supersedes historical tongue requirements below.
+
 Read the root `AGENTS.md` and `Contracts/README.md`. Own only `Processing/**` and
 `tests/processing/**`. Keep profile logic, mappings, diagnostic UI, dependencies,
 and lane documentation here. Put shared-change requests in `interface-requests/`.

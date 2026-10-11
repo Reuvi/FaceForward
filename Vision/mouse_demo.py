@@ -12,7 +12,7 @@ def mouse_demo_records(*, count=None, fps=30.0):
     """Repeat a 16-second, explicitly synthetic mouse exercise.
 
     Interleaved neutral periods allow deliberate arming. Includes a short blink,
-    independent long winks, simultaneous independent closures, 2D tongue/gaze
+    independent long winks, simultaneous independent closures, 2D pupil
     motion, and up/down head demand. No camera/model dependencies.
     """
     if count is not None and (type(count) is not int or count < 1):
@@ -33,7 +33,7 @@ def mouse_demo_records(*, count=None, fps=30.0):
         elif 11.5 <= t < 13:
             head = 0.8
         values = {"left_eye_open": 0 if left else 1, "right_eye_open": 0 if right else 1,
-                  "tongue_x": x, "tongue_y": y, "gaze_x": x, "gaze_y": y,
+                  "gaze_x": x, "gaze_y": y,
                   "head_x": 0.5, "head_y": head}
         yield Envelope("synthetic-mouse-recording", index, index * 1000 / fps).frame([
             make_face(SUBJECT, {name: measurement(value, 1) for name, value in values.items()})

@@ -1,5 +1,11 @@
 # Agent working agreement
 
+**Current user decision — tongue retired:** read [Contracts/TONGUE_RETIREMENT.md](Contracts/TONGUE_RETIREMENT.md).
+App and Vision lab have no tongue detection, worker, calibration, graphs or input
+choice. App uses fixed pupils for pointer movement; preserve independent eyes and
+head axes. Detector presets v11 migrate older files without restoring tongue.
+This supersedes historical tongue requirements below.
+
 Build a camera-based accessibility controller: **Vision → Processing → Drivers**.
 Read `docs/ORIGINAL_PROJECT_NOTES.md`, `README.md`, `docs/TEAM_WORKFLOW.md`, and
 `Contracts/README.md` before editing. The original notes capture the team's intent;

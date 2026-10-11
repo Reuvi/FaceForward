@@ -12,14 +12,10 @@ import cv2
 import numpy as np
 
 from .geometry import reference, sub
+from .landmarks import INNER_LIP, OUTER_LIP
 from .tongue_tip import estimate_tip
 
 
-INNER_LIP = (78, 95, 88, 178, 87, 14, 317, 402, 318, 324,
-             308, 415, 310, 311, 312, 13, 82, 81, 80, 191)
-# Ordered outer ring from MediaPipe FaceLandmarksConnections.FACE_LANDMARKS_LIPS.
-OUTER_LIP = (61, 146, 91, 181, 84, 17, 314, 405, 321, 375,
-             291, 409, 270, 269, 267, 0, 37, 39, 40, 185)
 CROP_WIDTH, CROP_HEIGHT = 160, 160
 CROP_SPAN = 1.6
 TONGUE_MEASUREMENT = "color_tip_mouth_width_v1"

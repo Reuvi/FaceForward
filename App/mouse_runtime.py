@@ -28,6 +28,7 @@ class MouseSession:
     def __init__(self, lab=None, *, clock=monotonic_ms):
         self.clock = clock
         self.lab = lab or Lab(clock=clock)
+        self.lab.locked_pointer_source = "gaze"
         self.lab.settings({"runtime": {"source": "external", "subject_id": SUBJECT}})
         self.lab.locked_source = "external"
         self.lock = threading.RLock()
@@ -69,8 +70,9 @@ class MouseSession:
             return self.detector_runtime
 
     def detector_command(self, name, *args):
-        allowed = {"start_eye_guide", "start_wink_guide", "present_eye_step", "start_movement_guide", "present_movement_step",
-                   "load_tongue_model", "use_lip_boundary", "reset_head_x", "collect", "cancel", "freeze_mouth", "mark_tongue", "clear_tongue_marks", "fit_tongue", "reset_tongue", "retry_tongue_step", "configure", "reset_calibration"}
+        allowed = {"start_eye_guide", "start_wink_guide", "present_eye_step",
+                   "start_movement_guide", "present_movement_step", "reset_head_x",
+                   "retry_movement_step", "collect", "cancel", "configure", "reset_calibration"}
         if name not in allowed:
             raise ValueError("Unsupported calibration command")
         with self.lock:
@@ -78,24 +80,12 @@ class MouseSession:
                 raise ValueError("Choose Camera or Detector demo in Vision source first")
             runtime = self.ensure_detector_runtime()
             self.lab.disconnect("Calibration changed; start preview again when ready",
-                                clear_eye_history=name in ("start_eye_guide", "start_wink_guide", "configure", "collect", "fit_tongue", "reset_tongue", "reset_calibration"))
+                                clear_eye_history=name in ("start_eye_guide", "start_wink_guide", "configure", "collect", "reset_calibration"))
             result = runtime.command(name, *args)
-            validation_only = name == "collect" and args and args[0] in ("validate_absent", "validate_visible")
-            if name not in ("freeze_mouth", "cancel", "present_eye_step", "present_movement_step") and not validation_only:
+            if name not in ("cancel", "present_eye_step", "present_movement_step"):
                 self.profile_label = "Modified calibration — save profile to keep it"
                 self.profile_binding = None
             return result
-
-    def set_pointer_source(self, source):
-        if source not in ("tongue", "gaze"):
-            raise ValueError("Choose tongue or pupil direction")
-        with self.lock:
-            self.lab.disconnect("Pointer source changed; start preview again when ready")
-            config = self.lab.state()["config"]
-            config["pointer_source"] = source
-            self.lab.settings({"config": config})
-            self.profile_label = "Modified pointer source — save profile to keep it"
-            self.profile_binding = None
 
     def detector_state(self):
         with self.lock:
@@ -275,9 +265,7 @@ class MouseSession:
                 core = self.detector_runtime.workbench
                 if changed_source:
                     core.reset_calibration()
-                    core.tongue_model = None
                 core.disconnect("Source starting; calibration retained. Waiting for the face.")
-                core.validation.clear()
                 self.detector_runtime.preview = None
                 self.detector_runtime.preview_due = 0
                 self.detector_runtime.previous_timestamp = None
@@ -341,13 +329,6 @@ class MouseSession:
         from Vision.capture import OpenCVCamera
         from Vision.landmarks import LAB_TRACKING_CONFIDENCE, MediaPipeDetector
         self.ensure_detector_runtime()
-        from Vision.lip_boundary import LipBoundaryModel
-        with self.lock:
-            core = self.detector_runtime.workbench
-            if not core.independent_tongue:
-                core.tongue_model = LipBoundaryModel()
-                core.tongue_range = None
-                core.validation.clear()
         index = 0
         self.detector_runtime.tracker_floors = dict(face_presence_floor=LAB_TRACKING_CONFIDENCE,
                                                    face_tracking_floor=LAB_TRACKING_CONFIDENCE)

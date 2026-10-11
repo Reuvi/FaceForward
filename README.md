@@ -1,25 +1,17 @@
 # Face-controlled accessibility interface
 
-Latest pupil update: [fixed direction and 11×11 matrix](docs/DIRECT_PUPIL_TESTING.md).
-No pupil sensitivity controls or calibration remain. Downward detection has a
-supported narrow-eye exception and a stronger fixed positive-Y mapping. Presets
-now save v10; older pupil settings are validated and discarded.
-
-Related update: [lip-boundary tongue + calibrated Head X recovery](docs/LIP_BOUNDARY_HEAD_TESTING.md).
-Camera tongue now defaults to a built-in local color extension beyond the lips;
-Head X keeps calibration, supports failed-pose retry and saturates at learned
-limits while raw tracking is valid. Detector presets now use v10 and tongue
-still runs independently. This supersedes older backend
-and profile-version instructions below.
-
-Pupils now use [direct MediaPipe direction](docs/DIRECT_PUPIL_TESTING.md) without a pupil calibration guide.
+Current MVP: **eyes/winks, Head Y, Head X and pupils**. Tongue detection has been
+removed from the live app, calibration and graphs. Pupils control the pointer with
+no calibration or sensitivity controls and an 11×11 matrix display. Saved eye/head
+calibration remains reusable; detector presets now save v11. Start with the
+[current testing and profile guide](App/README.md).
 
 A hackathon prototype for controlling a computer through a consumer webcam and
 comfortable facial movements. The pipeline separates measurement, personalized
 signal processing, and device output so three teammates can develop independently.
 
 **Repository status:** one native mouse lab with live detector calibration and
-Processing in the same window. Independent eyes, head X/Y and experimental tongue
+Processing in the same window. Independent eyes, head X/Y and pupil
 measurements feed the existing scopes and simulated mouse. Saved local profiles
 keep detector fits and mouse settings together. Live accuracy validation and the
 real Drivers connection remain pending.
@@ -37,15 +29,9 @@ Vision/.venv/bin/python -m App --source camera --model Vision/.local/face_landma
 Follow [the unified workflow and saved-profile guide](App/README.md).
 [Horizontal head testing](docs/HEAD_HORIZONTAL_TESTING.md) covers the new independent
 Head X yaw guide, raw/normalized graphs and saved horizontal ranges.
-The [new tongue + pupil joystick guide](docs/TONGUE_PUPIL_TESTING.md) covers local
-neural tongue masks (no color clicking), full-screen pupil calibration, the input
-selector, saved ranges and live testing. [Install the optional local tongue model](Vision/TONGUE_MODEL_NOTICE.md) once; camera runtime stays offline.
-The [head/tongue calibration guide](docs/MOVEMENT_CALIBRATION_GUIDE.md) covers guided
-position fitting, raw graphs on camera setup, shared readings and saved profiles.
-The [tongue-tip testing guide](docs/TONGUE_TIP_TESTING.md) explains the visible
-front-edge midpoint, overlays, raw units, and older-profile recalibration.
-The [tongue model plan](Vision/TONGUE_MODEL_PLAN.md) incorporates the supplied
-segmentation research and distinguishes the current color baseline from future models.
+The [pupil testing guide](docs/DIRECT_PUPIL_TESTING.md) explains direct iris
+normalization, downward movement and the square matrix. Historical tongue guides
+are superseded by the [retirement contract](Contracts/TONGUE_RETIREMENT.md).
 The [detector runbook](Vision/DETECTION_LAB.md) specifies measurements and thresholds.
 Optional camera dependencies/model setup are in [Vision setup](Vision/README.md).
 The standalone component tools are for developers; App requires no second program.

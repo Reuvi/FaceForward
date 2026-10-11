@@ -1,5 +1,9 @@
 # Shared contracts — initial v1
 
+[TONGUE_RETIREMENT.md](TONGUE_RETIREMENT.md) is current: no active tongue
+path, pupil-only App pointer and detector presets v11. Earlier tongue requirements
+below are historical; keep the two invalid v1 schema slots for compatibility.
+
 [PUPIL_MATRIX.md](PUPIL_MATRIX.md) supersedes adjustable pupil settings: fixed
 direction, supported downward detection, 11×11 matrices and detector presets v10.
 

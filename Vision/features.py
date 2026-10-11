@@ -74,6 +74,11 @@ class DetectionConfig:
     def to_dict(self):
         return asdict(self)
 
+    def active_dict(self):
+        """Current lab settings; legacy tongue fields remain decodable only."""
+        return {key: value for key, value in self.to_dict().items()
+                if not key.startswith(("tongue_", "min_mouth_"))}
+
     @classmethod
     def from_dict(cls, values):
         if not isinstance(values, dict):

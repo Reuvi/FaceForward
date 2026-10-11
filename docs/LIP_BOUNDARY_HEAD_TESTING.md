@@ -1,5 +1,12 @@
 # Lip-boundary tongue detection and Head X recovery
 
+> Current MVP: tongue has been removed from App and Vision lab. Use
+> [App's current testing/profile guide](../App/README.md) and
+> [pupil matrix testing](../docs/DIRECT_PUPIL_TESTING.md). Eyes and head axes remain;
+> pupils are the pointer input, with no pupil calibration or sensitivity controls.
+> Detector presets are v11; old tongue state is discarded on load. Any tongue
+> setup, backend, recheck or mapping instructions below are historical.
+
 Current change: detector presets v9 (`lip-boundary-head-reliability-v9`), combined
 profiles v3. Native Python/Tk only. Head X **keeps its calibration**. Head Y,
 independent eye/wink behavior, direct MediaPipe pupils and mouse mappings retain

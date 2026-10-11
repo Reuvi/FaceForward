@@ -1,5 +1,12 @@
 # Head and tongue calibration, raw views, and the device boundary
 
+> Current MVP: tongue has been removed from App and Vision lab. Use
+> [App's current testing/profile guide](../App/README.md) and
+> [pupil matrix testing](../docs/DIRECT_PUPIL_TESTING.md). Eyes and head axes remain;
+> pupils are the pointer input, with no pupil calibration or sensitivity controls.
+> Detector presets are v11; old tongue state is discarded on load. Any tongue
+> setup, backend, recheck or mapping instructions below are historical.
+
 Head X now has an independent yaw guide beside Head Y pitch. See
 [horizontal head testing](HEAD_HORIZONTAL_TESTING.md) for current instructions
 and detector preset v7. The vertical behavior below is preserved.

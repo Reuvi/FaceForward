@@ -12,7 +12,6 @@ from .eye_view import EyeGuidePanel
 from .movement_view import MovementPanel, draw_position, draw_raw_scopes, draw_calibrated_scope, draw_pupil_scope
 from .eye_scope import draw_eye_scope, draw_feature_scope
 from .features import DetectionConfig
-from .tongue_view import TongueSetupPanel
 from .pupil_view import PupilPanel
 from .lab_runtime import LabRuntime
 
@@ -36,7 +35,6 @@ class DetectionLab:
         self.eye_details = tk.StringVar()
         self.head_details = tk.StringVar()
         self.head_x_details = tk.StringVar()
-        self.tongue_details = tk.StringVar()
         outer = ttk.Frame(container if self.embedded else root, padding=10)
         outer.pack(fill="both", expand=True)
         bar = ttk.Frame(outer)
@@ -94,16 +92,7 @@ class DetectionLab:
         self.head_x_reset.pack(fill="x",pady=5)
         self.text(self.head_x_tab,"Amber shows raw yaw in degrees; green shows the full 0–1 range. Your left limit is 0, neutral is .5 and right limit is 1. Keep your face visible.")
         ttk.Label(self.head_x_tab,textvariable=self.head_x_details,justify="left",wraplength=440,font=("Menlo",10)).pack(anchor="w",pady=10)
-        self.tongue_tab=self.tab(tabs,"4 Tongue")
-        self.tongue_reset=ttk.Button(self.tongue_tab,text="Reset tongue — start over",command=lambda:self.call("reset_tongue"))
-        self.tongue_reset.pack(fill="x",pady=3)
-        self.tongue_panel=MovementPanel(self.tongue_tab,root,self.call,"tongue")
-        tongue=self.scroll_content(self.tongue_tab)
-        self.tongue_setup=TongueSetupPanel(tongue,self.call)
-        self.mouth=self.tongue_setup.mouth
-        self.mouth.bind("<Button-1>",self.mark_tongue)
-        ttk.Label(tongue,textvariable=self.tongue_details,justify="left",wraplength=420,font=("Menlo",10)).pack(anchor="w",pady=6)
-        self.pupil_tab=self.tab(tabs,"5 Pupils")
+        self.pupil_tab=self.tab(tabs,"4 Pupils")
         pupil_content=self.scroll_content(self.pupil_tab)
         self.text(pupil_content,"MediaPipe iris direction is available immediately: no pupil calibration or dot guide. Center is (.5, .5); left/up approach 0 and right/down approach 1. Keep both eyes open and visible. Head turns can still affect direction; this is not screen gaze.")
         self.pupil_panel=PupilPanel(pupil_content,root,self.call)
@@ -155,20 +144,11 @@ class DetectionLab:
         except (ValueError,TypeError) as exc:
             messagebox.showerror("Cannot start",str(exc),parent=self.root)
 
-    def mark_tongue(self,event):
-        if not self.runtime.snapshot()["frozen"]:
-            return
-        photo = self.photos.get("mouth")
-        if photo is None:
-            return
-        x = (event.x - (self.mouth.winfo_width() - photo.width()) / 2) / photo.width()
-        y = (event.y - (self.mouth.winfo_height() - photo.height()) / 2) / photo.height()
-        self.call("mark_tongue",x,y)
-
     @staticmethod
     def editable_settings(config):
         return {key: value for key, value in config.items()
-                if key not in ("head_mode", "head_position_separation")}
+                if key not in ("head_mode", "head_position_separation")
+                and not key.startswith(("tongue_", "min_mouth_"))}
 
     def apply_settings(self):
         try:
@@ -191,7 +171,7 @@ class DetectionLab:
             config=DetectionConfig.from_dict(self.editable_settings(config.to_dict()))
             path=filedialog.asksaveasfilename(defaultextension=".json",initialfile="detector-settings.json")
             if path:
-                Path(path).write_text(json.dumps(config.to_dict(),indent=2)+"\n")
+                Path(path).write_text(json.dumps(self.editable_settings(config.to_dict()),indent=2)+"\n")
         except (ValueError,OSError) as exc:
             messagebox.showerror("Cannot save",str(exc),parent=self.root)
 
@@ -205,16 +185,11 @@ class DetectionLab:
             except (ValueError,OSError) as exc:
                 messagebox.showerror("Cannot export",str(exc))
 
-    def show_image(self,widget,key,bgr,size,*,frozen=False,marks=()):
+    def show_image(self,widget,key,bgr,size):
         if bgr is None:
             widget.configure(image="",text="No current image",pady=15)
             self.photos.pop(key,None)
             return
-        if key == "mouth" and frozen:
-            bgr=bgr.copy()
-            for x, y in marks:
-                cx, cy = round(x * (bgr.shape[1]-1)), round(y * (bgr.shape[0]-1))
-                cv2.rectangle(bgr,(cx-5,cy-5),(cx+5,cy+5),(0,230,255),1)
         rgb=cv2.cvtColor(cv2.resize(bgr,size),cv2.COLOR_BGR2RGB)
         photo=tk.PhotoImage(data=f"P6\n{size[0]} {size[1]}\n255\n".encode()+rgb.tobytes(),format="PPM")
         self.photos[key]=photo;widget.configure(image=photo,text="",pady=0)
@@ -239,7 +214,7 @@ class DetectionLab:
             self.after_id=self.root.after(200,self.tick)
             return
         guide=state.get("movement_guide")
-        expected=({"head":self.head_tab,"head_x":self.head_x_tab,"tongue":self.tongue_tab}.get(guide["kind"]) if guide else None)
+        expected=({"head":self.head_tab,"head_x":self.head_x_tab}.get(guide["kind"]) if guide else None)
         if guide and guide["active"] and self.calibration_tabs.select()!=str(expected):
             self.call("cancel")
             state=self.runtime.snapshot()
@@ -247,12 +222,7 @@ class DetectionLab:
         self.head_panel.update(state)
         self.head_x_panel.update(state)
         self.head_x_reset.configure(state="normal" if not state["calibrating"] or guide and guide["kind"]=="head_x" else "disabled")
-        self.tongue_panel.update(state)
         self.pupil_panel.update(state)
-        self.tongue_setup.update(state)
-        tongue_busy = (state["collecting"] in ("tongue_absent", "validate_absent", "validate_visible")
-                       or bool(state.get("movement_guide") and state["movement_guide"]["kind"] == "tongue" and state["movement_guide"]["active"]))
-        self.tongue_reset.configure(state="normal" if not state["calibrating"] or tongue_busy else "disabled")
         if state["config"] != self.displayed_config:
             self.displayed_config = state["config"]
             self.settings.delete("1.0","end")
@@ -263,7 +233,6 @@ class DetectionLab:
         self.source_status.set(f"{state['source']}   |   capture #{(state['frame'] or {}).get('sequence','—')}   |   single user: {'detected' if state['selected'] else 'waiting for face'}   |   " +
             "   ".join(f"{k}: {v:.2f}" if k.endswith("_floor") else f"{k}: {v:.1f}" for k,v in timing.items()))
         self.show_image(self.preview,"preview",state["preview"],(320,240))
-        self.show_image(self.mouth,"mouth",state["mouth"],(256,256),frozen=state["frozen"],marks=state.get("tongue_marks",()))
         signals=next((f["signals"] for f in frame["faces"] if f["subject_id"]==state["selected"]),{})
         eye_lines=[]
         for side in ("left","right"):
@@ -299,17 +268,7 @@ class DetectionLab:
             pair_text(tuple(signals.get(k,{}).get("value") for k in ("gaze_x","gaze_y")))+"\n"+
             state["reasons"].get("pupil",pupil.get("reason","Waiting"))+"\n"+
             "\n".join(f"{side.title()}: {pair_text(v.get('xy'))} · {v.get('reason')}\n  Lid gap {self.fmt(v.get('lid_gap'))} · blink {self.fmt(v.get('blink'))} · look down {self.fmt(v.get('look_down'))}" for side,v in pupil.get("eyes",{}).items()))
-        val=state["validation"]
-        worker = state.get("tongue_worker")
-        crop_label = 'FROZEN — click tissue' if state['frozen'] else 'LIVE crop / green candidate mask'
-        if worker:
-            age = worker["age_ms"]
-            rate = worker["hz"]
-            crop_label = f"Tongue worker: {rate:.1f} Hz | result age: {self.fmt(age)} ms\nOverlay uses its original captured crop"
-            if worker["error"]:
-                crop_label += "\n" + worker["error"]
-        self.tongue_details.set(f"{crop_label}\n{state['reasons'].get('tongue','Waiting for face')}\nRaw tip (mouth widths): {state['candidate']}\n" + "\n".join(f"{k}: {'PASS' if v['passed'] else 'FAIL'} ({v['detected_fraction']:.0%}, n={v['samples']})" for k,v in val.items()))
-        self.metrics.set("\n".join(f"{k:16} {self.fmt(signals.get(k,{}).get('value'))}   {'valid' if signals.get(k,{}).get('valid') else 'unavailable'}" for k in ("left_eye_open","right_eye_open","head_y","head_x","tongue_x","tongue_y","gaze_x","gaze_y")))
+        self.metrics.set("\n".join(f"{k:16} {self.fmt(signals.get(k,{}).get('value'))}   {'valid' if signals.get(k,{}).get('valid') else 'unavailable'}" for k in ("left_eye_open","right_eye_open","head_y","head_x","gaze_x","gaze_y")))
         if self.calibration_tabs.select()==str(self.eye_tab):
             draw_eye_scope(self.eye_scope,state)
             self.movement_scope_picker.pack_forget()
@@ -321,7 +280,7 @@ class DetectionLab:
         else:
             self.eye_scope_picker.pack_forget()
             self.movement_scope_picker.pack(fill="x",before=self.scope)
-            kind="pupil" if self.calibration_tabs.select()==str(self.pupil_tab) else "tongue" if self.calibration_tabs.select()==str(self.tongue_tab) else "head_x" if self.calibration_tabs.select()==str(self.head_x_tab) else "head"
+            kind="pupil" if self.calibration_tabs.select()==str(self.pupil_tab) else "head_x" if self.calibration_tabs.select()==str(self.head_x_tab) else "head"
             draw_position(self.eye_scope,state,kind)
             if self.movement_scope_mode.get()=="Normalized positions":draw_calibrated_scope(self.scope,state)
             elif kind=="pupil":draw_pupil_scope(self.scope,state)
@@ -335,7 +294,6 @@ class DetectionLab:
         self.eye_panel.close()
         self.head_panel.close()
         self.head_x_panel.close()
-        self.tongue_panel.close()
         self.pupil_panel.close()
 
     def close(self):

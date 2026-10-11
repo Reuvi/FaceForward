@@ -170,45 +170,22 @@ class WorkbenchTests(unittest.TestCase):
             self.collect(side+"_open")
             self.collect(side+"_closed",**{side+"_closed":True})
 
-    def tongue(self):
-        self.collect("tongue_absent")
-        self.feed(tongue=True)
-        self.core.freeze_mouth()
-        self.core.mark_tongue(.5,.5)
-        self.core.fit_tongue()
 
-    def tongue_positions(self):
-        runtime=LabRuntime(clock=lambda:self.now);runtime.workbench=self.core
-        self.core.start_movement_guide("tongue")
-        while self.core.movement_guide.active:
-            guide=self.core.movement_guide;state=guide.state(self.now)
-            if state["waiting"]:self.core.present_movement_step(guide.index,state["phase"])
-            self.feed(**runtime.demo_input())
-        self.assertTrue(self.core.movement_guide.passed,self.core.notice)
 
     def test_all_four_channels_and_independent_simultaneous_closures(self):
         self.eyes()
         self.collect("head_up",head=.15)
         self.collect("head_neutral",head=.5)
         self.collect("head_down",head=.85)
-        self.tongue()
-        signals=self.feed(tongue=True)
-        self.assertFalse(signals["tongue_x"]["valid"])
-        self.collect("validate_absent")
-        self.collect("validate_visible",tongue=True)
-        self.assertFalse(self.feed(tongue=True)["tongue_x"]["valid"])  # Appearance alone is not a personal range.
-        self.tongue_positions()
-        # An instantaneous synthetic jump may be unknown; measure a fresh held frame.
-        self.feed(left_closed=True,right_closed=True,tongue=True,tongue_x=.65,head=.675)
-        signals=self.feed(left_closed=True,right_closed=True,tongue=True,tongue_x=.65,head=.675)
+        signals=self.feed(left_closed=True,right_closed=True,head=.675)
         self.assertEqual(signals["left_eye_open"]["value"],0)
         self.assertEqual(signals["right_eye_open"]["value"],0)
         self.assertAlmostEqual(signals["head_y"]["value"],.75)
-        self.assertAlmostEqual(self.core.tongue.xy[0],.24,delta=.035)
-        self.assertAlmostEqual(signals["tongue_x"]["value"],.875,delta=.05)
-        self.assertTrue(signals["tongue_y"]["valid"])
-        self.assertFalse(signals["gaze_x"]["valid"])
-        self.assertFalse(self.feed()["tongue_x"]["valid"])
+        self.assertFalse(signals["gaze_x"]["valid"])  # Closed eyes cannot supply pupils.
+        signals=self.feed(pupil_x=.875, pupil_y=.5)
+        self.assertAlmostEqual(signals["gaze_x"]["value"],.875)
+        self.assertTrue(signals["gaze_y"]["valid"])
+        self.assertFalse(signals["tongue_x"]["valid"])
         self.assertEqual(len(self.core.trace),self.sequence)
 
     def test_single_eye_does_not_require_other_calibration(self):
@@ -227,17 +204,6 @@ class WorkbenchTests(unittest.TestCase):
         self.assertAlmostEqual(self.feed(head=.35)["head_y"]["value"],.25)
         self.assertFalse(self.feed(head=1)["head_y"]["valid"])
 
-    def test_tongue_validation_failure_recheck_and_model_change(self):
-        self.tongue()
-        self.tongue_positions()
-        self.collect("validate_absent",tongue=True)
-        self.collect("validate_visible",tongue=True)
-        self.assertFalse(self.feed(tongue=True)["tongue_x"]["valid"])
-        self.collect("validate_absent")
-        self.assertTrue(self.feed(tongue=True)["tongue_x"]["valid"])
-        self.core.freeze_mouth();self.core.mark_tongue(.5,.5)
-        self.assertFalse(self.feed(tongue=True)["tongue_x"]["valid"])
-        self.assertEqual(self.core.validation,{})
 
     def test_no_face_staleness_and_restart_preserve_fits_and_auto_attach(self):
         self.eyes()
@@ -304,13 +270,13 @@ class WorkbenchTests(unittest.TestCase):
         self.assertEqual(self.core.export_calibration(), fits)
         self.assertTrue(self.feed()["left_eye_open"]["valid"])
 
-    def test_recalibration_invalidates_immediately_and_blocks_mixed_tongue_jobs(self):
+    def test_recalibration_invalidates_immediately_and_blocks_mixed_jobs(self):
         self.eyes()
         self.core.collect("left_open")
         signals=self.core.state()["frame"]["faces"][0]["signals"]
         self.assertFalse(signals["left_eye_open"]["valid"])
         self.assertTrue(signals["right_eye_open"]["valid"])
-        with self.assertRaises(ValueError):self.core.freeze_mouth()
+        with self.assertRaises(ValueError):self.core.start_movement_guide("head")
         self.core.cancel()
 
     def test_duplicate_envelope_pauses_but_keeps_fits(self):

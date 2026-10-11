@@ -87,7 +87,7 @@ class PipelineTests(unittest.TestCase):
             self.tick()
         self.assertEqual(self.outputs[-1]["left_click"], 1)
         self.assertEqual(self.outputs[-1]["right_click"], 0)
-        self.assertEqual(self.outputs[-1]["pointer_x"], 0.5)  # Unsupported tongue stays invalid.
+        self.assertEqual(self.outputs[-1]["pointer_x"], 0.5)  # Unsupported pupil input stays invalid.
 
     def test_subject_loss_is_visible_and_never_transfers_to_bystander(self):
         self.lab.action({"action": "arm"})
@@ -114,7 +114,7 @@ class PipelineTests(unittest.TestCase):
         self.assertTrue(self.session.deliver(frame)["accepted"])
         self.tick()
         frame = deepcopy(frame); frame["sequence"] += 1
-        frame["faces"][0]["signals"]["tongue_x"] = measurement(0.7, 1)
+        frame["faces"][0]["signals"]["gaze_x"] = measurement(0.7, 1)
         self.assertTrue(self.session.deliver(frame)["accepted"])
         self.tick()
         self.assertEqual(len(self.lab.processor.pointer.history), 1)

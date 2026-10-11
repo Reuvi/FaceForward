@@ -1,9 +1,7 @@
 """Generated images exercise personal movement ranges and shared capture views."""
 
 from copy import deepcopy
-from pathlib import Path
 import importlib.util
-import tempfile
 import unittest
 
 AVAILABLE = all(importlib.util.find_spec(name) for name in ("cv2", "numpy"))
@@ -14,7 +12,6 @@ if AVAILABLE:
     from Vision.capture import CapturedImage
     from Vision.demo_detection import demo_image
     from Vision.signals import Envelope
-    from Processing.mouse.profiles import read_profile, write_profile
 
 
 @unittest.skipUnless(AVAILABLE, "Vision pixel dependencies required")
@@ -50,15 +47,6 @@ class MovementIntegrationTests(unittest.TestCase):
         while self.core.job:
             self.feed(**controls)
 
-    def appearance(self):
-        self.collect("tongue_absent")
-        self.feed(tongue=True)
-        for command, args in (
-            ("freeze_mouth", ()),
-            ("mark_tongue", (0.5, 0.5)),
-            ("fit_tongue", ()),
-        ):
-            self.session.detector_command(command, *args)
 
     def guide(self, kind, recheck=False, **override):
         self.session.detector_command("start_movement_guide", kind, recheck)
@@ -108,7 +96,6 @@ class MovementIntegrationTests(unittest.TestCase):
 
     def test_legacy_position_profile_discards_only_head_and_pitch_roundtrips(self):
         self.core.eyes["left"] = EyeCalibration(.04, .25, .5)
-        self.appearance()
         self.assertTrue(self.guide("head").passed)
         original = self.core.export_calibration()
         fitted = self.core.head
@@ -116,7 +103,7 @@ class MovementIntegrationTests(unittest.TestCase):
         self.assertEqual(self.core.head, fitted)
         for explicit in (True, False):
             old = deepcopy(original)
-            old.update(version=5, algorithm="color-tongue-tip-v5")
+            old.update(version=5, algorithm="color-tongue-tip-v5", tongue=None, tongue_range=None, tongue_measurement="color_tip_mouth_width_v1")
             old.pop("head_x"); old.pop("pupil")
             old["settings"].pop("head_yaw_separation")
             old["head"].update(low=.3, center=.5, high=.7)
@@ -128,7 +115,7 @@ class MovementIntegrationTests(unittest.TestCase):
             self.assertEqual(self.core.config.head_mode, "pitch")
             self.assertIsNone(self.core.head)
             migrated = self.core.export_calibration()
-            for key in ("eyes", "winks", "tongue", "tongue_range"):
+            for key in ("eyes", "winks"):
                 self.assertEqual(migrated[key], original[key])
             self.assertIn("head pitch guide", self.core.notice)
             self.assertFalse(self.feed()["faces"][0]["signals"]["head_y"]["valid"])
@@ -156,158 +143,14 @@ class MovementIntegrationTests(unittest.TestCase):
         self.assertIsNotNone(calibration["trace"][-1]["head_raw"])
         self.assertIsNotNone(calibration["trace"][-1]["left_raw"])
         self.assertIsNone(calibration["trace"][-1]["head_y"])
-        self.assertIsNone(calibration["trace"][-1]["tongue_candidate_x"])
+        self.assertNotIn("tongue_candidate_x", calibration["trace"][-1])
         self.assertIsNone(self.runtime.worker)
 
-    def test_tongue_reset_cancels_own_capture_and_guide_without_a_face(self):
-        self.core.eyes["left"] = EyeCalibration(.04,.25,.5)
-        self.assertTrue(self.guide("head").passed)
-        eyes, head = dict(self.core.eyes), self.core.head
-        self.session.detector_command("collect", "tongue_absent")
-        self.feed()
-        self.session.detector_command("reset_tongue")
-        self.assertIsNone(self.core.job)
-        self.assertFalse(self.core.negatives)
-        self.appearance()
-        self.session.detector_command("start_movement_guide", "tongue")
-        self.session.detector_command("reset_tongue")
-        self.assertIsNone(self.core.movement_guide)
-        self.assertIsNone(self.core.tongue_model)
-        self.assertIsNone(self.core.tongue_range)
-        self.assertIsNone(self.core.tongue.xy)
-        self.assertIsNone(self.core.tongue.mask)
-        self.assertFalse(self.core.positives or self.core.negatives or self.core.validation)
-        self.assertEqual(self.core.eyes, eyes)
-        self.assertEqual(self.core.head, head)
-        self.feed(blank=True)
-        self.session.detector_command("reset_tongue")
-        self.assertFalse(self.session.lab.processor.armed)
 
-    def test_bad_tongue_marks_can_be_cleared_while_background_is_kept(self):
-        self.collect("tongue_absent")
-        background = deepcopy(self.core.negatives)
-        self.feed(tongue=True)
-        self.session.detector_command("freeze_mouth")
-        self.session.detector_command("mark_tongue", .5, .6)
-        self.assertEqual(self.core.state()["tongue_marks"], [(.5,.6)])
-        self.session.detector_command("clear_tongue_marks")
-        self.assertEqual(self.core.negatives, background)
-        self.assertFalse(self.core.positives or self.core.tongue_marks)
-        self.session.detector_command("mark_tongue", .5, .6)
-        self.session.detector_command("fit_tongue")
-        self.assertIsNotNone(self.core.tongue_model)
 
-    def test_retry_failed_tongue_pose_preserves_previous_groups_and_appearance(self):
-        self.appearance()
-        model = self.core.tongue_model
-        self.session.detector_command("start_movement_guide", "tongue")
-        guide = self.core.movement_guide
-        def finish(fail=False):
-            for _ in range(250):
-                if not guide.active: return
-                state = guide.state(self.now)
-                if state["waiting"]:
-                    self.session.detector_command("present_movement_step", state["index"], state["phase"], self.core.generation)
-                controls = self.runtime.demo_input()
-                if fail and state["name"] == "right": controls["tongue"] = False
-                self.feed(**controls)
-            self.fail("Guide did not finish")
-        finish(fail=True)
-        self.assertFalse(guide.passed)
-        self.assertEqual(guide.steps[guide.index][1], "right")
-        groups = deepcopy(guide.groups)
-        self.assertEqual(set(groups), {"center", "left"})
-        old_generation = self.core.generation
-        self.session.detector_command("retry_tongue_step")
-        self.assertEqual(guide.groups, groups)
-        self.assertIs(self.core.tongue_model, model)
-        self.assertIsNone(self.core.tongue_range)
-        self.session.detector_command("present_movement_step", guide.index, "prepare", old_generation)
-        self.assertIsNone(guide.start_ms)
-        finish()
-        self.assertTrue(guide.passed, guide.report)
-        self.assertIsNotNone(self.core.tongue_range)
-        self.assertFalse(self.session.lab.processor.armed)
 
-    def test_tongue_appearance_is_separate_from_personal_range_and_unknown(self):
-        self.appearance()
-        frame = self.feed(tongue=True, tongue_x=0.6)
-        self.assertIsNotNone(self.core.tongue.xy)
-        self.assertFalse(frame["faces"][0]["signals"]["tongue_x"]["valid"])
-        guide = self.guide("tongue")
-        self.assertTrue(guide.passed, guide.report)
-        self.assertEqual(len(guide.steps), 11)
-        self.feed(tongue=True, tongue_x=0.6, tongue_y=0.4)
-        frame = self.feed(tongue=True, tongue_x=0.6, tongue_y=0.4)
-        self.assertEqual(frame["position_space"], "personal_tongue_tip_v1")
-        self.assertAlmostEqual(self.core.tongue.xy[0], 0.16, delta=0.035)
-        self.assertAlmostEqual(
-            frame["faces"][0]["signals"]["tongue_x"]["value"], 0.75, delta=0.05
-        )
-        self.assertAlmostEqual(
-            frame["faces"][0]["signals"]["tongue_y"]["value"], 0.25, delta=0.05
-        )
-        absent = self.feed(tongue=False)
-        self.assertFalse(absent["faces"][0]["signals"]["tongue_x"]["valid"])
-        self.assertIsNone(self.core.trace[-1]["tongue_candidate_x"])
-        self.assertIsNone(self.core.trace[-1]["tongue_x"])
-        self.assertEqual(self.session.lab.state()["raw"]["sequence"], self.sequence)
 
-    def test_range_profile_roundtrip_recheck_and_legacy_migration(self):
-        self.appearance()
-        self.assertTrue(self.guide("tongue").passed)
-        original = deepcopy(self.core.tongue_range)
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "movement.json"
-            self.session.save_profile(path)
-            data = read_profile(path)
-            self.assertEqual(data["detector"]["version"], 10)
-            self.session.load_profile(path)
-            self.assertEqual(self.core.tongue_range, original)
-            self.assertFalse(
-                self.feed(tongue=True)["faces"][0]["signals"]["tongue_x"]["valid"]
-            )
-            self.assertTrue(self.guide("tongue", True).passed, self.core.notice)
-            self.assertEqual(self.core.tongue_range, original)
-            self.assertTrue(
-                self.feed(tongue=True)["faces"][0]["signals"]["tongue_x"]["valid"]
-            )
-            bad = deepcopy(data)
-            bad["detector"]["tongue_range"]["x"]["center"] = 2
-            write_profile(path, bad)
-            with self.assertRaises(ValueError):
-                self.session.load_profile(path)
-            self.assertEqual(self.core.tongue_range, original)
-            legacy = deepcopy(data)
-            legacy["detector"].pop("tongue_range")
-            legacy["detector"].pop("tongue_measurement")
-            legacy["detector"].pop("head_x"); legacy["detector"].pop("pupil")
-            legacy["detector"].update(
-                version=3, algorithm="frame-wink-eye-head-tongue-v3"
-            )
-            write_profile(path, legacy)
-            self.session.load_profile(path)
-            self.assertIsNone(self.core.tongue_model)
-            self.assertIn("centroid",self.core.notice)
-            with self.assertRaises(ValueError):
-                self.collect("validate_absent")
-            self.assertIsNone(self.core.tongue_range)
-            self.assertFalse(
-                self.feed(tongue=True)["faces"][0]["signals"]["tongue_x"]["valid"]
-            )
 
-    def test_failed_absence_does_not_enable_range_and_loss_cancels_capture(self):
-        self.appearance()
-        self.assertFalse(self.guide("tongue", tongue=True).passed)
-        self.assertIsNone(self.core.tongue_range)
-        self.assertIn("Absent check failed", self.core.notice)
-        self.assertTrue(self.guide("tongue").passed)
-        fit = deepcopy(self.core.tongue_range)
-        self.session.detector_command("start_movement_guide", "head")
-        self.feed(blank=True)
-        self.assertIsNone(self.core.movement_guide)
-        self.assertEqual(self.core.tongue_range, fit)
-        self.assertFalse(self.session.lab.processor.armed)
 
     def test_late_ui_ack_cannot_start_a_restarted_guide(self):
         self.session.detector_command("start_movement_guide", "head")
@@ -320,36 +163,3 @@ class MovementIntegrationTests(unittest.TestCase):
             "present_movement_step", 0, "prepare", self.core.generation
         )
         self.assertEqual(self.core.movement_guide.start_ms, self.now)
-
-    def test_ambiguous_color_region_cannot_pass_absence_check(self):
-        self.appearance()
-        self.feed(round_candidate=True)
-        self.assertTrue(self.core.tongue.candidate_present)
-        self.assertIsNone(self.core.tongue.xy)
-        self.assertFalse(self.guide("tongue", tongue=False, round_candidate=True).passed)
-        self.assertIn("Absent check failed", self.core.notice)
-        self.assertIsNone(self.core.tongue_range)
-
-    def test_tip_diagnostics_share_capture_and_export_null_without_centroid_fallback(self):
-        import csv
-        self.appearance()
-        self.feed(tongue=True)
-        source = self.session.state(include_detector=True)["detector"]
-        calibration = self.session.detector_state()
-        self.assertEqual(source["trace"], calibration["trace"])
-        raw = calibration["trace"][-1]
-        self.assertEqual(raw["tongue_measurement"], "color_tip_mouth_width_v1")
-        self.assertGreater(raw["tongue_tip_y"], raw["tongue_region_y"] + .1)
-        self.assertEqual(calibration["mouth"].shape[:2], (160,160))
-        self.feed(round_candidate=True)
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory)/"trace.csv"
-            self.runtime.export_trace(path)
-            with path.open() as stream:
-                last = list(csv.DictReader(stream))[-1]
-        self.assertEqual(last["sequence"], str(self.sequence))
-        self.assertEqual(last["tongue_tip_x"], "")
-        self.assertEqual(last["tongue_x"], "")
-        self.assertEqual(last["tongue_candidate_present"], "True")
-        self.assertNotEqual(last["tongue_region_x"], "")
-        self.assertNotEqual(last["tongue_tip_reason"], "")

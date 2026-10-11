@@ -60,21 +60,13 @@ class UnifiedCalibrationTests(unittest.TestCase):
         self.guided_eyes()
         for target,head in (("up",.2),("neutral",.5),("down",.8)):
             self.collect("head_"+target,head=head)
-        self.collect("tongue_absent")
-        self.feed(tongue=True)
-        self.session.detector_command("freeze_mouth")
-        self.session.detector_command("mark_tongue",.5,.5)
-        self.session.detector_command("fit_tongue")
-        self.collect("validate_absent")
-        self.collect("validate_visible",tongue=True)
-        self.guided_movement("tongue")
 
     def test_v4_migration_keeps_eyes_winks_head_but_discards_centroid_tongue(self):
         self.calibrate()
         original = deepcopy(self.core.export_calibration())
         legacy = deepcopy(original)
         legacy.update(version=4, algorithm="personal-head-tongue-ranges-v4")
-        legacy.pop("tongue_measurement")
+        legacy["tongue"] = {"positive":[[40,160,140]],"negative":[[20,100,100]],"radius":6,"margin":4}
         legacy.pop("head_x"); legacy.pop("pupil")
         legacy["tongue_range"] = {
             axis: dict(low=.2, center=.5, high=.8, endpoint_tolerance=.05)
@@ -90,10 +82,10 @@ class UnifiedCalibrationTests(unittest.TestCase):
         migrated = self.core.export_calibration()
         for key in ("eyes", "winks", "head"):
             self.assertEqual(migrated[key], original[key])
-        self.assertEqual(migrated["version"], 10)
-        self.assertIsNone(migrated["tongue"])
-        self.assertIsNone(migrated["tongue_range"])
-        self.assertIn("repeat appearance and tip range", self.core.notice)
+        self.assertEqual(migrated["version"], 11)
+        self.assertNotIn("tongue", migrated)
+        self.assertNotIn("tongue_range", migrated)
+        self.assertIn("Retired tongue state", self.core.notice)
 
     def guided_movement(self,kind):
         self.session.detector_command("start_movement_guide",kind)
@@ -133,8 +125,7 @@ class UnifiedCalibrationTests(unittest.TestCase):
     def test_failed_action_training_retries_without_changing_other_calibration(self):
         self.calibrate()
         eyes = dict(self.core.eyes)
-        head, tongue = self.core.head, self.core.tongue_model
-        tongue_range = deepcopy(self.core.tongue_range)
+        head = self.core.head
         self.lab.action({"action":"arm"}); self.hold()
         self.assertEqual(self.feed(left_closed=True)["left_click"], 1)
         self.session.detector_command("start_wink_guide")
@@ -147,8 +138,6 @@ class UnifiedCalibrationTests(unittest.TestCase):
         self.assertIn("Too few clear train open/closed action frames", self.core.notice)
         self.assertEqual(self.core.eyes, eyes)
         self.assertIs(self.core.head, head)
-        self.assertIs(self.core.tongue_model, tongue)
-        self.assertEqual(self.core.tongue_range, tongue_range)
         self.session.detector_command("start_wink_guide")
         self.assertEqual(self.core.eye_guide.state(self.now)["total"], 6)
         self.finish_eye_guide()
@@ -235,8 +224,6 @@ class UnifiedCalibrationTests(unittest.TestCase):
                 self.feed(session_id="restarted")
                 self.assertTrue(self.session.state()["profile_bound"])
                 self.assertEqual(self.core.export_calibration(), detector)
-                self.assertEqual(self.core.validation, {})
-                self.assertIsNotNone(self.core.tongue_model)
                 self.assertFalse(self.lab.processor.armed)
                 self.session.stop()
                 self.session.start("demo", preview=False)
@@ -315,7 +302,7 @@ class UnifiedCalibrationTests(unittest.TestCase):
             write_profile(broken,corrupted)
             with self.assertRaises(ValueError):self.session.load_profile(broken)
             self.assertEqual(self.core.export_calibration(),detector)
-            self.assertEqual(detector["version"],10)
+            self.assertEqual(detector["version"],11)
             self.assertEqual(read_profile(path)["format"],"face_mouse_profile_v3")
             self.assertEqual(detector['settings']['eye_rest_ms'],100)
             self.session.load_profile(path)
@@ -327,8 +314,7 @@ class UnifiedCalibrationTests(unittest.TestCase):
             # Old profiles remain readable; they retain the original single threshold.
             detector["version"]=1;detector["algorithm"]="lid-gap-head-y-lab-color-v1"
             detector.pop("winks")
-            detector.pop("tongue_range")
-            detector.pop("tongue_measurement")
+            detector["tongue"] = None
             detector.pop("head_x"); detector.pop("pupil")
             for fit in detector["eyes"].values():
                 del fit["closed_limit"];del fit["open_limit"]
@@ -345,8 +331,7 @@ class UnifiedCalibrationTests(unittest.TestCase):
                     from Processing.research.settings import settings
                     legacy["detector"].update(version=2,algorithm="guided-lid-gap-head-y-lab-color-v2")
                     legacy["detector"].pop("winks")
-                    legacy["detector"].pop("tongue_range")
-                    legacy["detector"].pop("tongue_measurement")
+                    legacy["detector"]["tongue"] = None
                     legacy["detector"].pop("head_x"); legacy["detector"].pop("pupil")
                     legacy["research"]={"settings":settings(),"fits":{},"pose_bounds":{},"models":{},"gaze":None}
                 old_path=Path(directory)/f"legacy{version}.json"
@@ -379,7 +364,7 @@ class UnifiedCalibrationTests(unittest.TestCase):
         self.assertEqual(self.core.head,old_head)
         with self.assertRaises(ValueError):self.core.collect("head_up")
         with self.assertRaises(ValueError):self.core.export_calibration()
-        with self.assertRaises(ValueError):self.core.reset_tongue()
+        with self.assertRaises(ValueError):self.core.start_movement_guide("head_x")
         self.lab.action({"action":"arm"});self.feed()
         self.assertFalse(self.lab.processor.armed)
         self.session.detector_command("present_eye_step",0)
@@ -399,14 +384,14 @@ class UnifiedCalibrationTests(unittest.TestCase):
         self.calibrate()
         self.assertFalse(self.lab.processor.armed)
         self.lab.action({"action":"arm"})
-        self.hold(tongue=True)
-        result=self.hold(tongue=True,left_closed=True)
+        self.hold()
+        result=self.hold(left_closed=True)
         self.assertEqual((result["left_click"],result["right_click"]),(1,0))
-        result=self.hold(tongue=True,right_closed=True)
+        result=self.hold(right_closed=True)
         self.assertEqual((result["left_click"],result["right_click"]),(0,1))
-        result=self.hold(tongue=True,left_closed=True,right_closed=True)
+        result=self.hold(left_closed=True,right_closed=True)
         self.assertEqual((result["left_click"],result["right_click"]),(1,1))
-        result=self.hold(tongue=True,tongue_x=.65,head=.78)
+        result=self.hold(pupil_x=.8,head=.78)
         self.assertGreater(result["pointer_x"],.51)
         self.assertGreater(result["scroll_y"],.51)
         self.assertEqual(self.lab.state()["raw"]["sequence"],self.core.frame["sequence"])
@@ -416,17 +401,17 @@ class UnifiedCalibrationTests(unittest.TestCase):
 
     def test_calibration_changes_disarm_immediately_and_during_capture(self):
         self.calibrate()
-        self.lab.action({"action":"arm"});self.hold(tongue=True)
-        self.assertEqual(self.hold(left_closed=True,tongue=True)["left_click"],1)
+        self.lab.action({"action":"arm"});self.hold()
+        self.assertEqual(self.hold(left_closed=True)["left_click"],1)
         self.session.detector_command("collect","right_open")
         self.assertFalse(self.lab.state()["message"]["enabled"])
         self.lab.action({"action":"arm"})
-        self.feed(left_closed=True,tongue=True)
+        self.feed(left_closed=True)
         self.assertFalse(self.lab.processor.armed)
         self.session.detector_command("cancel")
         self.assertFalse(self.lab.processor.armed)
 
-    def test_combined_profile_roundtrip_rebinds_but_requires_tongue_recheck(self):
+    def test_combined_profile_roundtrip_restores_eyes_head_and_direct_pupils(self):
         self.calibrate()
         config=self.lab.processor.config.to_dict()
         config["left_eye"]["dwell_ms"]=500
@@ -446,17 +431,14 @@ class UnifiedCalibrationTests(unittest.TestCase):
             self.session.load_profile(path)
             self.assertTrue(self.session.state()["profile_bound"])
             self.assertFalse(self.lab.processor.armed)
-            self.feed(tongue=True)
+            self.feed()
             signals=self.session.frame["faces"][0]["signals"]
             self.assertTrue(signals["left_eye_open"]["valid"])
             self.assertTrue(signals["head_y"]["valid"])
             self.assertFalse(signals["tongue_x"]["valid"])
             self.assertEqual(self.lab.processor.config.left_eye.dwell_ms,500)
             self.assertEqual(self.lab.state()["runtime"]["pointer_speed"],1000)
-            self.collect("validate_absent")
-            self.collect("validate_visible",tongue=True)
-            self.feed(tongue=True)
-            self.assertTrue(self.session.frame["faces"][0]["signals"]["tongue_x"]["valid"])
+            self.assertTrue(signals["gaze_x"]["valid"])
             self.assertTrue(self.session.state()["profile_bound"])
             self.assertFalse(self.lab.processor.armed)
 
@@ -491,8 +473,8 @@ class UnifiedCalibrationTests(unittest.TestCase):
             self.assertFalse(self.lab.processor.armed)
 
     def test_stop_preserves_calibration_and_releases_output(self):
-        self.calibrate();self.lab.action({"action":"arm"});self.hold(tongue=True)
-        self.assertEqual(self.hold(left_closed=True,tongue=True)["left_click"],1)
+        self.calibrate();self.lab.action({"action":"arm"});self.hold()
+        self.assertEqual(self.hold(left_closed=True)["left_click"],1)
         self.session.stop()
         self.assertIsNone(self.core.selected)
         self.assertEqual(set(self.core.eyes), {"left", "right"})
@@ -519,9 +501,8 @@ class UnifiedCalibrationTests(unittest.TestCase):
                    lambda d:d["eyes"].update(center=d["eyes"]["left"]),
                    lambda d:d["head"].update(center=50),
                    lambda d:d["head"].update(endpoint_tolerance=.09),
-                   lambda d:d["tongue"].update(positive=[[0,0,999]]),
-                   lambda d:d["tongue"].update(radius=100),
-                   lambda d:d["tongue"].update(margin=-1))
+                   lambda d:d.update(tongue={}),
+                   lambda d:d["pupil"].update(measurement="wrong"))
         for mutate in mutations:
             bad=deepcopy(baseline);mutate(bad)
             with self.assertRaises(ValueError):self.core.load_calibration(bad)

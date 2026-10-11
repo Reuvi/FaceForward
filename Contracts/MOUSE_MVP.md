@@ -1,5 +1,9 @@
 # Mouse lab integration, October 2026
 
+[TONGUE_RETIREMENT.md](TONGUE_RETIREMENT.md) is current: no active tongue
+path, pupil-only App pointer and detector presets v11. Earlier tongue requirements
+below are historical; keep the two invalid v1 schema slots for compatibility.
+
 Status: implemented for **native Vision → Processing → simulated mouse**.
 This adopts the local Python handoff requested by the team. SignalFrame v1 is
 unchanged. The earlier ControlFrame v1 remains a driver draft; the lab's separately

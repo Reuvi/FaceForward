@@ -1,5 +1,12 @@
 # Test the visible tongue tip
 
+> Current MVP: tongue has been removed from App and Vision lab. Use
+> [App's current testing/profile guide](../App/README.md) and
+> [pupil matrix testing](../docs/DIRECT_PUPIL_TESTING.md). Eyes and head axes remain;
+> pupils are the pointer input, with no pupil calibration or sensitivity controls.
+> Detector presets are v11; old tongue state is discarded on load. Any tongue
+> setup, backend, recheck or mapping instructions below are historical.
+
 **Current camera update:** tongue uses local neural segmentation without background
 capture or tissue clicks. A pupil-direction joystick and full-screen range guide
 are also available. Follow [the tongue/pupil test guide](TONGUE_PUPIL_TESTING.md)

@@ -21,6 +21,7 @@ class Lab:
         self.lock = threading.RLock()
         self.clock = clock
         self.locked_source = None
+        self.locked_pointer_source = None
         self.processor = MouseProcessor(config)
         self.runtime = {"sample_hz": 30, "rows": 9, "columns": 9, "vector_size": 11,
                         "pointer_speed": 900, "scroll_speed": 450, "source": "mock", "subject_id": "mock-person"}
@@ -134,6 +135,8 @@ class Lab:
             raise ValueError("Unknown settings group")
         with self.lock:
             config = MouseConfig.from_dict(values.get("config", self.processor.config.to_dict()))
+            if self.locked_pointer_source is not None:
+                config = replace(config, pointer_source=self.locked_pointer_source)
             runtime = dict(self.runtime)
             if not isinstance(values.get("runtime", {}), dict):
                 raise ValueError("runtime must be an object")

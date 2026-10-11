@@ -85,7 +85,7 @@ class HorizontalHeadTests(unittest.TestCase):
         self.assertEqual(values["head_x"]["value"],1)
         self.assertEqual(values["head_y"]["value"],.5)
         self.assertEqual(self.session.lab.processor.sample.scroll,.5)
-        self.assertIsNone(self.session.lab.processor.sample.pointer)
+        self.assertEqual(self.session.lab.processor.sample.pointer, (.5, .5))
 
     def test_shared_raw_views_csv_and_normalized_samples(self):
         self.assertTrue(self.guide("head_x").passed)
@@ -136,7 +136,7 @@ class HorizontalHeadTests(unittest.TestCase):
         self.assertFalse(guide.passed)
         self.assertEqual(self.core.head_x, saved)
         neutral = deepcopy(guide.groups["neutral"])
-        self.session.detector_command("retry_tongue_step")
+        self.session.detector_command("retry_movement_step")
         for _ in range(100):
             if not guide.active: break
             state = guide.state(self.now)
@@ -165,7 +165,7 @@ class HorizontalHeadTests(unittest.TestCase):
     def test_saved_yaw_only_profile_can_load_stopped_and_rejects_bad_fit_atomically(self):
         self.assertTrue(self.guide("head_x").passed); saved=self.core.head_x
         data=self.core.export_calibration()
-        self.assertEqual(data["version"],10); self.assertIsNone(data["head"])
+        self.assertEqual(data["version"],11); self.assertIsNone(data["head"])
         with tempfile.TemporaryDirectory() as folder:
             path=folder+"/profile.json";self.session.save_profile(path)
             self.session.stop();self.core.reset_calibration()
@@ -191,7 +191,7 @@ class HorizontalHeadTests(unittest.TestCase):
                     "frame-wink-eye-head-tongue-v3","personal-head-tongue-ranges-v4",
                     "color-tongue-tip-v5","tongue-segmentation-pupil-joystick-v6")
         for version,algorithm in enumerate(algorithms,1):
-            old=deepcopy(original);old.update(version=version,algorithm=algorithm)
+            old=deepcopy(original);old.update(version=version,algorithm=algorithm,tongue=None,tongue_range=None,tongue_measurement="color_tip_mouth_width_v1")
             old["pupil"] = None
             old.pop("head_x");old["settings"].pop("head_yaw_separation")
             for key,min_version in (("pupil",6),("tongue_measurement",5),("tongue_range",4),("winks",3)):

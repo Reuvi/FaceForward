@@ -317,7 +317,7 @@ class DesktopLab:
         specs = [
             ("Sampling & source", [
                 ("runtime.sample_hz", "Input Hz", None), ("config.interpolation_ms", "Interpolation ms", None),
-                ("config.stale_ms", "Stale timeout ms", None), ("config.pointer_source", "Pointer source", ("tongue", "gaze")),
+                ("config.stale_ms", "Stale timeout ms", None), ("config.pointer_source", "Pointer source", (self.lab.locked_pointer_source,) if self.lab.locked_pointer_source else ("tongue", "gaze")),
                 ("config.closed_value", "Closed eye bit", ("1", "0")), ("runtime.rows", "Matrix rows (odd)", None),
                 ("runtime.columns", "Matrix columns (odd)", None), ("runtime.vector_size", "Vector size (odd)", None),
                 ("runtime.source", "Sample source", ("mock", "external")), ("runtime.subject_id", "Selected subject", "text"),
@@ -330,7 +330,7 @@ class DesktopLab:
         ]
         if getattr(self,"appearance_eyes",False):
             specs[1]=("Independent wink samples", [],
-                      "Train blinks and winks in Detection calibration. A recognized wink stays ON while held and turns OFF on reopening. No dwell or release delay. Legacy raw demos/replays retain their original timing.")
+                      "Train wink actions in Detection calibration. A recognized wink stays ON while held and turns OFF on reopening. No dwell or release delay. Legacy raw demos/replays retain their original timing.")
         for axis in ("pointer", "scroll"):
             fields = [(f"config.{axis}.{key}", text, kind) for key, text, kind in (
                 ("deadzone", "Dead zone", None), ("hysteresis", "Activation margin", None), ("exponent", "Response exponent", None),

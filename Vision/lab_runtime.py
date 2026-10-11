@@ -1,4 +1,4 @@
-"""One fast camera/face worker, independent tongue process, shared latest snapshot."""
+"""One camera/face worker for eyes, head and pupils; shared latest snapshot."""
 
 from contextlib import ExitStack
 from copy import deepcopy
@@ -39,10 +39,8 @@ class LabRuntime:
             kind = "synthetic" if demo else "camera"
             if self.source_kind is not None and self.source_kind != kind:
                 self.workbench.reset_calibration()
-                self.workbench.tongue_model = None
             self.source_kind = kind
             self.workbench.disconnect("Starting source; calibration retained. Waiting for the face.")
-            self.workbench.validation.clear()
             self.preview = None
             self.timing = {}
             self.tracker_floors = {}
@@ -58,10 +56,6 @@ class LabRuntime:
                 if demo:
                     session = CaptureSession()
                 else:
-                    from .lip_boundary import LipBoundaryModel
-                    if not self.workbench.independent_tongue:
-                        self.workbench.tongue_model = LipBoundaryModel()
-                        self.workbench.tongue_range = None
                     self.tracker_floors = dict(face_presence_floor=LAB_TRACKING_CONFIDENCE,
                                                face_tracking_floor=LAB_TRACKING_CONFIDENCE)
                     detector = stack.enter_context(MediaPipeDetector(
@@ -121,10 +115,6 @@ class LabRuntime:
                 phase = (self.clock()/1000) % 8
                 controls.update(left_closed=2 <= phase < 3 or 6 <= phase < 7,
                                 right_closed=4 <= phase < 5 or 6 <= phase < 7)
-            controls.setdefault("tongue",True)
-            job=self.workbench.job
-            if job and job.target in ("tongue_absent","validate_absent","validate_visible"):
-                controls["tongue"]=job.target=="validate_visible"
             movement=self.workbench.movement_guide
             if movement and movement.active:
                 state=movement.state(self.clock())
@@ -132,11 +122,7 @@ class LabRuntime:
                     controls["head"]={"neutral":.5,"up":.2,"down":.8}[state["name"]]
                 elif movement.kind=="head_x":
                     controls["head_x"]={"neutral":.5,"left":.2,"right":.8}[state["name"]]
-                else:
-                    controls["tongue"]=state["name"]!="absent"
-                    x,y={"absent":(.5,.5),"center":(.5,.5),"left":(.3,.5),
-                         "right":(.7,.5),"up":(.5,.3),"down":(.5,.7)}[state["name"]]
-                    controls.update(tongue_x=x,tongue_y=y)
+            controls["tongue"] = False  # Retired input is absent from synthetic images too.
             return controls
 
     def ingest(self, captured, observations, *, inference_ms=0, preview=True):
@@ -154,12 +140,6 @@ class LabRuntime:
                 "age_ms": self.clock()-timestamp,
                 **self.tracker_floors,
             }
-            if self.workbench.independent_tongue:
-                tongue = self.workbench.async_tongue.state(self.clock())
-                age = tongue["age_ms"]
-                self.timing.update(tongue_hz=tongue["hz"],
-                                   tongue_age_ms=age if age is not None else -1,
-                                   tongue_replaced=tongue["replaced"])
             self.previous_timestamp = timestamp
             if preview and self.clock() >= self.preview_due:
                 self.preview = self._preview(captured.bgr, observations, frame)
@@ -180,16 +160,6 @@ class LabRuntime:
             for index in (13, 14, 61, 291, 168, 263, 362, 133, 33, 469, 470, 471, 472, 474, 475, 476, 477):
                 if index < len(obs.points):
                     cv2.circle(image, tuple(round(v) for v in obs.points[index]), 2, color, -1)
-        core = self.workbench
-        # Delayed results belong only on their captured mouth crop, below.
-        if core.crop is not None and not core.independent_tongue:
-            if core.tongue.edge is not None:
-                for pixel in core.tongue.edge:
-                    cv2.circle(image,tuple(round(v) for v in core.crop.image_point(core.crop.raw_point(pixel))),1,(0,180,255),-1)
-            if core.tongue.attachment is not None:
-                cv2.circle(image,tuple(round(v) for v in core.crop.image_point(core.tongue.attachment)),3,(255,80,200),-1)
-            if core.tongue.xy is not None:
-                cv2.circle(image,tuple(round(v) for v in core.crop.image_point(core.tongue.xy)),4,(255,255,0),-1)
         cv2.putText(image, "Unmirrored | user's LEFT is image RIGHT", (8, h-12), cv2.FONT_HERSHEY_SIMPLEX, .48, (245,245,245), 1)
         return cv2.resize(image, (640, 480))
 
@@ -204,7 +174,6 @@ class LabRuntime:
         self.stop()
         if self.worker is not None:
             self.worker.join(timeout=2)
-        self.workbench.close()
 
     def command(self, name, *args):
         with self.lock:
@@ -218,10 +187,10 @@ class LabRuntime:
             # interval can then retain its last display height after that capture
             # leaves the 8-second view, without sending the full history to Tk.
             needed = {"left_raw", "right_raw", "head_raw", "head_x_raw", "left_closed_bit", "right_closed_bit",
-                      "head_y", "head_x", "tongue_x", "tongue_y", "left_wink_bit", "right_wink_bit"}
+                      "head_y", "head_x", "left_wink_bit", "right_wink_bit"}
             needed.update(side+"_"+key for side in ("left","right")
                           for key in ("blink","squint","cheek","brow","wink_score"))
-            needed.update(("tongue_tip_x","tongue_tip_y","pupil_raw_x","pupil_raw_y","gaze_x","gaze_y"))
+            needed.update(("pupil_raw_x","pupil_raw_y","gaze_x","gaze_y"))
             needed.update(side+"_pupil_"+axis for side in ("left","right") for axis in ("x","y"))
             cutoff = self.workbench.trace[-1]["timestamp_ms"]-8000 if self.workbench.trace else 0
             scope_subject = state.get("scope_subject", state["selected"])
@@ -239,26 +208,6 @@ class LabRuntime:
                     needed -= available
             state.update(source=self.source, timing=dict(self.timing), preview=self.preview,
                          trace=list(reversed(rows)))
-            core = self.workbench
-            crop = core.frozen_crop or (core.async_tongue.crop if core.independent_tongue else None) or core.crop
-            state["mouth"] = crop.bgr.copy() if crop else None
-            state["frozen"] = self.workbench.frozen_crop is not None
-            if crop and not state["frozen"] and self.workbench.tongue.mask is not None:
-                mask = self.workbench.tongue.mask > 0
-                state["mouth"][mask] = (state["mouth"][mask]*.4 + (0,150,0)).astype("uint8")
-            if crop and not state["frozen"]:
-                if state["tongue_backend"] == "lip-boundary" and crop.outer_mask is not None:
-                    contours,_=cv2.findContours(crop.outer_mask,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
-                    cv2.drawContours(state["mouth"],contours,-1,(255,200,0),1)
-                tip=self.workbench.tongue
-                if tip.edge is not None:
-                    for pixel in tip.edge:cv2.circle(state["mouth"],tuple(round(v) for v in pixel),1,(0,180,255),-1)
-                for raw,color in ((tip.attachment,(255,80,200)),(tip.xy,(255,255,0))):
-                    if raw is not None:cv2.circle(state["mouth"],tuple(round(v) for v in crop.crop_point(raw)),3,color,-1)
-            state["candidate"] = self.workbench.tongue.xy
-            state["tip_present"] = self.workbench.tongue.xy is not None
-            state["candidate_present"] = self.workbench.tongue.candidate_present
-            state["tip_reason"] = self.workbench.tongue.reason
             return state
 
     def export_trace(self, path):

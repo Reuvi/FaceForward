@@ -12,8 +12,8 @@ Vision/.venv/bin/python -m App --source camera --model Vision/.local/face_landma
 ## Live test
 
 1. Start the camera with both eyes visible, then open
-   **Detection calibration → 5 Pupils**. There is no pupil setup or training step.
-   Other eyes/winks/head/tongue calibrations are independent and can be loaded.
+   **Detection calibration → 4 Pupils**. There is no pupil setup or training step.
+   Other eyes/winks/head calibrations are independent and can be loaded.
 2. Look left, center, right, up and down while keeping your head comfortable and
    fairly still. The cyan square marks the matrix cell; the small white dot is the
    precise position. Matrix center is **row 5, column 5**. Top/left is index 0;
@@ -34,10 +34,10 @@ Vision/.venv/bin/python -m App --source camera --model Vision/.local/face_landma
    the same matrix row/column and capture data. Use **Raw detector signals** for
    raw per-eye traces and **Normalized positions** for Pupil X/Y. Export CSV to
    inspect the raw signals, quality/reasons and matrix indices while testing down.
-7. To test the existing simulated mouse, choose **Pupil direction** under
-   **Pointer joystick input** on the source tab, then use **Live lab**. Its existing
-   mouse transfer functions still receive precise X/Y; they are separate from
-   detector calibration and do not train the pupil model. No new OS driver is added.
+7. To test the existing simulated mouse, open **Live lab** and press **Start
+   preview** with neutral inputs. Pupils are already the pointer input; there is
+   no source selector. Processing receives precise X/Y, with mouse response
+   settings separate from detection. No new OS driver is added.
 
 Eye-corner center maps to (.5,.5), which need not match natural resting gaze.
 Head movement can affect this eye-relative direction; it is not calibrated screen
@@ -98,12 +98,12 @@ input or change device transfer functions. CSV stores size, row, column and
 validity plus raw/continuous fields, rather than duplicating 121 cells per row.
 `gaze_measurement` is now `mediapipe_iris_direction_v3`.
 
-New detector presets are **v10**, `fixed-pupil-matrix-v10`, with pupil metadata
-`{"measurement":"mediapipe_iris_direction_v3"}` only. Old v1–v9 files validate
-fully before their pupil fits/sensitivities are discarded. Compatible eye/wink/
-head/tongue fits survive; explicit v9 tongue backend choice is preserved. Combined
-profiles remain v3, and pupil-only profiles still save without fitted detectors.
-See [the contract](../Contracts/PUPIL_MATRIX.md).
+New detector presets are **v11**, `eyes-head-pupils-v11`, with pupil metadata
+`{"measurement":"mediapipe_iris_direction_v3"}` only. Old v1–v10 files validate
+fully before their pupil fits/sensitivities and retired tongue data are discarded.
+Compatible eye/wink/head fits survive. Combined profiles remain v3, and pupil-only
+profiles can save without fitted detectors. See [the current App guide](../App/README.md)
+and [retirement contract](../Contracts/TONGUE_RETIREMENT.md).
 
 ## Developer checks
 
@@ -115,10 +115,6 @@ RUN_TK_TESTS=1 Vision/.venv/bin/python -m unittest discover -s tests/integration
 Tests cover fixed directional scales, supported narrowed eyes versus closures,
 missing/malformed expression support, all 121 grid cells, capture identity,
 unknown/stop/load/stale matrices, continuous mouse input, profile migration and
-native square/dark-hold drawing without sensitivity controls. Camera and tongue
-scheduling are unchanged.
+native square/dark-hold drawing without sensitivity controls. The remaining camera measurements keep their per-capture sampling.
 
-Verification: 321 tests passed (140 Vision, 106 integration with native Tk,
-75 Processing). The 490-frame mouse demo accepted every frame, observed both
-clicks/scroll/pointer and ended stopped with buttons released. Changed Python
-passes Ruff F, whitespace and integration scope checks.
+Earlier pupil-only validation is recorded in [coordination history](COORDINATION.md).

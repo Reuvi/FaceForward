@@ -5,8 +5,7 @@ import math
 import cv2
 import numpy as np
 
-from .landmarks import EYES, Observation
-from .tongue import INNER_LIP, OUTER_LIP
+from .landmarks import EYES, INNER_LIP, OUTER_LIP, Observation
 from .tracking import Box
 
 
