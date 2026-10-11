@@ -65,3 +65,22 @@ A later learned segmentation backend must explicitly version its coordinate spac
 and calibration. Changing the current color-mask tip measurement or crop requires
 a coordinated contract and fresh calibration, even if both return X/Y.
 See [the tongue model evaluation plan](../Vision/TONGUE_MODEL_PLAN.md).
+
+## Head Y step correction (2026-10-10)
+
+The Head Y guide now supports restarting its current capture/check and selecting
+neutral/up/down captures or checks independently. Keep accepted captures for
+other poses. Replacing a training reference clears dependent checks and requires
+fresh neutral/up/down checks before adopting the candidate. A check-only retry
+keeps the fitted references and already passed checks; it never trains the fit.
+
+Keep the last completed pitch fit during a full restart, failed correction or
+cancel. A loaded/completed fit supplies real saved scalar references when only
+one pose is recaptured; do not invent camera samples or duplicate saved values to
+satisfy sample-count rules. Actual new captures still need the normal sample and
+stability gates. Other eye/wink/head-X/pupil fits remain untouched.
+
+UI rest/preparation and original timestamp windows apply to every retry. Bump
+prompt generation so late acknowledgments cannot start a replacement step.
+Editing/retrying disarms App output and does not create a second camera. Preset
+v12, normalized units, sign handling, ranges and SignalFrame remain unchanged.

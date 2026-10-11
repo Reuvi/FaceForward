@@ -904,3 +904,12 @@ Handoff:
 - Headless mouse demo: all 490 frames accepted at ~30 Hz; all four actions observed;
   final output disabled, buttons released, velocities neutral. Changed Python
   passes Ruff F; whitespace and integration scope checks pass. No camera opened.
+
+## Head Y individual step retries — in progress
+
+- Owner: Reuvi integration conversation; branch `work/reuvi/integration/head-y-step-retry`.
+- Base: `54558656fd323e5e0121e4c4e379edde3820062d`.
+- Scope: Vision guide/workbench/native UI, App command allowlist, tests and docs.
+- Contract: Head Y step correction in `Contracts/MOVEMENT_CALIBRATION.md`.
+- Goal: redo one reference or check while keeping other poses and the last working
+  fit; fresh validation after changing a reference. Preserve all other channels.
