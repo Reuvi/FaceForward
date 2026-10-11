@@ -49,6 +49,8 @@ class Mapping:
     bindings: tuple = DEFAULT_BINDINGS
     input_mode: str = "gaming"
     adaptive_pointer: bool = True
+    pointer_mode: str = "target"
+    target_jitter: float = .01
 
     def __post_init__(self):
         if not isinstance(self.id, str) or not re.fullmatch(r"[a-z][a-z0-9-]{0,63}", self.id) or self.id == "mouse":
@@ -70,37 +72,46 @@ class Mapping:
             raise ValueError("Head mouse mappings cannot assign keyboard actions")
         if type(self.adaptive_pointer) is not bool:
             raise ValueError("Adaptive pointer must be boolean")
+        if self.pointer_mode not in ("velocity", "target"):
+            raise ValueError("Pointer mode must be velocity or target")
+        if self.input_mode == "head-mouse" and self.pointer_mode != "velocity":
+            raise ValueError("Mouse test uses head velocity")
+        number(self.target_jitter, "target jitter", 0, .1)
 
     def to_dict(self):
-        return {"format": "input_mapping_v2", "id": self.id, "name": self.name,
+        return {"format": "input_mapping_v3", "id": self.id, "name": self.name,
                 "revision": self.revision, "response": self.response.to_dict(),
                 "pointer_gain": self.pointer_gain, "head_x": asdict(self.head_x),
                 "head_y": asdict(self.head_y), "bindings": dict(zip(DIRECTIONS, self.bindings)),
-                "input_mode": self.input_mode, "adaptive_pointer": self.adaptive_pointer}
+                "input_mode": self.input_mode, "adaptive_pointer": self.adaptive_pointer,
+                "pointer_mode": self.pointer_mode, "target_jitter": self.target_jitter}
 
     @classmethod
     def from_dict(cls, data):
         fields = {"format", "id", "name", "revision", "response", "pointer_gain", "head_x", "head_y", "bindings"}
         if not isinstance(data, dict):
-            raise ValueError("Expected an input_mapping_v1 or input_mapping_v2 file")
+            raise ValueError("Expected an input_mapping_v1/v2/v3 file")
         version = data.get("format")
-        if version == "input_mapping_v2":
+        if version in ("input_mapping_v2", "input_mapping_v3"):
             fields |= {"input_mode", "adaptive_pointer"}
-        if set(data) != fields or version not in ("input_mapping_v1", "input_mapping_v2"):
-            raise ValueError("Expected an input_mapping_v1 or input_mapping_v2 file")
+        if version == "input_mapping_v3":
+            fields |= {"pointer_mode", "target_jitter"}
+        if set(data) != fields or version not in ("input_mapping_v1", "input_mapping_v2", "input_mapping_v3"):
+            raise ValueError("Expected an input_mapping_v1/v2/v3 file")
         if not isinstance(data["bindings"], dict) or set(data["bindings"]) != set(DIRECTIONS):
             raise ValueError("Mapping needs down/up/left/right bindings")
         try:
             return cls(data["id"], data["name"], data["revision"], MouseConfig.from_dict(data["response"]),
                        data["pointer_gain"], HeadConfig(**data["head_x"]), HeadConfig(**data["head_y"]),
                        tuple(data["bindings"][k] for k in DIRECTIONS),
-                       data.get("input_mode", "gaming"), data.get("adaptive_pointer", True))
+                       data.get("input_mode", "gaming"), data.get("adaptive_pointer", True),
+                       data.get("pointer_mode", "velocity"), data.get("target_jitter", .01))
         except TypeError as exc:
             raise ValueError("Malformed mapping settings") from exc
 
 
 def mouse_test_mapping():
-    return Mapping(id=MOUSE_TEST_ID, name="Mouse test", input_mode="head-mouse",
+    return Mapping(id=MOUSE_TEST_ID, name="Mouse test", input_mode="head-mouse", pointer_mode="velocity",
                    bindings=("none",) * 4,
                    response=replace(gaming_response(), interpolation_ms=0))
 

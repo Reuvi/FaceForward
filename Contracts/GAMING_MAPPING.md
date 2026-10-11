@@ -1,5 +1,7 @@
 # Gaming signal processing and preview
 
+> Current: [SCREEN_POINTER.md](SCREEN_POINTER.md) adds explicitly tagged screen targets to device_control_v1 and mapping v3. Gaming defaults to raw-pupil destinations; velocity remains selectable and Mouse test stays head-only velocity.
+
 > Updated by [pupil quality and Mouse test](PUPIL_QUALITY_MOUSE_TEST.md): mapping JSON v2 adds head-only mode and adaptive pointer filtering; device_control_v1 is unchanged.
 
 **Driver connection update:** [DRIVER_CONNECTION.md](DRIVER_CONNECTION.md)

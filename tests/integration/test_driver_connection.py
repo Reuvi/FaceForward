@@ -82,6 +82,8 @@ class DriverConnectionTests(unittest.TestCase):
         self.assertEqual((snap["pointer_x"],snap["pointer_y"]),(.5,.5))
 
     def test_centering_after_start_discards_pre_enable_interpolation(self):
+        settings=self.lab.state()['mapping'];settings['pointer_mode']='velocity'
+        self.lab.update_mapping(settings)
         for mapping in (GAMING_ID, "mouse"):
             with self.subTest(mapping=mapping):
                 self.lab.select_mapping(mapping)
@@ -99,6 +101,8 @@ class DriverConnectionTests(unittest.TestCase):
                 self.assertIsNone(self.lab.state()["output"]["error"])
 
     def test_wink_during_startup_waits_for_release_before_first_command(self):
+        settings=self.lab.state()['mapping'];settings['pointer_mode']='velocity'
+        self.lab.update_mapping(settings)
         self.lab.action({"action":"arm"})
         self.deliver(gaze_x=.8)  # Actual reopening readies the eye.
         self.deliver(gaze_x=.8,left_eye_open=0)
@@ -110,6 +114,16 @@ class DriverConnectionTests(unittest.TestCase):
         self.assertIsNone(output["error"])
         self.assertEqual(output["event_counts"].get(3,0),0)
         self.assertEqual(self.deliver(left_eye_open=0)["event_counts"].get(3),1)
+
+    def test_target_start_requires_release_but_not_centered_pupils(self):
+        self.lab.action({'action':'arm'})
+        self.assertFalse(self.deliver(gaze_x=.8,left_eye_open=0)['enabled'])
+        self.assertFalse(self.deliver(gaze_x=.8,left_eye_open=0)['enabled'])
+        output=self.deliver(gaze_x=.8,left_eye_open=1)
+        self.assertTrue(output['enabled'])
+        self.assertEqual(output['event_counts'].get(3,0),0)
+        self.assertEqual(self.lab.state()['message']['pointer']['x'],.8)
+        self.assertEqual(self.deliver(gaze_x=.8,left_eye_open=0)['event_counts'].get(3),1)
 
     def test_key_combo_loss_mapping_change_and_profile_settings_release(self):
         for change in ("source_stop","settings","mapping"):

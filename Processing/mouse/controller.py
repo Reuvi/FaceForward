@@ -90,6 +90,8 @@ class Lab:
                 "target_y": (diag["pointer_target"][1] + 1) / 2,
                 "target_scroll": (diag["scroll_target"] + 1) / 2,
                 "out_x": snap["pointer_x"], "out_y": snap["pointer_y"], "out_scroll": snap["scroll_y"],
+                "pointer_mode": snap.get("pointer_mode", "velocity"),
+                "target_speed": snap.get("target_speed", 0),
                 "left_raw": int(diag["left_closed"]) if diag["left_closed"] is not None else None,
                 "right_raw": int(diag["right_closed"]) if diag["right_closed"] is not None else None,
                 "left_out": snap["left_click"], "right_out": snap["right_click"],

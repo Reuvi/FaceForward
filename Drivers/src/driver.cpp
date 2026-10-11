@@ -89,7 +89,8 @@ struct fid_driver {
             status.pointer_velocity_x = status.pointer_velocity_y = 0;
             status.target_reached = 0;
             if (control.enabled() && !control.awaiting_neutral() &&
-                control.frame().pointer_mode == FID_POINTER_TARGET) {
+                control.frame().pointer_mode == FID_POINTER_TARGET &&
+                control.frame().target_speed > 0) {
                 const auto &frame = control.frame();
                 bool reached = false;
                 int32_t dx = 0, dy = 0;

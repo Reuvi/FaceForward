@@ -1,5 +1,9 @@
 # Processing → Drivers: explicit target pointer mode
 
+Adopted for App by [SCREEN_POINTER.md](../../Contracts/SCREEN_POINTER.md).
+The current JSON form is `pointer: {mode: "target", x, y, speed}`; this historical
+proposal's `target_x/target_y` remain the ABI field names, not App JSON keys.
+
 Status: proposed for the shared contract owner; implemented in the Drivers
 prototype ABI as version 2. The shared `Contracts/README.md` was intentionally
 left unchanged.

@@ -4,6 +4,7 @@ import importlib.util
 import os
 from pathlib import Path
 import tempfile
+import time
 import unittest
 
 AVAILABLE=all(importlib.util.find_spec(k) for k in ('numpy','cv2'))
@@ -118,6 +119,36 @@ class RawPupilControlTests(unittest.TestCase):
         self.assertEqual((snap['pointer_x'],snap['pointer_y']),(.5,.5))
         self.session.lab.action({'action':'stop'})
         self.assertFalse(self.session.lab.state()['output']['enabled'])
+
+    def test_raw_eye_fixation_reaches_screen_destination_and_does_not_drift(self):
+        from Drivers.output import default_library
+        library=Path(os.environ.get('FID_LIBRARY',default_library()))
+        if not library.is_file():self.skipTest('Build Drivers or set FID_LIBRARY')
+        self.session.lab.select_mapping('gaming-keyboard-mouse-1')
+        self.session.configure_output('dry-run',library)
+        self.session.lab.action({'action':'arm'})
+        self.feed(missing_pose=True,pupil_x=.8,pupil_y=.25)
+        pointer=self.session.lab.state()['message']['pointer']
+        self.assertEqual((pointer['mode'],pointer['speed']),('target',1))
+        self.assertAlmostEqual(pointer['x'],.8);self.assertAlmostEqual(pointer['y'],.25)
+        expected=[pointer['x'],pointer['y']]
+        deadline=time.monotonic()+3
+        while not self.session.lab.output.status().target_reached and time.monotonic()<deadline:
+            time.sleep(.01);self.feed(missing_pose=True,pupil_x=.8,pupil_y=.25)
+        self.assertTrue(self.session.lab.output.status().target_reached)
+        self.session.lab.output.collect()
+        count=self.session.lab.output.counts[1]
+        for i in range(25):
+            time.sleep(.01)
+            self.feed(missing_pose=True,pupil_x=.8+(.002 if i%2 else -.002),pupil_y=.25)
+        output=self.session.lab.state()['output']
+        self.assertEqual(output['pointer_position'],expected)
+        self.assertEqual(output['event_counts'][1],count)
+        self.assertIsNone(output['error'])
+        self.feed(left_closed=True)
+        self.assertEqual(self.session.lab.state()['message']['pointer']['speed'],0)
+        time.sleep(.04)
+        self.assertEqual(self.session.lab.output.snapshot()['pointer_position'],expected)
 
     @unittest.skipUnless(os.environ.get('RUN_TK_TESTS')=='1','native Tk check')
     def test_native_pupil_panel_displays_raw_values_without_guide_controls(self):

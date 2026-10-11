@@ -1,5 +1,9 @@
 # Pupil quality update and Mouse test
 
+Current movement: [Screen destination](SCREEN_POINTER_GUIDE.md) is the gaming
+default; it filters position and holds a fixation dead band. The velocity-filter
+benchmark below describes the still-selectable velocity mode and Mouse test.
+
 The current code retains the local MediaPipe model and uses fixed-scale raw
 eye-relative iris direction, without pupil calibration or head compensation.
 The quality and filtering changes improve availability and pointer response;

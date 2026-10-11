@@ -17,6 +17,10 @@ def control_message(snapshot):
     """Serialize the adopted gaming command; legacy mouse preview stays intact."""
     if "mapping_id" not in snapshot:
         return mouse_message(snapshot)
+    pointer = {"mode": snapshot.get("pointer_mode", "velocity"),
+               "x": snapshot["pointer_x"], "y": snapshot["pointer_y"]}
+    if pointer["mode"] == "target":
+        pointer["speed"] = snapshot["target_speed"]
     return {
         "format": "device_control_v1", "output_session_id": snapshot["output_session_id"],
         "sequence": snapshot["sequence"], "timestamp_ms": snapshot["timestamp_ms"],
@@ -26,6 +30,6 @@ def control_message(snapshot):
         "enabled": snapshot["enabled"],
         "buttons": {"left_click": snapshot["left_click"], "right_click": snapshot["right_click"]},
         "keys": dict(snapshot["keys"]),
-        "pointer": {"mode": "velocity", "x": snapshot["pointer_x"], "y": snapshot["pointer_y"]},
+        "pointer": pointer,
         "scroll_y": snapshot["scroll_y"], "known": dict(snapshot["known"]),
     }

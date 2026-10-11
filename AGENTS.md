@@ -1,5 +1,12 @@
 # Agent working agreement
 
+**Current screen pointer decision:** read `Contracts/SCREEN_POINTER.md`.
+Gaming defaults to an approximate primary-display destination from raw pupils;
+it arrives and stops. No pupil calibration is added. Mapping v3 supports target
+and velocity; older mappings import as velocity, Mouse test stays head velocity.
+Keep target position filtering/dead band separate from velocity shaping, with
+zero-speed holds on unknown input. Driver ABI stays v3; face/detector files stay v3/v13.
+
 **Current raw pupil decision:** follow `Contracts/RAW_PUPIL_CONTROL.md` (repository root).
 Pupils use fixed-scale raw iris X/Y with no pupil guide, learned endpoints or
 head-pose compensation gate. Prior calibrated-pupil requirements below are

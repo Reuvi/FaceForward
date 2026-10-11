@@ -7,8 +7,8 @@ is local Python/Tk. Output is selectable: Preview, Driver dry run, or Live mouse
 keyboard. Native output is explicitly enabled with the Camera source; Stop and
 closing App release it. [Build and live-output instructions](../docs/DRIVER_CONNECTION_GUIDE.md).
 The default is **gaming keyboard mouse mapping 1**: left/right eye actions →
-left/right mouse, head down/up/left/right → W/Space/Shift/S, pupils → pointer
-velocity. **Mouse test** combines calibrated head X/Y into pointer velocity and ignores every other input; it never clicks, types or scrolls. The previous **Mouse and scroll** mode remains selectable. See
+left/right mouse, head down/up/left/right → W/Space/Shift/S, pupils → an approximate
+screen destination where the cursor stops. **Mouse test** combines calibrated head X/Y into pointer velocity and ignores every other input; it never clicks, types or scrolls. The previous **Mouse and scroll** mode remains selectable. See
 [the Processing runbook](../Processing/mappings/README.md) for tuning and saved mappings.
 
 ## Open and test
@@ -65,16 +65,20 @@ default is a labeled synthetic demo; choose **Camera** to open your camera.
    calibration is needed: a fixed scale maps eye-relative direction to 0–1.
    There is no trained head-angle restriction or head compensation. A white dot
    shows the continuous value. Keep both pupils visible; adjust mouse gain,
-   dead zone and smoothing in **Signals → Mapping settings…**.
-6. Open **Signals**, center your head/pupil direction, open both eyes,
+   fixation dead band and smoothing in **Signals → Mapping settings…**.
+6. Open **Signals**, center your head and release eye actions,
    and press **Start**. Inspect raw → filtered → instruction for each
    input. **Mapping settings…** opens Head X/Y activation/release thresholds,
    smoothing, confirmation, key bindings and pointer response controls. Use
    **Copy as…** to make another named mapping; **Export mapping** saves it locally.
-   Pupil movement requests relative velocity, not the
-   screen location you are looking at.
-7. **Mapping settings…** also changes pupil dead zone, activation margin,
-   smoothing, response curve, acceleration and deceleration. Applying changes
+   **Screen destination** moves to a point and stops, using raw pupil X/Y as
+   approximate screen coordinates. No pupil-center startup gate is needed.
+   This has not been calibrated to the actual point you are looking at;
+   [behavior and accuracy limits](../docs/SCREEN_POINTER_GUIDE.md).
+7. **Mapping settings… → Pointer behavior** chooses Screen destination or Velocity.
+   Destination mode exposes smoothing and a fixation dead band around the last
+   destination (.01 by default). Velocity exposes the original central dead zone,
+   activation margin, response curve, acceleration and deceleration. Applying changes
    stops output. The pointer uses pupils in gaming or head X/Y in Mouse test. **Adaptive pointer smoothing (1€)** reduces stationary jitter and responds faster to deliberate motion; uncheck it to compare the fixed filter. In Mouse test, unused eye/key settings are hidden. Detector setup remains
    independent in Calibration.
 8. To control the OS, build Drivers and choose **Output → Live mouse + keyboard →
@@ -127,7 +131,7 @@ Save the migrated profile to preserve the new format. Existing files are not
 rewritten automatically.
 
 Gaming names, head thresholds, key bindings and pointer gain use separate
-`input_mapping_v2` files (v1 readable) exported from **Signals → Mapping settings…**. Face profiles continue
+`input_mapping_v3` files (v1/v2 import as velocity) exported from **Signals → Mapping settings…**. Mode and fixation dead band belong to the mapping. Face profiles continue
 to contain detector fits and the existing mouse response settings. Loading a face
 profile applies its response to the selected mapping and stops output; it keeps
 that mapping's name, head settings and bindings. Export mapping settings separately
@@ -160,7 +164,7 @@ continuous `gaze_x/y`; the additive `pupil_matrix_v1` is available for inspectio
 without quantizing mouse movement. `gaze_measurement` is now
 `mediapipe_iris_direction_v3`, identifying fixed-scale raw iris direction.
 Legacy compensated trace columns stay null, never fabricated. Independent `eye_intent_v1` samples remain on
-every capture. Gaming emits `device_control_v1` with held keys/buttons, velocity,
+every capture. Gaming emits `device_control_v1` with held keys/buttons, explicit target or velocity mode,
 validity and original capture provenance. Mouse mode preserves `mouse_preview_v0`.
 See [the command boundary](../Contracts/GAMING_MAPPING.md) and
 [driver connection](../Contracts/DRIVER_CONNECTION.md). Driver commands are sent

@@ -116,7 +116,7 @@ class Scope(ttk.Frame):
 class DesktopLab:
     heading = "Mouse Signal Lab"
     subtitle = "Native Python · local processing · simulated mouse output"
-    footer = "Mouse preview only    •    Start with centered inputs; Escape stops output"
+    footer = "Mouse preview only    •    Start explicitly; Escape stops output"
 
     def __init__(self, root, lab=None):
         self.root = root
@@ -446,7 +446,8 @@ class DesktopLab:
             for y, cell in enumerate(self.vector_cells):
                 self.vector.itemconfigure(cell, fill=GREEN if active_y == y else "#50626a" if y == (size[2] - 1) // 2 else EDGE)
             self.drawn_inputs = (active, active_y)
-        set_var(self.position, f"X {point[0]:.3f}   Y {point[1]:.3f}  / offset = velocity" if point else "No valid pointer sample")
+        meaning = "approximate screen destination" if self.state["snapshot"].get("pointer_mode") == "target" else "offset = velocity"
+        set_var(self.position, f"X {point[0]:.3f}   Y {point[1]:.3f}  / {meaning}" if point else "No valid pointer sample")
         for eye, var in self.eye_vars.items():
             set_var(var, state["manual"][eye] if runtime["source"] == "mock" else bool(diag[eye + "_closed"]))
 
@@ -520,8 +521,16 @@ class DesktopLab:
         for row in rows:
             dt = 0 if self.sim["t"] is None else max(0, min(0.05, row["t"] - self.sim["t"]))
             self.sim["t"] = row["t"]
-            for axis, dimension in (("x", width), ("y", height)):
-                self.sim[axis] = max(0.03, min(0.92, self.sim[axis] + (2 * row["out_" + axis] - 1) * runtime["pointer_speed"] * dt / dimension))
+            if row.get("pointer_mode") == "target":
+                dx, dy = (row["out_x"]-self.sim["x"])*width, (row["out_y"]-self.sim["y"])*height
+                distance = (dx*dx+dy*dy)**.5
+                step = min(distance, runtime["pointer_speed"]*row["target_speed"]*dt)
+                if distance and step:
+                    self.sim["x"] += dx/distance*step/width
+                    self.sim["y"] += dy/distance*step/height
+            else:
+                for axis, dimension in (("x", width), ("y", height)):
+                    self.sim[axis] = max(0.03, min(0.92, self.sim[axis] + (2 * row["out_" + axis] - 1) * runtime["pointer_speed"] * dt / dimension))
             self.sim["scroll"] += (2 * row["out_scroll"] - 1) * runtime["scroll_speed"] * dt
             for eye in ("left", "right"):
                 if row[eye + "_out"] and not self.sim["prev_" + eye]:
@@ -563,7 +572,8 @@ class DesktopLab:
                 set_var(self.metrics[name], f"{snap[name]:.3f}")
             set_var(self.metrics["buttons"], f"{snap['left_click']} / {snap['right_click']}")
             set_var(self.counts, f"Left presses {self.sim['left']}  ·  Right presses {self.sim['right']}  ·  Scroll {self.sim['scroll']:.0f} px")
-            set_var(self.boost, f"Boost   pointer {diag['pointer_boost']:.2f} / scroll {diag['scroll_boost']:.2f}   ·   Neutral = 0.5")
+            set_var(self.boost, "Screen destination · cursor stops on arrival" if snap.get('pointer_mode') == 'target' else
+                    f"Boost   pointer {diag['pointer_boost']:.2f} / scroll {diag['scroll_boost']:.2f}   ·   Neutral = 0.5")
             button_text = "Pause input stream" if state["streaming"] else "Resume input stream"
             if self.stream_button.cget("text") != button_text:
                 self.stream_button.configure(text=button_text)

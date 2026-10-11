@@ -165,6 +165,25 @@ class SimpleSignalsWindowTests(unittest.TestCase):
         self.assertTrue(all(group.winfo_ismapped() for group in panel.head_groups))
         self.assertTrue(panel.binding_group.winfo_ismapped())
 
+    def test_screen_destination_settings_show_only_relevant_response_controls(self):
+        self.ui.refresh();self.root.update()
+        panel=self.ui.mapping_page
+        panel.show_settings();self.root.update()
+        self.assertEqual(panel.pointer_mode.get(),'Screen destination')
+        self.assertTrue(panel.jitter_widget.winfo_ismapped())
+        self.assertTrue(panel.pointer_widgets['smoothing_ms'][1].winfo_ismapped())
+        self.assertFalse(panel.pointer_widgets['deadzone'][1].winfo_ismapped())
+        panel.pointer_mode.set('Velocity');panel.pointer_controls();self.root.update()
+        self.assertFalse(panel.jitter_widget.winfo_ismapped())
+        self.assertTrue(panel.pointer_widgets['deadzone'][1].winfo_ismapped())
+        panel._apply();self.ui.refresh();self.root.update()
+        self.assertEqual(self.session.lab.state()['mapping']['pointer_mode'],'velocity')
+        panel.pointer_mode.set('Screen destination');panel.target_jitter.set('.015');panel._apply()
+        state=self.session.lab.state()
+        self.assertEqual(state['message']['pointer'],dict(mode='target',x=.5,y=.5,speed=0))
+        self.assertEqual(state['mapping']['target_jitter'],.015)
+        self.assertFalse(state['snapshot']['armed'])
+
     def test_two_tabs_mapping_rows_and_pointer_settings_share_signals(self):
         from Vision.mouse_demo import mouse_demo_records
         from Processing.mappings.demo import gaming_demo_frame

@@ -93,10 +93,11 @@ class MouseTestMappingTests(unittest.TestCase):
         self.assertTrue(self.feed(x=None,y=None,left='unknown',right='unknown')['enabled'])
 
     def test_mapping_versions_and_invalid_head_keyboard_bindings(self):
-        current=Mapping().to_dict();self.assertEqual(current['format'],'input_mapping_v2')
+        current=Mapping().to_dict();self.assertEqual(current['format'],'input_mapping_v3')
         legacy=deepcopy(current);legacy['format']='input_mapping_v1'
         del legacy['input_mode'];del legacy['adaptive_pointer']
-        self.assertEqual(Mapping.from_dict(legacy).to_dict(),current)
+        del legacy['pointer_mode'];del legacy['target_jitter']
+        self.assertEqual(Mapping.from_dict(legacy).to_dict(),Mapping(pointer_mode='velocity').to_dict())
         head=mouse_test_mapping().to_dict()
         self.assertEqual(Mapping.from_dict(head),mouse_test_mapping())
         for key,value in (('input_mode','unknown'),('adaptive_pointer',1)):

@@ -63,6 +63,8 @@ class LiveDiagnosticsTests(unittest.TestCase):
         self.assertIn("fresh",pointer_status(self.session.state(),self.lab.state()))
 
     def test_stopped_center_wait_deadzone_and_filter_delay(self):
+        mapping = self.lab.state()['mapping'];mapping['pointer_mode'] = 'velocity'
+        self.lab.update_mapping(mapping)
         self.assertIn("press Start",pointer_status(*self.feed()))
         self.lab.action({"action":"arm"})
         self.assertIn("center pupils",pointer_status(*self.feed(.8)))
@@ -88,6 +90,23 @@ class LiveDiagnosticsTests(unittest.TestCase):
             self.assertEqual([r["event"] for r in rows],["session_start","sample","session_end"])
             self.assertNotIn("private-",path.read_text())
             self.assertEqual(path.stat().st_mode & 0o777,0o600)
+
+    def test_screen_destination_status_has_no_center_velocity_gate(self):
+        self.lab.action({'action':'arm'})
+        source,lab=self.feed(.8)
+        message=pointer_status(source,lab)
+        self.assertIn('screen destination',message)
+        self.assertIn('80.0%',message)
+        self.assertNotIn('dead zone',message)
+        lab['output'].update(mode='dry-run',target_reached=True,pointer_position=[.8,.5])
+        self.assertIn('arrived',pointer_status(source,lab))
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'target.jsonl'
+            log=DiagnosticLog(path);log.record(source,lab);log.close()
+            row=json.loads(path.read_text().splitlines()[1])
+            self.assertEqual(row['pointer_mode'],'target')
+            self.assertEqual(row['driver_position'],[.8,.5])
+            self.assertTrue(row['target_reached'])
 
     def test_logs_rotate_and_logging_failure_is_nonfatal(self):
         with tempfile.TemporaryDirectory() as directory:

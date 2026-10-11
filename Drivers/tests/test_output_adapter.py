@@ -125,6 +125,65 @@ class OutputAdapterTests(unittest.TestCase):
         self.output.submit(data,RUNTIME)
         self.assertEqual(self.output.counts[4],1)
 
+    def target(self, x=.55, y=.45, speed=1, **updates):
+        return self.send(pointer=dict(mode='target',x=x,y=y,speed=speed),**updates)
+
+    def test_target_arrives_and_repeated_destination_stays_still(self):
+        self.output.pause()
+        self.target()
+        deadline=time.monotonic()+2
+        while not self.output.status().target_reached and time.monotonic()<deadline:
+            time.sleep(.01);self.target()
+        status=self.output.status()
+        self.assertTrue(status.target_reached)
+        self.assertAlmostEqual(status.pointer_position_x,.55,places=6)
+        self.assertAlmostEqual(status.pointer_position_y,.45,places=6)
+        self.output.collect();count=self.output.counts[1]
+        for _ in range(12):
+            time.sleep(.01);self.target()
+        self.assertEqual(self.output.counts[1],count)
+        self.assertTrue(self.output.snapshot()['target_reached'])
+
+    def test_zero_speed_unknown_and_disabled_target_never_pull_to_center(self):
+        self.output.pause()
+        # A zero-speed target less than half a pixel away used to snap into place.
+        self.target(.5001,.5,0)
+        for _ in range(4):
+            time.sleep(.01);self.target(.5001,.5,0)
+        self.assertEqual(self.output.status().pointer_position_x,.5)
+        self.target(.9,.9)
+        time.sleep(.04)
+        known=command(0,0)['known'];known['pointer']=False
+        self.target(.5,.5,0,known=known)
+        before=self.output.snapshot()['pointer_position']
+        for _ in range(4):
+            time.sleep(.01);self.target(.5,.5,0,known=known)
+        self.assertEqual(self.output.snapshot()['pointer_position'],before)
+        self.target(.5,.5,0,enabled=False)
+        self.assertFalse(self.output.status().enabled)
+        self.assertEqual(self.output.snapshot()['pointer_position'],before)
+
+    def test_target_validation_mode_changes_and_watchdog_release(self):
+        for pointer in (dict(mode='target',x=.7,y=.5),dict(mode='target',x=.7,y=.5,speed=1.1),
+                        dict(mode='target',x=float('nan'),y=.5,speed=1)):
+            self.output.pause()
+            with self.assertRaises(DriverError):self.send(pointer=pointer)
+        self.send()
+        with self.assertRaises(DriverError):self.target()
+        self.target()
+        with self.assertRaises(DriverError):self.send()
+        known=command(0,0)['known'];known['pointer']=False
+        with self.assertRaises(DriverError):self.target(known=known)
+        with self.assertRaises(DriverError):self.target(enabled=False)
+        self.target()
+        keys=command(0,0)['keys'];keys['w']=1
+        self.target(keys=keys)
+        deadline=time.monotonic()+2
+        while self.output.status().enabled and time.monotonic()<deadline:time.sleep(.01)
+        self.assertTrue(self.output.status().timed_out)
+        self.assertEqual(self.output.status().held_key_mask,0)
+        with self.assertRaises(DriverError):self.target()
+
 
 if __name__ == "__main__":
     unittest.main()

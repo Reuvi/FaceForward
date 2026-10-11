@@ -1,5 +1,7 @@
 # Raw pupil control — current user decision
 
+> [SCREEN_POINTER.md](SCREEN_POINTER.md) updates downstream gaming movement to approximate screen destinations. The no-calibration raw detector behavior here remains current; the velocity-only Processing behavior below is historical.
+
 The user requested skipping pupil calibration and using raw eye-relative iris
 position for mouse direction. This supersedes the pupil guide, learned endpoints
 and head-pose compensation requirements in PUPIL_HEAD_CALIBRATION.md.

@@ -1,5 +1,10 @@
 # App driver connection handoff
 
+Current addition: [screen destination integration](../Contracts/SCREEN_POINTER.md)
+uses existing ABI v3 target fields through `output.py`. Gaming defaults to target;
+the prior velocity path remains supported. Rebuild for the zero-speed target hold
+fix. Native position/arrival telemetry is exposed; no C layout changed.
+
 ## Behavior
 
 Reuvi requested connecting the finished Processing phase to the existing driver

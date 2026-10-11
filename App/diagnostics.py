@@ -11,6 +11,7 @@ def pointer_status(source, lab):
     snap, config = lab["snapshot"], lab["config"]
     diag, detector = snap["diagnostics"], source.get("detector") or {}
     head_only = snap.get("pointer_input") == "head"
+    target = snap.get("pointer_mode") == "target"
     input_name = "Head X/Y" if head_only else "Pupil"
     if lab["output"].get("error"):
         return "Pointer stopped: " + lab["output"]["error"]
@@ -46,13 +47,19 @@ def pointer_status(source, lab):
     if not snap["enabled"]:
         pending = []
         radius = diag.get("pointer_radius")
-        if radius is not None and radius > config["pointer"]["deadzone"]:
+        if not target and radius is not None and radius > config["pointer"]["deadzone"]:
             pending.append("Head X/Y" if head_only else "pupils")
         for key, name in (() if head_only else (("head_x", "Head X"), ("head_y", "Head Y"))):
             if not diag.get(key, {}).get("neutral", True):
                 pending.append(name)
         return ("Waiting to start: center " + ", ".join(pending) + "." if pending else
+                "Waiting to start: release eye actions and center head inputs." if target else
                 "Waiting to start: release eye actions and center inputs.")
+    if target:
+        location = f"X {snap['pointer_x']:.1%}, Y {snap['pointer_y']:.1%}"
+        status = ("preview" if lab["output"]["mode"] == "preview" else
+                  "arrived" if lab["output"].get("target_reached") else "moving toward point")
+        return f"Approximate screen destination: {location} · {status}."
     radius = diag.get("pointer_radius")
     threshold = config["pointer"]["deadzone"] + config["pointer"]["hysteresis"]
     if radius is not None and not diag.get("pointer_active"):
@@ -137,6 +144,10 @@ class DiagnosticLog:
                      "head_reasons":{k:reasons.get(k) for k in ("head_x", "head")},
                      "head_x":diag.get("head_x"), "head_y":diag.get("head_y"),
                      "pointer_demand":[snap["pointer_x"],snap["pointer_y"]],
+                     "pointer_mode":snap.get("pointer_mode", "velocity"),
+                     "target_speed":snap.get("target_speed"),
+                     "driver_position":lab["output"].get("pointer_position"),
+                     "target_reached":lab["output"].get("target_reached"),
                      "pointer_filter":lab["config"]["pointer"], "min_confidence":lab["config"]["min_confidence"],
                      "pointer_gain":(lab.get("mapping") or {}).get("pointer_gain",1),
                      "adaptive_pointer":(lab.get("mapping") or {}).get("adaptive_pointer", False),

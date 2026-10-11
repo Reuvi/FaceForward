@@ -1158,3 +1158,56 @@ Remaining: restart App for the next human camera trial. Raw direction is a
 joystick input; resting gaze/head movement may bias its center. Software checks
 do not establish human tracking accuracy. No camera or native OS input was used
 for this follow-up, and other active checkouts were preserved.
+
+## Screen destination pointer — user-requested integration
+
+Lane / task / branch: Reuvi integration / gaze-target-control /
+`codex/integration/gaze-target-control`, based on `6180643`.
+Changed paths: Processing mapping/filter/preview/UI, Drivers adapter and zero-speed
+target guard, App diagnostics, Vision pupil help text, component/integration tests,
+contracts and runbooks. Contract-first commit: `1cd7f9f`.
+
+The user wants the cursor to settle at the eye-directed location. Gaming now uses
+the existing driver's target mode: bounded normalized primary-display coordinates
+plus travel speed. The previous no-pupil-calibration choice is retained, so raw
+pupils produce an explicitly approximate destination, not calibrated screen gaze.
+See [setup and accuracy limits](SCREEN_POINTER_GUIDE.md). Mouse test stays head-only
+velocity; legacy mouse/scroll and imported v1/v2 mappings retain velocity.
+
+Processing smooths positions, holds a small fixation dead band around the last
+accepted destination and never integrates a stationary pupil observation as speed.
+Target startup allows any fresh pupil position after explicit Start, while known
+eye actions/head keys must release. Unknown pupils emit speed 0 immediately; face
+loss/staleness/Stop/settings changes disarm and release. Added a C guard so a
+zero-speed target cannot cause even a sub-pixel correction. Diagnostic state/logs
+now distinguish target mode, destination, actual driver position and arrival.
+
+Interfaces: `device_control_v1` gains explicit `{mode:"target",x,y,speed}`;
+velocity fields are unchanged. ABI v3 layouts are unchanged. Mapping v3 stores
+pointer mode and `target_jitter`; face profiles v3 and detector presets v13 are
+unchanged. Loading a face profile preserves the chosen mapping mode/dead band.
+Targets use the driver's existing primary display; native support is macOS/Linux
+X11 with its display dependencies, not pure Wayland. No model/dependency downloads.
+
+Checks on the final code:
+- `python3 -m unittest discover -s tests/processing -q`: **116 passed**.
+- `RUN_TK_TESTS=1 FID_LIBRARY=Drivers/build/libface_input_driver.dylib` with the
+  existing Vision venv, `-m unittest discover -s tests/integration -p <module> -q`
+  for each module in a fresh process: **143 passed**, no skips or Tk warnings.
+- `cmake -S Drivers -B Drivers/build`, `cmake --build Drivers/build -j 4`,
+  `ctest --test-dir Drivers/build --output-on-failure`: **5/5 suites passed**,
+  including **11 Python adapter tests** against the actual compiled library.
+- A full synthetic pupil → Processing → compiled driver check reaches (.8,.25),
+  stays there during ±.002 input jitter, emits no further movement after arrival,
+  and holds position on closure. Direct driver tests also verify zero-speed holds,
+  mode-change validation and independent watchdog/key release. No OS events.
+- 490-frame gaming App dry run: **490 accepted**, no errors, 931 movement events,
+  3 clicks per side, 4 key downs/ups; final disabled, held keys 0, target speed 0.
+- All four existing local profiles loaded read-only, paused/disarmed, retaining
+  screen-destination mode and fixation dead band. No personal files changed.
+- Ruff F, Python compilation, whitespace and integration scope checks passed.
+
+Remaining: restart App after updating the compiled driver and evaluate with the
+user's camera. Real-person gaze accuracy and live target movement were not measured
+in this task. A screen-dot fit would be separate work for actual screen alignment;
+this release changes destination control while keeping raw pupil detection.

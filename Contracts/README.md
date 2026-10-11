@@ -1,5 +1,10 @@
 # Shared contracts — initial v1
 
+[SCREEN_POINTER.md](SCREEN_POINTER.md) adds an explicit target variant to
+device_control_v1 using the driver's existing ABI v3. Gaming defaults to approximate
+screen destinations from raw pupils; Mouse test remains head-only velocity.
+Mapping v3 reads v1/v2 as velocity. This supersedes older gaming velocity defaults.
+
 [DRIVER_CONNECTION.md](DRIVER_CONNECTION.md) connects Processing to the merged
 ABI v3 driver, with explicit preview/dry-run/native modes, synchronous processed
 commands and immediate release on stop/fault. Eye activations produce single

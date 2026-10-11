@@ -7,6 +7,7 @@ import uuid
 from Processing.mouse.engine import AxisFilter, MouseProcessor
 from Processing.mouse.signals import decode
 from .config import DIRECTIONS, KEYS, Mapping, mouse_test_mapping
+from .target import TargetFilter
 
 
 class HeadGate:
@@ -79,8 +80,11 @@ class GamingProcessor(MouseProcessor):
         self.head_y = HeadGate(self.mapping.head_y)
         self.output_session_id = str(uuid.uuid4())
         super().__init__(self.mapping.response, subject_id)
-        self.pointer = AxisFilter(self.config.pointer, 2, gain=self.mapping.pointer_gain,
-                                  adaptive=self.mapping.adaptive_pointer)
+        self.pointer = (TargetFilter(self.config.pointer, gain=self.mapping.pointer_gain,
+                                    adaptive=self.mapping.adaptive_pointer, jitter=self.mapping.target_jitter)
+                        if self.mapping.pointer_mode == "target" else
+                        AxisFilter(self.config.pointer, 2, gain=self.mapping.pointer_gain,
+                                   adaptive=self.mapping.adaptive_pointer))
 
     def decode_sample(self, frame):
         sample = super().decode_sample(frame)
@@ -108,8 +112,11 @@ class GamingProcessor(MouseProcessor):
 
     def can_enable(self):
         usable = self.pointer.valid or self.head_x.ready or self.head_y.ready or self.left.ready or self.right.ready
+        eyes_released = (self.sample is not None and
+                         not (self.sample.left_known and self.sample.left_closed) and
+                         not (self.sample.right_known and self.sample.right_closed))
         return (usable and self.pointer.neutral() and self.head_x.neutral and self.head_y.neutral
-                and not self.left.down and not self.right.down)
+                and eyes_released and not self.left.down and not self.right.down)
 
     def tick(self, now_ms):
         snap = super().tick(now_ms)
@@ -124,6 +131,8 @@ class GamingProcessor(MouseProcessor):
         snap.update(keys=keys, scroll_y=.5, mapping_id=self.mapping.id,
                     mapping_name=self.mapping.name, mapping_revision=self.mapping.revision,
                     pointer_input="head" if self.mapping.input_mode == "head-mouse" else "pupils",
+                    pointer_mode=self.mapping.pointer_mode,
+                    target_speed=int(self.mapping.pointer_mode == "target" and snap["enabled"] and diag["raw_pointer"] is not None),
                     output_session_id=self.output_session_id)
         diag.update(scroll_target=0, scroll_boost=0, interpolated_scroll=None,
                     head_x=self.head_diagnostic(self.head_x), head_y=self.head_diagnostic(self.head_y))
@@ -168,6 +177,16 @@ class GamingProcessor(MouseProcessor):
         for index, axis in enumerate(("x", "y")):
             point = diag["raw_pointer"]
             filtered = diag["interpolated_pointer"]
+            if self.mapping.pointer_mode == "target":
+                value = snap["pointer_"+axis]
+                instruction = ("unknown; stopped" if point is None else "output stopped" if not snap["enabled"]
+                               else f"screen {axis.upper()} {value:.1%}")
+                rows.append({"id": "pupil_"+axis, "input": "Pupils "+axis.upper(),
+                             "raw": point[index] if point is not None else None,
+                             "filtered": (self.pointer.filtered[index]+1)/2 if self.pointer.filtered is not None else None,
+                             "threshold": f"Fixation dead band {self.mapping.target_jitter:.1%}",
+                             "instruction": "Destination: "+instruction})
+                continue
             signed = 2*snap["pointer_"+axis]-1
             direction = ("right" if signed > 0 else "left") if axis == "x" else ("down" if signed > 0 else "up")
             instruction = "unknown; stopped" if point is None else "stopped" if abs(signed) < .0001 else f"{direction} {abs(signed):.0%}"

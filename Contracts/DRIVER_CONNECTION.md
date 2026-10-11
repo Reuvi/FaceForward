@@ -1,5 +1,7 @@
 # App → native driver connection
 
+> Current: [SCREEN_POINTER.md](SCREEN_POINTER.md) also connects explicit screen targets through the existing ABI v3. It supersedes pupil velocity-only behavior and the center arming gate for target mode; velocity startup still requires neutral input.
+
 Reuvi explicitly requested merging driverTest and connecting the completed gaming
 Processing phase to that driver. This supersedes the preview-only boundary in
 GAMING_MAPPING.md. Keep the driver's existing ABI v3 struct layouts and independent

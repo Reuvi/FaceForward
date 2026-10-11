@@ -79,7 +79,7 @@ class PupilPanel:
         self.frame.pack(fill="x", pady=8)
         self.message = tk.StringVar(value="Raw pupil direction · no calibration needed")
         ttk.Label(self.frame, textvariable=self.message, wraplength=420).pack(anchor="w")
-        ttk.Label(self.frame, text="Look left/right/up/down to move the pointer. Keep both pupils visible. Pointer gain, dead zone and smoothing are in Signals → Mapping settings.",
+        ttk.Label(self.frame, text="Keep both pupils visible. Gaming can use these readings for an approximate screen destination. Pointer gain, fixation dead band and smoothing are in Signals → Mapping settings.",
                   wraplength=420).pack(anchor="w", pady=5)
         ttk.Label(self.frame, text="The cell and dot show fixed-scale raw direction, not screen gaze. Dark cells hold only the display; unknown input stops movement.",
                   wraplength=420).pack(anchor="w", pady=5)

@@ -13,7 +13,7 @@ Live mouse + keyboard choices. See [build and live-output setup](../../docs/DRIV
 | Head up | Hold Space |
 | Head left | Hold left Shift |
 | Head right | Hold S |
-| Pupils away from center | Continuous pointer velocity; farther is faster |
+| Pupils | Approximate screen destination; arrive and stop |
 
 Both head axes can act together (down + left = W + Shift). Eyes remain independent.
 A and D are available for edited bindings but inactive in the built-in mapping.
@@ -42,7 +42,7 @@ Vision/.venv/bin/python -m App --source camera --model Vision/.local/face_landma
 python3 -m App --mapping mouse
 ```
 
-In App, use **Signals**. In the standalone Processing lab, use **Signal mapping**. Center your head and pupil direction, open both eyes, and
+In App, use **Signals**. In the standalone Processing lab, use **Signal mapping**. Center your head, release eye actions, and
 press **Start preview**. The eight rows show the usable raw normalized value,
 filtered value, threshold and instruction. Unknown stays unknown in the numeric
 readout; a darker plot hold is display history only. The graph picker shows raw detector, head or pointer processing traces. The standalone
@@ -53,7 +53,7 @@ eye action and head X/Y guides; pupil motion needs no guide. Partial calibration
 is supported: an unavailable channel is released while other usable channels can
 work. Pupil direction uses fixed-scale raw iris X/Y, with no pupil fit or calibrated
 head-angle gate. Processing uses precise `gaze_x/y`, never the 11×11 matrix;
-gain, dead zone, adaptive smoothing and invalid-input stops still apply.
+gain, fixation dead band, adaptive position smoothing and invalid-input stops apply.
 
 The synthetic demo cycles every 16 seconds: neutral, immediate labeled eye
 actions, pupil circle, head up+right (Space+S), head down+left (W+Shift), neutral.
@@ -72,13 +72,22 @@ before activation. Reversal releases the old direction before qualifying the new
 Invalid input releases immediately, bypassing smoothing, and that axis must
 return to actual neutral before another activation.
 
-Pupils use the existing radial dead zone: start above .19 signed displacement,
+The gaming default is **Screen destination**: smooth the bounded pupil-derived
+position, then keep the last accepted destination until the change exceeds
+`target_jitter` (.01 normalized screen dimensions by default). Holding an
+off-center input does not integrate movement. Gain scales position around its
+configured center; inversion still applies. Driver speed controls travel toward
+the point. Invalid input clears history and emits speed 0 immediately. Raw pupil
+values provide approximate positioning, not calibrated gaze; see
+[screen pointer setup](../../docs/SCREEN_POINTER_GUIDE.md).
+
+**Velocity** remains selectable. It uses the existing radial dead zone: start above .19 signed displacement,
 release at .16 with default settings. **Signals → Mapping settings…** exposes the response
 curve, smoothing and acceleration limits; standalone **Transfer settings** also
 exposes interpolation (50 ms by default) and other developer settings.
-Gaming and Mouse test default to adaptive **1€** velocity smoothing, followed by acceleration/deceleration limits. It uses a shared two-axis speed estimate and the Smoothing ms setting; raw inputs and neutral-start checks remain unchanged. Uncheck **Adaptive pointer smoothing (1€)** to use the earlier fixed filter. Unknown input resets history immediately. Mouse test defaults to zero interpolation delay; imported face-profile response settings retain their values. See [method, benchmark and limitations](../../docs/PUPIL_QUALITY_GUIDE.md).
+Velocity mappings default to adaptive **1€** velocity smoothing, followed by acceleration/deceleration limits. Screen destination uses the same adaptive filter on position, without velocity curves/acceleration. Uncheck **Adaptive pointer smoothing (1€)** for fixed smoothing. Mouse test stays velocity and defaults to zero interpolation delay; imported face-profile response settings retain their values. See [method, benchmark and limitations](../../docs/PUPIL_QUALITY_GUIDE.md).
 
-**Mapping settings… → Pointer gain** scales only the motion beyond the dead zone
+In velocity mode, **Mapping settings… → Pointer gain** scales only the motion beyond the dead zone
 (.1–4×, capped at full velocity). A gain increase cannot amplify neutral jitter
 past the threshold. Jump boost is disabled by default in gaming mode. These
 defaults are starting values for personal tuning, not measured human accuracy.
@@ -103,7 +112,7 @@ combined as a held state. Pointer and independent mouse-button bindings remain
 fixed within each mapping family. Mouse test always has all key bindings set to none. Apply increments the mapping revision and
 requires a new Start preview.
 
-**Export mapping / Import mapping** writes strict `input_mapping_v2` JSON (v1 remains readable), including input mode and adaptive-filter selection alongside
+**Export mapping / Import mapping** writes strict `input_mapping_v3` JSON (v1/v2 read as velocity), including pointer mode, fixation dead band, input mode and adaptive-filter selection alongside
 name, stable ID, revision, response settings, pointer gain, head thresholds and
 bindings. Import validates the whole file before replacing/selecting it. Files
 contain no detector fits, observations or armed state. Export uses an atomic
@@ -112,7 +121,7 @@ ID replaces that mapping; use Copy as… first to preserve another variant.
 
 The separate face profile format remains `face_mouse_profile_v3` with detector
 v13. Its existing mouse response settings apply to the active mapping on load;
-head settings and bindings stay with the mapping. The Mouse and scroll mode
+head settings, bindings, pointer mode and fixation dead band stay with the mapping. The Mouse and scroll mode
 keeps its own independent response settings.
 
 ## Python boundary
@@ -128,7 +137,7 @@ lab.start()  # Independent 100 Hz tick; keeps checking age when captures stop.
 lab.action({"action": "arm"})
 # Each current Vision callback: lab.ingest(signal_frame)
 state = lab.state(after_command=0)
-print(state["message"])  # device_control_v1; latest pointer velocity
+print(state["message"])  # device_control_v1; explicit pointer mode and destination/velocity
 print(state["commands"])  # Bounded preview transitions, complete command per entry
 lab.close()  # Disarms and records the release before joining the worker.
 ```

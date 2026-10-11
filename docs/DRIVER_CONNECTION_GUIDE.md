@@ -52,7 +52,7 @@ Vision/.venv/bin/python -m App --source camera --model Vision/.local/face_landma
    the valid raw/normalized values first.
 2. On **Signals**, choose **Output → Live mouse + keyboard**
    and press **Connect output**. This connects while stopped.
-3. Center your head and pupil direction, open your eyes, then press **Start live
+3. Center your head and release eye actions, then press **Start live
    control**. The panel must say **LIVE MOUSE + KEYBOARD** and running. Preview
    and Driver dry run are available in the same selector.
 4. **Stop**, Escape while App is focused, source stop, or window close releases
@@ -77,7 +77,13 @@ stays stopped. It does not change permissions or install a background service.
 | Right recognized eye action | One complete right click when activation begins |
 | Head down/up | Hold W / Space; release on neutral or invalid input |
 | Head left/right | Hold left Shift / S; independent of vertical motion |
-| Pupils away from neutral | Continuous relative mouse movement |
+| Pupils in Screen destination mode | Move toward an approximate primary-display point and stop |
+
+Screen destination is the new gaming default. Raw pupils are not calibrated
+screen gaze; [setup and limitations](SCREEN_POINTER_GUIDE.md). Mapping settings
+also offers the previous Velocity behavior. Mouse test stays head-only velocity.
+Only velocity mode requires centered pointer input at startup. Rebuild Drivers
+after pulling this update so zero-speed target commands stop without any correction.
 
 A held eye activation produces one click, not repeated clicks or dragging.
 Reopening/OFF/unknown resets the driver's click latch; Processing still requires

@@ -81,7 +81,7 @@ class GamingMappingTests(unittest.TestCase):
     def setUp(self):
         self.now = 1000.
         self.sequence = 0
-        config = Mapping(head_x=HeadConfig(smoothing_ms=0), head_y=HeadConfig(smoothing_ms=0))
+        config = Mapping(pointer_mode="velocity", head_x=HeadConfig(smoothing_ms=0), head_y=HeadConfig(smoothing_ms=0))
         self.core = GamingProcessor(config, subject_id="person")
         self.core.arm()
         self.feed()
@@ -159,7 +159,7 @@ class GamingMappingTests(unittest.TestCase):
         self.assertEqual((stopped["pointer_x"],stopped["pointer_y"]),(.5,.5))
 
     def test_neutral_jitter_stays_still_even_with_gain(self):
-        self.core = GamingProcessor(replace(Mapping(),pointer_gain=4),subject_id="person")
+        self.core = GamingProcessor(replace(Mapping(pointer_mode="velocity"),pointer_gain=4),subject_id="person")
         self.core.arm()
         self.feed()
         for i in range(50):

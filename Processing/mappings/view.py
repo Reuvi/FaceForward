@@ -69,8 +69,14 @@ class MappingPanel(ttk.Frame):
             entry.grid(row=row, column=1, columnspan=3, sticky="ew", padx=5)
             self.edit_widgets.append(entry)
         self.bindings = {}
+        self.pointer_mode = tk.StringVar()
+        label(group, "Pointer behavior").grid(row=2, column=0, sticky="w", pady=3)
+        self.mode_widget = ttk.Combobox(group, textvariable=self.pointer_mode, state="readonly",
+                                       values=("Screen destination", "Velocity"), width=22)
+        self.mode_widget.grid(row=2, column=1, columnspan=3, sticky="ew", padx=5)
+        self.mode_widget.bind("<<ComboboxSelected>>", lambda event: self.pointer_controls())
         self.binding_group = ttk.Frame(group)
-        self.binding_group.grid(row=2, column=0, columnspan=4, sticky="ew")
+        self.binding_group.grid(row=3, column=0, columnspan=4, sticky="ew")
         for i, direction in enumerate(DIRECTIONS):
             row, col = i//2, (i%2)*2
             label(self.binding_group, direction.title()).grid(row=row, column=col, sticky="w", pady=3)
@@ -80,6 +86,12 @@ class MappingPanel(ttk.Frame):
             entry.grid(row=row, column=col+1, padx=5)
             self.edit_widgets.append(entry)
         self.pointer_fields = {}
+        self.pointer_widgets = {}
+        self.target_jitter = tk.StringVar()
+        self.jitter_label = label(group, "Fixation dead band (0–0.1)")
+        self.jitter_label.grid(row=4, column=0, sticky="w", pady=3)
+        self.jitter_widget = ttk.Entry(group, textvariable=self.target_jitter, width=8)
+        self.jitter_widget.grid(row=4, column=1, sticky="w", padx=5)
         self.adaptive = tk.BooleanVar(value=True)
         self.adaptive_widget = ttk.Checkbutton(settings_parent, text="Adaptive pointer smoothing (1€)", variable=self.adaptive)
         self.adaptive_widget.pack(anchor="w", pady=5)
@@ -90,10 +102,13 @@ class MappingPanel(ttk.Frame):
                     ("smoothing_ms", "Smoothing ms"), ("exponent", "Response curve"),
                     ("acceleration", "Acceleration / s"), ("deceleration", "Deceleration / s"))):
                 row, col = divmod(i, 3)
-                label(pointer, title).grid(row=row, column=col*2, sticky="w", padx=5, pady=5)
+                title_widget = label(pointer, title)
+                title_widget.grid(row=row, column=col*2, sticky="w", padx=5, pady=5)
                 var = tk.StringVar()
                 self.pointer_fields[key] = var
-                ttk.Entry(pointer, textvariable=var, width=8).grid(row=row,column=col*2+1,padx=5)
+                widget = ttk.Entry(pointer, textvariable=var, width=8)
+                widget.grid(row=row,column=col*2+1,padx=5)
+                self.pointer_widgets[key] = (title_widget, widget)
         self.apply_button = desktop.button(settings_parent, "Apply settings — stops output", self.apply)
         self.apply_button.pack(anchor="w", pady=7)
         self.help_text = tk.StringVar()
@@ -137,6 +152,20 @@ class MappingPanel(ttk.Frame):
         self.settings_window.deiconify()
         self.settings_window.lift()
 
+    def pointer_controls(self):
+        target = self.pointer_mode.get() == "Screen destination"
+        for widget in (self.jitter_label, self.jitter_widget):
+            widget.grid() if target else widget.grid_remove()
+        visible = [(key, widgets) for key, widgets in self.pointer_widgets.items()
+                   if not target or key == "smoothing_ms"]
+        for widgets in self.pointer_widgets.values():
+            for widget in widgets:
+                widget.grid_remove()
+        for i, (_, widgets) in enumerate(visible):
+            row, col = divmod(i, 3)
+            for offset, widget in enumerate(widgets):
+                widget.grid(row=row, column=col*2+offset)
+
     def apply(self):
         try:
             self._apply()
@@ -165,6 +194,8 @@ class MappingPanel(ttk.Frame):
             return
         data["name"], data["pointer_gain"] = self.name.get(), float(self.gain.get())
         data["adaptive_pointer"] = self.adaptive.get()
+        data["pointer_mode"] = "target" if self.pointer_mode.get() == "Screen destination" else "velocity"
+        data["target_jitter"] = float(self.target_jitter.get())
         data["revision"] += 1
         for (axis, key), var in self.fields.items():
             data[axis][key] = float(var.get())
@@ -221,9 +252,15 @@ class MappingPanel(ttk.Frame):
                 group.grid_remove() if head_only else group.grid()
             self.adaptive_widget.configure(state="normal" if mapping else "disabled")
             self.adaptive.set(mapping.get("adaptive_pointer", True) if mapping else False)
+            self.pointer_mode.set("Screen destination" if mapping and mapping["pointer_mode"] == "target" else "Velocity")
+            self.target_jitter.set(mapping["target_jitter"] if mapping else .01)
+            self.mode_widget.configure(state="disabled" if head_only or not mapping else "readonly")
+            self.pointer_controls()
             self.help_text.set("Head X + Head Y move the pointer together. Both head axes need calibration. Eyes and pupils are ignored; no clicks, keys or scroll."
                                if head_only else "Head thresholds use the fraction of your calibrated range from neutral. Eyes use calibrated actions without a dwell timer."
-                               + ("" if self.compact else " Pointer curve/dead zone are in Transfer settings."))
+                               + (" Screen destination moves to a point and stops; without screen calibration its alignment is approximate. Fixation dead band 0.01 means 1% of the screen. Velocity keeps moving while off-center."
+                                  if not head_only else "")
+                               + ("" if self.compact else " Pointer smoothing and velocity response are in Transfer settings."))
             for widget in self.edit_widgets:
                 widget.configure(state="disabled" if mapping is None else "readonly" if isinstance(widget, ttk.Combobox) else "normal")
             self.apply_button.configure(state="disabled" if mapping is None and not self.compact else "normal")

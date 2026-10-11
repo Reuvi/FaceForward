@@ -65,6 +65,7 @@ class DriverOutput:
         for axis in (config.pointer_x, config.pointer_y, config.scroll):
             axis.neutral, axis.dead_zone, axis.inverted = .5, 0, 0
         config.pointer_x.max_speed = config.pointer_y.max_speed = self.speeds[0]
+        config.target_max_speed = self.speeds[0]
         config.scroll.max_speed = self.speeds[1]
         for button in config.buttons:
             button.dwell_ms = 0
@@ -94,6 +95,10 @@ class DriverOutput:
                 "awaiting_neutral": bool(status.awaiting_neutral),
                 "timed_out": bool(status.timed_out), "held_keys": status.held_key_mask,
                 "error": self.error, "events": list(self.events),
+                "pointer_mode": "target" if status.pointer_mode == 1 else "velocity",
+                "pointer_position": [status.pointer_position_x, status.pointer_position_y] if status.pointer_position_valid else None,
+                "target": [status.target_x, status.target_y],
+                "target_reached": bool(status.enabled and status.pointer_mode == 1 and status.target_speed > 0 and status.target_reached),
                 "event_counts": dict(self.counts), "accepted_frames": status.accepted_frames}
 
     def pause(self):
@@ -134,13 +139,21 @@ class DriverOutput:
         if not isinstance(keys, dict) or set(keys) != set(KEYS) or any(type(v) is not int or v not in (0, 1) for v in keys.values()):
             raise DriverError("Expected complete six-key state")
         pointer = message.get("pointer") if gaming else message.get("velocity")
-        if not isinstance(pointer, dict) or (gaming and pointer.get("mode") != "velocity"):
-            raise DriverError("Expected pointer velocity")
+        if not isinstance(pointer, dict) or (gaming and pointer.get("mode") not in ("velocity", "target")):
+            raise DriverError("Expected pointer velocity or target")
+        target = gaming and pointer["mode"] == "target"
+        if target and set(pointer) != {"mode", "x", "y", "speed"}:
+            raise DriverError("Expected complete target coordinates and speed")
         x, y = (number(pointer.get(axis), "pointer "+axis) for axis in ("x", "y"))
+        speed = number(pointer["speed"], "target speed") if target else 0
         scroll = number(message.get("scroll_y") if gaming else pointer.get("scroll"), "scroll")
         frame = Frame(x, y, scroll, buttons[names[0]], buttons[names[1]], 0, 0, 0, .5, .5, 0,
                       sum(1 << i for i, key in enumerate(KEYS) if keys[key]))
-        mapping = (identity(message.get("mapping_id"), "mapping"), sequence(message.get("mapping_revision"), "mapping revision")) if gaming else ("mouse", 0)
+        if target:
+            frame.pointer_x = frame.pointer_y = .5
+            frame.pointer_mode = 1
+            frame.target_x, frame.target_y, frame.target_speed = x, y, speed
+        mapping = (identity(message.get("mapping_id"), "mapping"), sequence(message.get("mapping_revision"), "mapping revision"), pointer["mode"]) if gaming else ("mouse", 0, "velocity")
         if gaming:
             known = message.get("known")
             fields = {"left_click", "right_click", "head_x", "head_y", "pointer"}
@@ -148,13 +161,14 @@ class DriverOutput:
                 raise DriverError("Expected complete channel validity")
             if any(not known[name] and buttons[name] for name in names):
                 raise DriverError("Unknown eye cannot click")
-            if not known["pointer"] and (x != .5 or y != .5):
+            if not known["pointer"] and (x != .5 or y != .5 or speed != 0):
                 raise DriverError("Unknown pupils cannot move the pointer")
             if not known["head_x"] and not known["head_y"] and frame.keys_down:
                 raise DriverError("Unknown head axes cannot hold keys")
-        neutral = not frame.keys_down and not any(buttons.values()) and (x, y, scroll) == (.5, .5, .5)
+        neutral = (not frame.keys_down and not any(buttons.values()) and scroll == .5
+                   and (target or (x, y) == (.5, .5)))
         if not message["enabled"]:
-            if not neutral:
+            if not neutral or (target and (speed != 0 or (x, y) != (.5, .5))):
                 raise DriverError("Disabled command must release every output")
             return frame, None, None, None
         source = message.get("source")

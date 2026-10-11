@@ -1,5 +1,11 @@
 # Drivers lane
 
+**Current screen pointer:** `../Contracts/SCREEN_POINTER.md` adopts the existing
+ABI v3 target mode for App. The adapter validates explicit target coordinates,
+speed, freshness and mode transitions. Speed 0 must never call the movement
+backend. Report normalized primary-display position and arrival; keep velocity
+behavior, independent watchdog and held-key release intact.
+
 App now uses the public `binding.py` and `output.py`; read
 `../Contracts/DRIVER_CONNECTION.md`. Preserve ABI v3 struct layouts and the legacy
 `fid_submit` tools. The additive `fid_submit_processed` path consumes processed
