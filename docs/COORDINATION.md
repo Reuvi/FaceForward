@@ -617,3 +617,11 @@ disabled states. Compilation, whitespace and integration scope checks pass.
   tongue/gaze validation; changing source kind intentionally clears in-memory fits.
 - Remaining: real-person camera accuracy still needs user testing. The one-person
   assumption does not identify different people. No OS driver or format changes.
+
+## Active tongue replacement + pupil joystick — October 10
+
+Reuvi integration, branch `work/reuvi/integration/tongue-pupil-joysticks`, base
+4b8b25d. Scope: Vision detector/calibration/UI/profile, App selector/lifecycle,
+contracts, guides and relevant tests. User reports color segmentation unusable
+and requests pupil direction as a second joystick. Preserve working head pitch.
+Contract: JOYSTICK_DETECTION.md, landed before implementation. No Drivers changes.
