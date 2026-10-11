@@ -1,5 +1,9 @@
 # Fixed pupil direction and square matrix
 
+> Pupil mapping update: [PUPIL_HEAD_CALIBRATION.md](PUPIL_HEAD_CALIBRATION.md)
+> supersedes fixed/no-calibration pupil behavior. Tongue stays retired, matrix
+> shape stays 11×11, and detector presets now save v12.
+
 User requests stronger downward detection, no pupil sensitivity controls or
 calibration, and a square matrix representation. This supersedes the adjustable
 pupil settings in DIRECT_PUPILS.md. Keep the native local runtime, one camera,

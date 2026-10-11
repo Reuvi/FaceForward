@@ -126,7 +126,7 @@ class MovementGuide:
         if role == "absence":
             sample = int(value is not None) if usable else None
         else:
-            dimensions = 1 if self.kind in ("head", "head_x") else 2
+            dimensions = getattr(self, "dimensions", 1 if self.kind in ("head", "head_x") else 2)
             sample = (
                 tuple(value)
                 if usable

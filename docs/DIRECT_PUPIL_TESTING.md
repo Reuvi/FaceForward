@@ -1,5 +1,9 @@
 # Fixed pupil direction and square matrix
 
+> Latest pupil behavior: [personal endpoints and head-angle compensation](PUPIL_HEAD_CALIBRATION_GUIDE.md).
+> Run the pupil guide; fixed/no-calibration instructions below are historical.
+> Detector presets now save v12. Tongue remains retired.
+
 Current pupil update: no calibration, no sensitivity controls, and an **11×11
 square matrix**. Downward response is stronger; left/right/up retain their prior
 default mapping. This supersedes adjustable pupil settings from detector v8/v9.

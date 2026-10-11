@@ -85,7 +85,8 @@ class HorizontalHeadTests(unittest.TestCase):
         self.assertEqual(values["head_x"]["value"],1)
         self.assertEqual(values["head_y"]["value"],.5)
         self.assertEqual(self.session.lab.processor.sample.scroll,.5)
-        self.assertEqual(self.session.lab.processor.sample.pointer, (.5, .5))
+        self.assertIsNone(self.session.lab.processor.sample.pointer)  # Pupils have not been calibrated.
+        self.assertIsNotNone(self.core.pupil.xy)
 
     def test_shared_raw_views_csv_and_normalized_samples(self):
         self.assertTrue(self.guide("head_x").passed)
@@ -165,7 +166,7 @@ class HorizontalHeadTests(unittest.TestCase):
     def test_saved_yaw_only_profile_can_load_stopped_and_rejects_bad_fit_atomically(self):
         self.assertTrue(self.guide("head_x").passed); saved=self.core.head_x
         data=self.core.export_calibration()
-        self.assertEqual(data["version"],11); self.assertIsNone(data["head"])
+        self.assertEqual(data["version"],12); self.assertIsNone(data["head"])
         with tempfile.TemporaryDirectory() as folder:
             path=folder+"/profile.json";self.session.save_profile(path)
             self.session.stop();self.core.reset_calibration()

@@ -6,7 +6,7 @@ from .calibration import AxisCalibration, EyeCalibration
 from .features import DetectionConfig
 from .pupil import MEASUREMENT
 
-ALGORITHM = "eyes-head-pupils-v11"
+ALGORITHM = "head-compensated-pupils-v12"
 
 
 def decode_winks(data):
@@ -27,16 +27,19 @@ def decode_preset(data):
         config = DetectionConfig.from_dict(config.active_dict())
         return config, eyes, head, None
     _keys(data, ("version", "algorithm", "settings", "eyes", "winks", "head", "head_x", "pupil"), "Detector preset")
-    if type(data["version"]) is not int or data["version"] != 11 or data["algorithm"] != ALGORITHM:
+    if type(data["version"]) is not int or data["version"] not in (11, 12) or data["algorithm"] != {11: "eyes-head-pupils-v11", 12: ALGORITHM}.get(data["version"]):
         raise ValueError("Unsupported detector preset version or algorithm")
     settings = data["settings"]
     _keys(settings, DetectionConfig().active_dict(), "Detector settings")
     config = DetectionConfig.from_dict(settings)
     if config.head_mode != "pitch":
         raise ValueError("Current head calibration requires pitch mode")
-    _keys(data["pupil"], ("measurement",), "Fixed pupil identity")
-    if data["pupil"]["measurement"] != MEASUREMENT:
-        raise ValueError("Unsupported fixed pupil measurement")
+    if data["version"] == 11:
+        _keys(data["pupil"], ("measurement",), "Fixed pupil identity")
+        if data["pupil"]["measurement"] != MEASUREMENT:
+            raise ValueError("Unsupported fixed pupil measurement")
+    else:
+        decode_pupil(data)
     if not isinstance(data["eyes"], dict) or set(data["eyes"]) - {"left", "right"}:
         raise ValueError("Unknown eye preset")
     eyes = {}
@@ -62,7 +65,7 @@ def decode_preset(data):
 
 
 def decode_head_x(data, config):
-    if data.get("version") not in (7,8,9,10,11):
+    if data.get("version") not in (7,8,9,10,11,12):
         return None
     if config.head_mode != "pitch":
         raise ValueError("Head-axis presets require pitch-mode vertical calibration")
@@ -77,15 +80,25 @@ def decode_head_x(data, config):
     return fit
 
 
+def decode_pupil(data):
+    if data.get("version", 0) < 12:
+        return None
+    from .pupil_calibration import validate_model
+    _keys(data["pupil"], ("measurement", "calibration"), "Pupil preset")
+    if data["pupil"]["measurement"] != MEASUREMENT:
+        raise ValueError("Unsupported pupil measurement")
+    return validate_model(data["pupil"]["calibration"])
+
+
 def encode_preset(core):
     result = {
-        "version": 11, "algorithm": ALGORITHM, "settings": core.config.active_dict(),
+        "version": 12, "algorithm": ALGORITHM, "settings": core.config.active_dict(),
         "eyes": {side: {name: getattr(fit, name) for name in ("closed", "opened", "threshold", "closed_limit", "open_limit")}
                  for side, fit in core.eyes.items()},
         "winks": core.winks,
         "head": asdict(core.head) if core.head else None,
         "head_x": asdict(core.head_x) if core.head_x else None,
-        "pupil": {"measurement": MEASUREMENT},
+        "pupil": {"measurement": MEASUREMENT, "calibration": core.pupil_model},
     }
     decode_preset(result)
     return result

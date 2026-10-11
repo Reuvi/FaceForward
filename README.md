@@ -2,8 +2,8 @@
 
 Current MVP: **eyes/winks, Head Y, Head X and pupils**. Tongue detection has been
 removed from the live app, calibration and graphs. Pupils control the pointer with
-no calibration or sensitivity controls and an 11×11 matrix display. Saved eye/head
-calibration remains reusable; detector presets now save v11. Start with the
+personal directional calibration, head-angle compensation and an 11×11 matrix
+display. Saved eye/head calibration remains reusable; detector presets now save v12. Start with the
 [current testing and profile guide](App/README.md).
 
 A hackathon prototype for controlling a computer through a consumer webcam and

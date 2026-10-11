@@ -173,6 +173,8 @@ class WorkbenchTests(unittest.TestCase):
 
 
     def test_all_four_channels_and_independent_simultaneous_closures(self):
+        from tests.vision.pupil_fixture import pupil_fixture
+        self.core.pupil_model = pupil_fixture()
         self.eyes()
         self.collect("head_up",head=.15)
         self.collect("head_neutral",head=.5)

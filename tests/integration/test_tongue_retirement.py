@@ -25,8 +25,11 @@ def legacy_profile(current, version):
                   'frame-wink-eye-head-tongue-v3', 'personal-head-tongue-ranges-v4',
                   'color-tongue-tip-v5', 'tongue-segmentation-pupil-joystick-v6',
                   'independent-head-axes-v7', 'direct-mediapipe-pupils-v8',
-                  'lip-boundary-head-reliability-v9', 'fixed-pupil-matrix-v10')
+                  'lip-boundary-head-reliability-v9', 'fixed-pupil-matrix-v10', 'eyes-head-pupils-v11')
     data = deepcopy(current)
+    if version == 11:
+        data.update(version=11, algorithm=algorithms[10], pupil={'measurement':'mediapipe_iris_direction_v3'})
+        return data
     data.update(version=version, algorithm=algorithms[version-1],
                 tongue={'positive': [[40,160,140]], 'negative': [[20,100,100]], 'radius': 6, 'margin': 4})
     if version < 3:
@@ -45,6 +48,8 @@ def legacy_profile(current, version):
         data['pupil'] = None
     elif version < 10:
         data['pupil'] = dict(measurement='mediapipe_iris_direction_v2', x_sensitivity=2, y_sensitivity=.5)
+    elif version == 10:
+        data['pupil'] = dict(measurement='mediapipe_iris_direction_v3')
     if version < 7:
         data.pop('head_x')
     return data
@@ -69,6 +74,8 @@ class TongueRetirement(unittest.TestCase):
         return self.session.deliver_detection(CapturedImage(Envelope('retired',sequence,self.now),pixels),faces,preview=False)
 
     def test_every_capture_has_only_active_diagnostics_and_no_tongue_work(self):
+        from tests.vision.pupil_fixture import pupil_fixture
+        self.core.pupil_model = pupil_fixture()
         with patch('Vision.tongue.mouth_crop', side_effect=AssertionError('retired crop')), \
              patch('Vision.tongue_worker.TongueWorker', side_effect=AssertionError('retired worker')):
             for i in range(30):
@@ -90,12 +97,12 @@ class TongueRetirement(unittest.TestCase):
 
     def test_all_legacy_versions_keep_compatible_fits_and_drop_retired_fields(self):
         baseline = self.core.export_calibration()
-        for version in range(1,11):
+        for version in range(1,12):
             with self.subTest(version=version):
                 old = legacy_profile(baseline,version)
                 self.core.load_calibration(old)
                 saved = self.core.export_calibration()
-                self.assertEqual(saved['version'],11)
+                self.assertEqual(saved['version'],12)
                 self.assertEqual(saved['eyes'],baseline['eyes'])
                 self.assertEqual(saved['head'],baseline['head'])
                 self.assertEqual(saved['head_x'],baseline['head_x'] if version>=7 else None)
@@ -134,11 +141,13 @@ class TongueRetirement(unittest.TestCase):
             self.assertEqual(self.session.lab.state()['config']['pointer_source'],'gaze')
             self.assertEqual(self.session.lab.state()['config']['pointer']['smoothing_ms'],135)
             self.feed(1,pupil_x=.8)
-            self.assertAlmostEqual(self.session.lab.processor.sample.pointer[0],.8)
+            self.assertIsNone(self.session.lab.processor.sample.pointer)
+            self.assertIsNotNone(self.core.pupil.xy)
+            self.assertIsNone(self.core.pupil_model)
             self.session.lab.settings({'config':data['processing']})
             self.assertEqual(self.session.lab.state()['config']['pointer_source'],'gaze')
             self.session.save_profile(path)
-            self.assertEqual(read_profile(path)['detector']['version'],11)
+            self.assertEqual(read_profile(path)['detector']['version'],12)
             self.assertEqual(read_profile(path)['processing']['pointer_source'],'gaze')
 
     def test_retired_commands_cannot_change_calibration(self):

@@ -57,6 +57,8 @@ class UnifiedCalibrationTests(unittest.TestCase):
         while self.core.job is not None:self.feed(**controls)
 
     def calibrate(self):
+        from tests.vision.pupil_fixture import pupil_fixture
+        self.core.pupil_model = pupil_fixture()
         self.guided_eyes()
         for target,head in (("up",.2),("neutral",.5),("down",.8)):
             self.collect("head_"+target,head=head)
@@ -82,7 +84,7 @@ class UnifiedCalibrationTests(unittest.TestCase):
         migrated = self.core.export_calibration()
         for key in ("eyes", "winks", "head"):
             self.assertEqual(migrated[key], original[key])
-        self.assertEqual(migrated["version"], 11)
+        self.assertEqual(migrated["version"], 12)
         self.assertNotIn("tongue", migrated)
         self.assertNotIn("tongue_range", migrated)
         self.assertIn("Retired tongue state", self.core.notice)
@@ -302,7 +304,7 @@ class UnifiedCalibrationTests(unittest.TestCase):
             write_profile(broken,corrupted)
             with self.assertRaises(ValueError):self.session.load_profile(broken)
             self.assertEqual(self.core.export_calibration(),detector)
-            self.assertEqual(detector["version"],11)
+            self.assertEqual(detector["version"],12)
             self.assertEqual(read_profile(path)["format"],"face_mouse_profile_v3")
             self.assertEqual(detector['settings']['eye_rest_ms'],100)
             self.session.load_profile(path)

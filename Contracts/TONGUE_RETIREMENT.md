@@ -1,5 +1,9 @@
 # Tongue removal — current mouse MVP
 
+> Pupil mapping update: [PUPIL_HEAD_CALIBRATION.md](PUPIL_HEAD_CALIBRATION.md)
+> supersedes fixed/no-calibration pupil behavior. Tongue stays retired, matrix
+> shape stays 11×11, and detector presets now save v12.
+
 User decision: retire tongue detection. This supersedes tongue runtime, guide,
 backend, graph and pointer-selection requirements in earlier contracts.
 

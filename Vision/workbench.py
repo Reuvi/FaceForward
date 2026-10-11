@@ -6,8 +6,10 @@ from .calibration import AxisCalibration, EyeCalibration
 from .features import DetectionConfig, analyze_features
 from .wink_guide import EyeCalibrationFlow
 from .movement_guide import MovementGuide
+from .pupil_guide import PupilGuide
+from .pupil_calibration import normalize as normalize_pupils, SPACE as PUPIL_SPACE
 from .wink_model import NAMES, measure as measure_winks, score as wink_score, classify as classify_wink
-from .pupil import PupilReading, measure as measure_pupils, normalize as normalize_pupils, matrix_sample as pupil_matrix, MEASUREMENT as PUPIL_MEASUREMENT
+from .pupil import PupilReading, measure as measure_pupils, matrix_sample as pupil_matrix, MEASUREMENT as PUPIL_MEASUREMENT
 from .pipeline import VisionPipeline
 from .signals import SINGLE_SUBJECT, invalid, make_face, measurement, monotonic_ms
 
@@ -40,13 +42,16 @@ class DetectorWorkbench:
         self.job = None
         self.eye_guide = None
         self.movement_guide = None
+        self.pupil_guide = None
         self.samples = {}
         self.eyes = {}
         self.winks = {}
         self.wink_vectors = {}
         self.wink_readings = {}
         self.head = self.head_x = None
+        self.pupil_model = None
         self.pupil = PupilReading()
+        self.pupil_corrected = None
         self.notice = "Single user: start a source, then calibrate or load a profile"
         self.reasons = {}
         self.trace = deque(maxlen=9000)
@@ -61,10 +66,13 @@ class DetectorWorkbench:
         self.winks.clear()
         self.wink_readings.clear()
         self.head = self.head_x = None
+        self.pupil_model = None
         self.pupil = PupilReading()
+        self.pupil_corrected = None
         self.job = None
         self.eye_guide = None
         self.movement_guide = None
+        self.pupil_guide = None
         self.generation += 1
 
     def disconnect(self, reason="Source stopped; calibration retained"):
@@ -72,10 +80,12 @@ class DetectorWorkbench:
         self.job = None
         self.eye_guide = None
         self.movement_guide = None
+        self.pupil_guide = None
         self.selected = None
         self.observations = {}
         self.features = {}
         self.pupil = PupilReading()
+        self.pupil_corrected = None
         self.wink_vectors = {}
         self.wink_readings = {}
         self.reasons = {}
@@ -122,22 +132,24 @@ class DetectorWorkbench:
         return encode_preset(self)
 
     def load_calibration(self, data):
-        from .presets import decode_preset, decode_winks, decode_head_x
+        from .presets import decode_preset, decode_winks, decode_head_x, decode_pupil
         self._require_idle()
         config, eyes, head, _ = decode_preset(data)
         winks = decode_winks(data)
         head_x = decode_head_x(data, config)
+        pupil_model = decode_pupil(data)
         self.expire()
         self._clear_calibration()
         self._invalidate("left_eye_open", "right_eye_open", "head_y", "head_x", "gaze_x", "gaze_y")
         self.config, self.eyes, self.head, self.head_x = config, eyes, head, head_x
         self.winks = winks
+        self.pupil_model = pupil_model
         self.pipeline.tracker.max_gap_ms = config.stale_ms
         self.notice = "Profile loaded. Check live readings; output remains stopped."
         if data["settings"].get("head_mode", "position") == "position":
             self.notice += " Old image-position head fit removed; run the head pitch guide."
-        if data["version"] < 11:
-            self.notice += " Retired tongue state and old pupil settings discarded; pupils need no calibration."
+        if data["version"] < 12:
+            self.notice += " Retired tongue state and old pupil settings discarded; run the new pupil guide."
         if eyes and not winks:
             self.notice += " Run Wink action calibration for wink recognition."
 
@@ -183,11 +195,13 @@ class DetectorWorkbench:
     @property
     def calibrating(self):
         return (self.job is not None or bool(self.eye_guide and self.eye_guide.active)
-                or bool(self.movement_guide and self.movement_guide.active))
+                or bool(self.movement_guide and self.movement_guide.active)
+                or bool(self.pupil_guide and self.pupil_guide.active))
 
     def _eye_guide_config(self, rest_seconds, kind):
         self._require_subject()
-        if (self.job is not None or self.movement_guide and self.movement_guide.active
+        if (self.job is not None or self.pupil_guide and self.pupil_guide.active
+                or self.movement_guide and self.movement_guide.active
                 or self.eye_guide and self.eye_guide.active and self.eye_guide.kind != kind):
             raise ValueError("Finish or cancel the current collection first")
         if rest_seconds is not None:
@@ -230,13 +244,14 @@ class DetectorWorkbench:
         self.job = None
         self.eye_guide = None
         self.movement_guide = None
+        self.pupil_guide = None
         self.notice = "Collection cancelled"
 
     def start_movement_guide(self, kind, recheck=False):
         self._require_subject()
         self._require_idle()
         if kind == "pupil":
-            raise ValueError("Pupils use direct MediaPipe direction; no calibration is required")
+            return self.start_pupil_guide()
         if kind not in ("head", "head_x") or recheck:
             raise ValueError("Choose head pitch or head yaw calibration")
         if kind=="head":
@@ -278,6 +293,50 @@ class DetectorWorkbench:
                     self.head=guide.fits["y"]
                 elif guide.kind=="head_x":
                     self.head_x=guide.fits["x"]
+
+    def start_pupil_guide(self):
+        self._require_subject()
+        if self.pupil_guide:
+            self.pupil_guide = None
+        self._require_idle()
+        self.pupil_guide = PupilGuide(self.config)
+        self._invalidate("gaze_x", "gaze_y")
+        self.generation += 1
+        self.notice = "Pupil guide: first keep looking at center while moving your head, then move only your eyes."
+
+    def present_pupil_step(self, index, phase, generation=None):
+        self.expire()
+        if self.pupil_guide and (generation is None or generation == self.generation):
+            self.pupil_guide.present(index, self.clock(), phase)
+
+    def retry_pupil_step(self):
+        self._require_subject()
+        self._require_idle()
+        if not self.pupil_guide or self.pupil_guide.passed:
+            raise ValueError("There is no failed pupil pose to retry")
+        self.pupil_guide.retry()
+        self.generation += 1
+
+    def reset_pupils(self):
+        self.pupil_guide = None
+        self._require_idle()
+        self.pupil_model = None
+        self.pupil_corrected = None
+        self._invalidate("gaze_x", "gaze_y")
+        self.generation += 1
+        self.notice = "Pupils reset. Eye and head calibration retained; run the pupil guide."
+
+    def _guide_pupils(self, timestamp):
+        guide = self.pupil_guide
+        if not guide or not guide.active:
+            return
+        reading = self.pupil
+        value = (*reading.xy, *reading.pose) if reading.xy is not None and reading.pose is not None else None
+        guide.feed(timestamp, value, reading.quality > 0)
+        if not guide.active:
+            self.notice = guide.report
+            if guide.passed:
+                self.pupil_model = guide.model
 
     def _require_idle(self):
         if self.calibrating:
@@ -377,6 +436,7 @@ class DetectorWorkbench:
             self.observations = current_observations
         self.features = {}
         self.pupil = PupilReading()
+        self.pupil_corrected = None
         self.wink_vectors = {}
         self.wink_readings = {}
         self.reasons = {}
@@ -387,6 +447,7 @@ class DetectorWorkbench:
             self.pupil = measure_pupils(observation, self.features)
             self._collect_frame(frame["timestamp_ms"])
             self._guide_movement(frame["timestamp_ms"])
+            self._guide_pupils(frame["timestamp_ms"])
             if self.eye_guide and self.eye_guide.active:
                 self.eye_guide.feed(frame["timestamp_ms"], self.features, self.wink_vectors)
                 if not self.eye_guide.active:
@@ -430,14 +491,16 @@ class DetectorWorkbench:
                 self.reasons["head_x"] = ("Head X at calibrated limit · tracking remains valid"
                                            if bounded != feature.value else "Calibrated head X")
             self.reasons["pupil"] = self.pupil.reason
-            xy = normalize_pupils(self.pupil.xy)
+            xy, self.pupil_corrected, reason = normalize_pupils(self.pupil_model, self.pupil.xy, self.pupil.pose)
+            if self.pupil.xy is not None:
+                self.reasons["pupil"] = reason
             if xy is not None:
                 values["gaze_x"], values["gaze_y"] = [measurement(v, self.pupil.quality) for v in xy]
-                self.reasons["pupil"] = "Direct MediaPipe iris direction · no calibration"
+                self.reasons["pupil"] = reason
             frame["faces"] = [make_face(face["subject_id"], values if face["subject_id"] == self.selected else {})
                               for face in frame["faces"]]
         frame["diagnostic_only"] = True
-        frame["gaze_measurement"] = PUPIL_MEASUREMENT
+        frame["gaze_measurement"] = PUPIL_SPACE
         frame["pupil_matrix"] = pupil_matrix(frame, SINGLE_SUBJECT)
         intent = dict(format="eye_intent_v1",subject_id=SINGLE_SUBJECT,
                       **{key:frame[key] for key in ("session_id","sequence","timestamp_ms")})
@@ -464,7 +527,12 @@ class DetectorWorkbench:
         row = {"session_id": frame["session_id"], "sequence": frame["sequence"], "timestamp_ms": frame["timestamp_ms"],
                "subject_id": SINGLE_SUBJECT, "calibration_generation": self.generation, "head_mode": self.config.head_mode,
                "head_raw_units": "image_height_fraction" if self.config.head_mode == "position" else "degrees"}
-        row.update(gaze_measurement=PUPIL_MEASUREMENT,
+        row.update(gaze_measurement=PUPIL_SPACE, pupil_measurement=PUPIL_MEASUREMENT,
+                   pupil_compensated_x=self.pupil_corrected[0] if self.pupil_corrected else None,
+                   pupil_compensated_y=self.pupil_corrected[1] if self.pupil_corrected else None,
+                   pupil_pose_yaw=self.pupil.pose[0] if self.pupil.pose else None,
+                   pupil_pose_pitch=self.pupil.pose[1] if self.pupil.pose else None,
+                   pupil_pose_roll=self.pupil.pose[2] if self.pupil.pose else None,
                    pupil_raw_x=self.pupil.xy[0] if self.pupil.xy else None,
                    pupil_raw_y=self.pupil.xy[1] if self.pupil.xy else None,
                    pupil_reason=self.reasons.get("pupil", self.pupil.reason))
@@ -512,6 +580,9 @@ class DetectorWorkbench:
         return {"frame": self.frame, "selected": self.selected, "notice": self.notice,
                 "scope_subject": SINGLE_SUBJECT,
                 "pupil": asdict(self.pupil),
+                "pupil_corrected": self.pupil_corrected,
+                "pupil_model": self.pupil_model,
+                "pupil_guide": self.pupil_guide.state(self.clock()) if self.pupil_guide else None,
                 "wink_readings": dict(self.wink_readings),
                 "wink_models": {side:model["report"] for side,model in self.winks.items()},
                 "features": {k: asdict(v) for k, v in self.features.items()}, "reasons": dict(self.reasons),

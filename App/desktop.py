@@ -113,7 +113,7 @@ class IntegratedDesktop(DesktopLab):
 
         pointer_row = ttk.Frame(self.vision_page)
         pointer_row.pack(fill="x", pady=(0,6))
-        label(pointer_row,"Pointer input: Pupil direction · no calibration or sensitivity settings",foreground=MUTED).pack(side="left")
+        label(pointer_row,"Pointer input: Pupils · personal directions + head compensation",foreground=MUTED).pack(side="left")
         self.profile_text = tk.StringVar()
         label(self.vision_page, textvariable=self.profile_text, foreground=MUTED).pack(anchor="w", pady=(0,8))
 

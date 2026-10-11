@@ -1,5 +1,9 @@
 # Shared contracts — initial v1
 
+[PUPIL_HEAD_CALIBRATION.md](PUPIL_HEAD_CALIBRATION.md) is the latest pupil contract:
+personal endpoints plus learned head compensation, detector presets v12. It
+supersedes fixed pupil mapping below. Tongue remains retired.
+
 [TONGUE_RETIREMENT.md](TONGUE_RETIREMENT.md) is current: no active tongue
 path, pupil-only App pointer and detector presets v11. Earlier tongue requirements
 below are historical; keep the two invalid v1 schema slots for compatibility.

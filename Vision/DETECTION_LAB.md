@@ -1,5 +1,9 @@
 # Native detection lab: calibration, measurements, and test procedure
 
+> Latest pupil behavior: [personal endpoints and head-angle compensation](../docs/PUPIL_HEAD_CALIBRATION_GUIDE.md).
+> Run the pupil guide; fixed/no-calibration instructions below are historical.
+> Detector presets now save v12. Tongue remains retired.
+
 > Current MVP: tongue has been removed from App and Vision lab. Use
 > [App's current testing/profile guide](../App/README.md) and
 > [pupil matrix testing](../docs/DIRECT_PUPIL_TESTING.md). Eyes and head axes remain;

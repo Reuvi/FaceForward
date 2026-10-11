@@ -72,6 +72,7 @@ class MouseSession:
     def detector_command(self, name, *args):
         allowed = {"start_eye_guide", "start_wink_guide", "present_eye_step",
                    "start_movement_guide", "present_movement_step", "reset_head_x",
+                   "start_pupil_guide", "present_pupil_step", "retry_pupil_step", "reset_pupils",
                    "retry_movement_step", "collect", "cancel", "configure", "reset_calibration"}
         if name not in allowed:
             raise ValueError("Unsupported calibration command")
@@ -82,7 +83,7 @@ class MouseSession:
             self.lab.disconnect("Calibration changed; start preview again when ready",
                                 clear_eye_history=name in ("start_eye_guide", "start_wink_guide", "configure", "collect", "reset_calibration"))
             result = runtime.command(name, *args)
-            if name not in ("cancel", "present_eye_step", "present_movement_step"):
+            if name not in ("cancel", "present_eye_step", "present_movement_step", "present_pupil_step"):
                 self.profile_label = "Modified calibration — save profile to keep it"
                 self.profile_binding = None
             return result

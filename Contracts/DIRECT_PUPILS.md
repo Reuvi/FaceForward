@@ -1,5 +1,9 @@
 # Direct MediaPipe pupil direction
 
+> Pupil mapping update: [PUPIL_HEAD_CALIBRATION.md](PUPIL_HEAD_CALIBRATION.md)
+> supersedes fixed/no-calibration pupil behavior. Tongue stays retired, matrix
+> shape stays 11×11, and detector presets now save v12.
+
 User-requested replacement for the calibrated pupil section of
 JOYSTICK_DETECTION.md. Active camera/detector-demo pupils require no capture guide,
 learned range, eye calibration, saved head pose or recheck. Reuse the current

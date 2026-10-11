@@ -122,6 +122,9 @@ class LabRuntime:
                     controls["head"]={"neutral":.5,"up":.2,"down":.8}[state["name"]]
                 elif movement.kind=="head_x":
                     controls["head_x"]={"neutral":.5,"left":.2,"right":.8}[state["name"]]
+            pupil = self.workbench.pupil_guide
+            if pupil and pupil.active:
+                controls.update(pupil.demo_controls())
             controls["tongue"] = False  # Retired input is absent from synthetic images too.
             return controls
 
@@ -190,7 +193,7 @@ class LabRuntime:
                       "head_y", "head_x", "left_wink_bit", "right_wink_bit"}
             needed.update(side+"_"+key for side in ("left","right")
                           for key in ("blink","squint","cheek","brow","wink_score"))
-            needed.update(("pupil_raw_x","pupil_raw_y","gaze_x","gaze_y"))
+            needed.update(("pupil_raw_x","pupil_raw_y","pupil_compensated_x","pupil_compensated_y","gaze_x","gaze_y"))
             needed.update(side+"_pupil_"+axis for side in ("left","right") for axis in ("x","y"))
             cutoff = self.workbench.trace[-1]["timestamp_ms"]-8000 if self.workbench.trace else 0
             scope_subject = state.get("scope_subject", state["selected"])

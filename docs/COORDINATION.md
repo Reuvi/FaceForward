@@ -882,4 +882,25 @@ Handoff:
 - Scope: coordinated Vision/App calibration, persistence, diagnostics, contracts,
   tests and documentation. Preserve independent eyes/head and tongue retirement.
 - Contract: `Contracts/PUPIL_HEAD_CALIBRATION.md`; supersedes fixed pupil mapping.
-- Work in progress: personal directional endpoints plus learned head compensation.
+- Implementation: 14-step native guide learns center drift across yaw/pitch,
+  then four comfortable pupil endpoints, then independent validation captures.
+  Per-frame compensation is constant-size arithmetic. Raw/compensated/normalized
+  traces, learned references and the continuous dot/11×11 matrix share one source.
+- Independent pupil restart, failed-step retry, reset, loss/restart retention and
+  v12 preset round trips preserve eye/wink/head fits. v1–v11 migrate with pupils
+  uncalibrated; no tongue restoration. Invalid/out-of-supported-pose output stays
+  null, with dark previous-value plots only. App calibration always disarms output.
+- Runbook/technical detail: `docs/PUPIL_HEAD_CALIBRATION_GUIDE.md`; entry point is
+  Detection calibration → 4 Pupils → Start / restart pupil guide.
+- Remaining: live camera evaluation of head compensation and downward range.
+  This is a personal directional model, not screen gaze or measured human accuracy;
+  large roll, head translation/distance changes and nonlinear pose effects are
+  outside the fit. Drivers remain unchanged.
+- Verification: 146 Vision tests (144 passed, 2 optional legacy tongue-model
+  skips; local MediaPipe smoke passed), 95 integration tests with native Tk,
+  and 75 Processing tests. Total 314 passed, 2 optional skips. New tests cover
+  asymmetric pupil endpoints, cross-axis compensation, fresh held-out head poses,
+  profile validation/migration, timing, retry/reset and the full-screen lifecycle.
+- Headless mouse demo: all 490 frames accepted at ~30 Hz; all four actions observed;
+  final output disabled, buttons released, velocities neutral. Changed Python
+  passes Ruff F; whitespace and integration scope checks pass. No camera opened.
