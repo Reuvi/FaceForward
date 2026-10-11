@@ -1,5 +1,9 @@
 # Head and tongue calibration, raw views, and the device boundary
 
+Head X now has an independent yaw guide beside Head Y pitch. See
+[horizontal head testing](HEAD_HORIZONTAL_TESTING.md) for current instructions
+and detector preset v7. The vertical behavior below is preserved.
+
 **Current camera update:** tongue uses local neural segmentation without background
 capture or tissue clicks. A pupil-direction joystick and full-screen range guide
 are also available. Follow [the tongue/pupil test guide](TONGUE_PUPIL_TESTING.md)

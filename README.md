@@ -5,7 +5,7 @@ comfortable facial movements. The pipeline separates measurement, personalized
 signal processing, and device output so three teammates can develop independently.
 
 **Repository status:** one native mouse lab with live detector calibration and
-Processing in the same window. Independent eyes, head Y and experimental tongue
+Processing in the same window. Independent eyes, head X/Y and experimental tongue
 measurements feed the existing scopes and simulated mouse. Saved local profiles
 keep detector fits and mouse settings together. Live accuracy validation and the
 real Drivers connection remain pending.
@@ -21,6 +21,8 @@ Vision/.venv/bin/python -m App --source camera --model Vision/.local/face_landma
 ```
 
 Follow [the unified workflow and saved-profile guide](App/README.md).
+[Horizontal head testing](docs/HEAD_HORIZONTAL_TESTING.md) covers the new independent
+Head X yaw guide, raw/normalized graphs and saved horizontal ranges.
 The [new tongue + pupil joystick guide](docs/TONGUE_PUPIL_TESTING.md) covers local
 neural tongue masks (no color clicking), full-screen pupil calibration, the input
 selector, saved ranges and live testing. [Install the optional local tongue model](Vision/TONGUE_MODEL_NOTICE.md) once; camera runtime stays offline.

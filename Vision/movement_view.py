@@ -7,12 +7,12 @@ from .eye_scope import scope_samples
 from LabUI.traces import darker, trace_runs
 
 
-def head_display_range(state):
+def head_display_range(state, axis="y"):
     """Degree units stay raw; learned limits set the display extent only."""
-    fit = state.get("head")
+    fit = state.get("head_x" if axis == "x" else "head")
     if fit:
         return tuple(sorted((fit["low"], fit["high"])))
-    return (-45, 45) if state["config"]["head_mode"] == "pitch" else (0, 1)
+    return (-45, 45) if axis == "x" or state["config"]["head_mode"] == "pitch" else (0, 1)
 
 
 def draw_raw_scopes(canvas, state):
@@ -33,6 +33,11 @@ def draw_raw_scopes(canvas, state):
             else "Raw head Y · image-height fraction",
             (("head_raw", "Head", "#b18bff"),),
             *head_display_range(state),
+        ),
+        (
+            "Raw head yaw · degrees",
+            (("head_x_raw", "Yaw", "#ffbb70"),),
+            *head_display_range(state, "x"),
         ),
         (
             "Raw tongue tip · mouth widths",
@@ -69,11 +74,11 @@ def draw_raw_scopes(canvas, state):
         )
         for i, (key, label, color) in enumerate(series):
             canvas.create_text(
-                x + 70 + i * 65,
+                x + size - 8 - (len(series)-1-i)*35,
                 37,
                 text=label,
                 fill=color,
-                anchor="nw",
+                anchor="ne",
                 font=("Arial", 9),
             )
             for unknown, segment in trace_runs(
@@ -129,7 +134,7 @@ def display_point(state, keys):
             current = bool(
                 state["selected"] and row["sequence"] == frame.get("sequence")
             )
-            if current and keys[0] in ("head_y", "tongue_x", "gaze_x"):
+            if current and keys[0] in ("head_y", "head_x", "tongue_x", "gaze_x"):
                 signals = next(
                     (
                         face["signals"]
@@ -159,13 +164,14 @@ def draw_calibrated_scope(canvas, state):
     for index, (key, title, color) in enumerate(
         (
             ("head_y", "Head Y", "#b18bff"),
+            ("head_x", "Head X", "#ffbb70"),
             ("tongue_x", "Tongue X", "#75e3a8"),
             ("tongue_y", "Tongue Y", "#f2d66f"),
             ("gaze_x", "Pupil X", "#55cfff"), ("gaze_y", "Pupil Y", "#ff9cd5"),
         )
     ):
         canvas.create_text(
-            8 + index * width / 5,
+            8 + index * width / 6,
             26,
             text=title,
             fill=color,
@@ -207,7 +213,9 @@ def draw_position(canvas, state, kind):
     target = (
         guide["target"] if guide and guide["active"] and guide["kind"] == kind else None
     )
-    if kind == "head":
+    if kind == "head_x":
+        _draw_horizontal_head(canvas, state, w, h, target)
+    elif kind == "head":
         raw, raw_known = display_point(state, ("head_raw",))
         normalized, known = display_point(state, ("head_y",))
         raw_low, raw_high = head_display_range(state)
@@ -376,12 +384,44 @@ def draw_position(canvas, state, kind):
     )
 
 
+def _draw_horizontal_head(canvas, state, width, height, target):
+    raw_low, raw_high = head_display_range(state, "x")
+    fit = state.get("head_x")
+    raw_center = fit["center"] if fit else 0.
+    for index, (key, title, color) in enumerate((
+        ("head_x_raw", "Raw yaw · degrees", "#ffbb70"),
+        ("head_x", "Personal head X · left 0 / neutral .5 / right 1", "#75e3a8"),
+    )):
+        x0, x1 = 30+index*width/2, (index+1)*width/2-30
+        y = height*.52
+        canvas.create_text(x0, 5, text=title, fill="white", anchor="nw", width=x1-x0, font=("Arial",10))
+        canvas.create_line(x0, y, x1, y, fill="#455565", width=5)
+        center = (raw_center-raw_low)/(raw_high-raw_low) if index == 0 else .5
+        labels = ((0, f"{raw_low:g}°"), (center, f"{raw_center:g}°"), (1, f"{raw_high:g}°")) if index == 0 else ((0,"Left 0"),(.5,"Neutral .5"),(1,"Right 1"))
+        for fraction, label in labels:
+            x = x0+fraction*(x1-x0)
+            canvas.create_line(x,y-8,x,y+8,fill="#aab8c8")
+            canvas.create_text(x,y+20,text=label,fill="#adbbcc",font=("Arial",9),
+                               anchor="w" if fraction == 0 else "e" if fraction == 1 else "center")
+        point, known = display_point(state, (key,))
+        if point:
+            value = (point[0]-raw_low)/(raw_high-raw_low) if index == 0 else point[0]
+            x = x0+max(0,min(1,value))*(x1-x0)
+            canvas.create_oval(x-7,y-7,x+7,y+7,fill=color if known else darker(color),outline="")
+            canvas.create_text(x0,height-20,text=f"{point[0]:.3f}"+(" · unknown hold" if not known else ""),
+                               fill=color,anchor="w")
+        if index == 1 and target is not None:
+            x = x0+target[0]*(x1-x0)
+            canvas.create_line(x,y-20,x,y+10,fill="#ffa663",dash=(4,3))
+
+
 class MovementPanel:
     def __init__(self, parent, root, call, kind):
         self.root, self.call, self.kind = root, call, kind
+        self.label = "Head X" if kind == "head_x" else kind.title()
         self.frame = ttk.Frame(parent)
         self.frame.pack(fill="x")
-        self.title = tk.StringVar(value=f"{kind.title()} position guide")
+        self.title = tk.StringVar(value=f"{self.label} position guide")
         self.instruction = tk.StringVar()
         self.progress = tk.StringVar()
         self.sounds = CalibrationSounds(root)
@@ -403,7 +443,7 @@ class MovementPanel:
         row.pack(fill="x", pady=5)
         self.start = ttk.Button(
             row,
-            text="Start head pitch guide" if kind == "head" else f"Start {kind} position guide",
+            text="Start head pitch guide" if kind == "head" else "Start head yaw guide" if kind == "head_x" else f"Start {kind} position guide",
             command=lambda: call("start_movement_guide", kind),
         )
         self.start.pack(side="left")
@@ -439,10 +479,12 @@ class MovementPanel:
                 else "disabled"
             )
         if not guide or guide["kind"] != self.kind:
-            self.title.set(self.kind.title() + " position guide")
+            self.title.set(self.label + " position guide")
             self.instruction.set(
                 "Neutral → up → down, followed by new checks."
                 if self.kind == "head"
+                else "Neutral → your left → your right, followed by new checks. Turn your head; keep your face visible."
+                if self.kind == "head_x"
                 else "Follow the full-screen dot with your eyes; keep your head still. Press Space at each target to capture." if self.kind == "pupil"
                 else "Inspect the live segmentation mask below, then start this guide. Each pose waits for capture." if state.get("tongue_backend")=="segmentation"
                 else "First complete the numbered appearance steps below. Then start this guide. Each pose waits for I'm in position — capture."
@@ -464,9 +506,9 @@ class MovementPanel:
             )
             self.sounds.play(cue)
         self.title.set(
-            f"{self.kind.title()} · REST {guide['remaining_ms']/1000:.1f}s"
+            f"{self.label} · REST {guide['remaining_ms']/1000:.1f}s"
             if guide["phase"] == "rest" else
-            f"{self.kind.title()} · {guide['index'] + 1}/{guide['total']} · {guide['role'].title()}"
+            f"{self.label} · {guide['index'] + 1}/{guide['total']} · {guide['role'].title()}"
         )
         self.instruction.set(
             (guide["instruction"] + "\nNext: " + guide["next_instruction"]

@@ -15,16 +15,17 @@ WINK_ALGORITHM = "frame-wink-eye-head-tongue-v3"
 MOVEMENT_ALGORITHM = "personal-head-tongue-ranges-v4"
 TIP_ALGORITHM = "color-tongue-tip-v5"
 JOYSTICK_ALGORITHM = "tongue-segmentation-pupil-joystick-v6"
+HEAD_AXES_ALGORITHM = "independent-head-axes-v7"
 
 
 def decode_winks(data):
     from .wink_model import validate_models
-    return validate_models(data["winks"]) if data.get("version") in (3,4,5,6) else {}
+    return validate_models(data["winks"]) if data.get("version") in (3,4,5,6,7) else {}
 
 
 def decode_tongue_range(data, config):
     from .movement_guide import validate_range
-    return validate_range(data["tongue_range"],config) if data.get("version") in (5,6) else None
+    return validate_range(data["tongue_range"],config) if data.get("version") in (5,6,7) else None
 
 
 def _keys(value, expected, name):
@@ -35,13 +36,14 @@ def _keys(value, expected, name):
 def decode_preset(data):
     """Validate completely before the workbench changes any active state."""
     fields=("version", "algorithm", "settings", "eyes", "head", "tongue")
-    if isinstance(data,dict) and data.get("version") in (3,4,5,6):fields+=("winks",)
-    if isinstance(data,dict) and data.get("version") in (4,5,6):fields+=("tongue_range",)
-    if isinstance(data,dict) and data.get("version") in (5,6):fields+=("tongue_measurement",)
-    if isinstance(data,dict) and data.get("version")==6: fields+=("pupil",)
+    if isinstance(data,dict) and data.get("version") in (3,4,5,6,7):fields+=("winks",)
+    if isinstance(data,dict) and data.get("version") in (4,5,6,7):fields+=("tongue_range",)
+    if isinstance(data,dict) and data.get("version") in (5,6,7):fields+=("tongue_measurement",)
+    if isinstance(data,dict) and data.get("version") in (6,7): fields+=("pupil",)
+    if isinstance(data,dict) and data.get("version")==7: fields+=("head_x",)
     _keys(data, fields, "Detector preset")
     if (type(data["version"]) is not int
-            or (data["version"], data["algorithm"]) not in ((1, LEGACY_ALGORITHM), (2, ALGORITHM), (3,WINK_ALGORITHM), (4,MOVEMENT_ALGORITHM), (5,TIP_ALGORITHM), (6,JOYSTICK_ALGORITHM))):
+            or (data["version"], data["algorithm"]) not in ((1, LEGACY_ALGORITHM), (2, ALGORITHM), (3,WINK_ALGORITHM), (4,MOVEMENT_ALGORITHM), (5,TIP_ALGORITHM), (6,JOYSTICK_ALGORITHM), (7,HEAD_AXES_ALGORITHM))):
         raise ValueError("Unsupported detector preset version or algorithm")
     settings = data["settings"]
     if isinstance(settings, dict):
@@ -50,8 +52,8 @@ def decode_preset(data):
         settings.setdefault("head_mode", "position")
     config = DetectionConfig.from_dict(settings)
     from .tongue_segment import MEASUREMENT, MODEL_SHA256, SegmentedTongueModel
-    allowed_measurements = (TONGUE_MEASUREMENT, MEASUREMENT) if data["version"] == 6 else (TONGUE_MEASUREMENT,)
-    if data["version"] in (5,6) and data["tongue_measurement"] not in allowed_measurements:
+    allowed_measurements = (TONGUE_MEASUREMENT, MEASUREMENT) if data["version"] in (6,7) else (TONGUE_MEASUREMENT,)
+    if data["version"] in (5,6,7) and data["tongue_measurement"] not in allowed_measurements:
         raise ValueError("Unsupported tongue measurement coordinate space")
     if not isinstance(data["eyes"], dict) or set(data["eyes"]) - {"left", "right"}:
         raise ValueError("Unknown eye preset")
@@ -72,6 +74,7 @@ def decode_preset(data):
                 or min(abs(head.center-head.low), abs(head.high-head.center)) < separation
                 or head.endpoint_tolerance != config.endpoint_tolerance):
             raise ValueError("Head preset range does not match settings")
+    horizontal = decode_head_x(data, config)
     tongue = None
     pupil, _ = decode_pupil(data, config)
     neural = data.get("tongue_measurement") == MEASUREMENT
@@ -98,7 +101,7 @@ def decode_preset(data):
                 or not finite_number(values["margin"]) or values["margin"] != config.tongue_margin):
             raise ValueError("Invalid tongue radius or margin")
         tongue = TongueModel(*centers, values["radius"], values["margin"], {"restored": True})
-    if not eyes and head is None and tongue is None and pupil is None:
+    if not eyes and head is None and horizontal is None and tongue is None and pupil is None:
         raise ValueError("Profile needs at least one fitted detector")
     winks=decode_winks(data)
     if set(winks)-set(eyes):raise ValueError("Wink model requires matching eye geometry")
@@ -112,11 +115,27 @@ def decode_preset(data):
     if config.head_mode == "position":
         config, head = replace(config, head_mode="pitch"), None
     # Expanded negatives and front-edge coordinates cannot reuse an inner-mouth fit.
-    return config, eyes, head, tongue if data["version"] in (5,6) else None
+    return config, eyes, head, tongue if data["version"] in (5,6,7) else None
+
+
+def decode_head_x(data, config):
+    if data.get("version") != 7:
+        return None
+    if config.head_mode != "pitch":
+        raise ValueError("Head-axis presets require pitch-mode vertical calibration")
+    if data["head_x"] is None:
+        return None
+    _keys(data["head_x"], ("low", "center", "high", "endpoint_tolerance"), "Head X fit")
+    fit = AxisCalibration(**data["head_x"])
+    if (not all(-90 <= value <= 90 for value in (fit.low, fit.center, fit.high))
+            or min(abs(fit.center-fit.low), abs(fit.high-fit.center)) < config.head_yaw_separation
+            or fit.endpoint_tolerance != config.endpoint_tolerance):
+        raise ValueError("Head X preset range does not match settings")
+    return fit
 
 
 def decode_pupil(data, config):
-    if data.get("version") != 6 or data.get("pupil") is None:
+    if data.get("version") not in (6,7) or data.get("pupil") is None:
         return None, None
     from .movement_guide import validate_range
     values = data["pupil"]
@@ -129,8 +148,11 @@ def decode_pupil(data, config):
 
 
 def encode_preset(core):
-    result = {"version": 5, "algorithm": TIP_ALGORITHM, "tongue_measurement": TONGUE_MEASUREMENT, "settings": core.config.to_dict(),
+    result = {"version": 7, "algorithm": HEAD_AXES_ALGORITHM, "tongue_measurement": TONGUE_MEASUREMENT, "settings": core.config.to_dict(),
               "winks": core.winks,
+              "head_x": asdict(core.head_x) if core.head_x else None,
+              "pupil": {"range": {k:asdict(v) for k,v in core.pupil_range.items()},
+                        "pose": list(core.pupil_pose)} if core.pupil_range else None,
               "tongue_range": {key:asdict(fit) for key,fit in core.tongue_range.items()} if core.tongue_range else None,
               "eyes": {side: {name: getattr(fit, name) for name in ("closed", "opened", "threshold", "closed_limit", "open_limit")}
                        for side, fit in core.eyes.items()},
@@ -139,13 +161,9 @@ def encode_preset(core):
         model = core.tongue_model
         result["tongue"] = {"positive": model.positive.tolist(), "negative": model.negative.tolist(),
                             "radius": model.radius, "margin": model.margin}
-    if core.pupil_range or hasattr(core.tongue_model, "measurement"):
-        result.update(version=6, algorithm=JOYSTICK_ALGORITHM,
-                      pupil={"range": {k:asdict(v) for k,v in core.pupil_range.items()},
-                             "pose": list(core.pupil_pose)} if core.pupil_range else None)
-        if hasattr(core.tongue_model, "measurement"):
-            from .tongue_segment import MODEL_SHA256
-            result["tongue_measurement"] = core.tongue_model.measurement
-            result["tongue"] = {"backend": "yolov8n-seg", "sha256": MODEL_SHA256}
+    if hasattr(core.tongue_model, "measurement"):
+        from .tongue_segment import MODEL_SHA256
+        result["tongue_measurement"] = core.tongue_model.measurement
+        result["tongue"] = {"backend": "yolov8n-seg", "sha256": MODEL_SHA256}
     decode_preset(result)
     return result

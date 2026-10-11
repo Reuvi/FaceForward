@@ -1,5 +1,9 @@
 # Native detection lab: calibration, measurements, and test procedure
 
+Current head update: [Head X yaw testing](../docs/HEAD_HORIZONTAL_TESTING.md).
+Horizontal and vertical guides/fits are separate. New detector presets are v7;
+older presets remain readable. Earlier vertical-only descriptions below are historical.
+
 **Current camera update:** tongue uses local neural segmentation without background
 capture or tissue clicks. A pupil-direction joystick and full-screen range guide
 are also available. Follow [the tongue/pupil test guide](../docs/TONGUE_PUPIL_TESTING.md)

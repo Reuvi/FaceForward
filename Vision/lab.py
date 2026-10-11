@@ -35,6 +35,7 @@ class DetectionLab:
         self.metrics = tk.StringVar()
         self.eye_details = tk.StringVar()
         self.head_details = tk.StringVar()
+        self.head_x_details = tk.StringVar()
         self.tongue_details = tk.StringVar()
         outer = ttk.Frame(container if self.embedded else root, padding=10)
         outer.pack(fill="both", expand=True)
@@ -86,7 +87,14 @@ class DetectionLab:
         self.head_panel=MovementPanel(head,root,self.call,"head")
         self.text(head,"Purple shows pitch in degrees using your learned range; green uses the full 0–1 range. Your up limit is 0, neutral is .5 and down limit is 1. Move only as far as comfortable.")
         ttk.Label(head,textvariable=self.head_details,justify="left",wraplength=440,font=("Menlo",10)).pack(anchor="w",pady=10)
-        self.tongue_tab=self.tab(tabs,"3 Tongue")
+        self.head_x_tab=self.tab(tabs,"3 Head X")
+        self.text(self.head_x_tab,"Turn your head toward your own left and right. The guide learns comfortable yaw limits and neutral independently of vertical pitch.")
+        self.head_x_panel=MovementPanel(self.head_x_tab,root,self.call,"head_x")
+        self.head_x_reset=ttk.Button(self.head_x_tab,text="Reset Head X only",command=lambda:self.call("reset_head_x"))
+        self.head_x_reset.pack(fill="x",pady=5)
+        self.text(self.head_x_tab,"Amber shows raw yaw in degrees; green shows the full 0–1 range. Your left limit is 0, neutral is .5 and right limit is 1. Keep your face visible.")
+        ttk.Label(self.head_x_tab,textvariable=self.head_x_details,justify="left",wraplength=440,font=("Menlo",10)).pack(anchor="w",pady=10)
+        self.tongue_tab=self.tab(tabs,"4 Tongue")
         self.tongue_reset=ttk.Button(self.tongue_tab,text="Reset tongue — start over",command=lambda:self.call("reset_tongue"))
         self.tongue_reset.pack(fill="x",pady=3)
         self.tongue_panel=MovementPanel(self.tongue_tab,root,self.call,"tongue")
@@ -95,14 +103,14 @@ class DetectionLab:
         self.mouth=self.tongue_setup.mouth
         self.mouth.bind("<Button-1>",self.mark_tongue)
         ttk.Label(tongue,textvariable=self.tongue_details,justify="left",wraplength=420,font=("Menlo",10)).pack(anchor="w",pady=6)
-        self.pupil_tab=self.tab(tabs,"4 Pupils")
+        self.pupil_tab=self.tab(tabs,"5 Pupils")
         self.text(self.pupil_tab,"Use your pupil direction as a joystick. Center stops; farther left/right/up/down means more input. Both eyes must be open and visible. This is eye direction, not exact screen gaze.")
         self.pupil_panel=PupilPanel(self.pupil_tab,root,self.call)
         ttk.Button(self.pupil_tab,text="Reset pupil calibration",command=lambda:self.call("reset_pupil")).pack(fill="x",pady=4)
         self.pupil_details=tk.StringVar()
         ttk.Label(self.pupil_tab,textvariable=self.pupil_details,wraplength=440,justify="left").pack(anchor="w",pady=8)
         settings=self.tab(tabs,"Settings")
-        self.text(settings,"Edit tunables below. Applying clears calibration; your face reconnects automatically. Saving stores these tunables only. Use Save active profile in the main App to save learned calibration. Head calibration always uses pitch.")
+        self.text(settings,"Edit tunables below. Applying clears calibration; your face reconnects automatically. Saving stores these tunables only. Use Save active profile in the main App to save learned calibration. Head Y uses pitch; Head X uses yaw.")
         ttk.Button(settings,text="Reset all calibration",command=lambda:self.call("reset_calibration")).pack(fill="x",pady=5)
         self.settings=tk.Text(settings,width=48,height=26,font=("Menlo",10))
         self.settings.pack(fill="both",expand=True,pady=5)
@@ -232,12 +240,14 @@ class DetectionLab:
             self.after_id=self.root.after(200,self.tick)
             return
         guide=state.get("movement_guide")
-        expected=({"head":self.head_tab,"tongue":self.tongue_tab,"pupil":self.pupil_tab}.get(guide["kind"]) if guide else None)
+        expected=({"head":self.head_tab,"head_x":self.head_x_tab,"tongue":self.tongue_tab,"pupil":self.pupil_tab}.get(guide["kind"]) if guide else None)
         if guide and guide["active"] and self.calibration_tabs.select()!=str(expected):
             self.call("cancel")
             state=self.runtime.snapshot()
         self.eye_panel.update(state)
         self.head_panel.update(state)
+        self.head_x_panel.update(state)
+        self.head_x_reset.configure(state="normal" if not state["calibrating"] or guide and guide["kind"]=="head_x" else "disabled")
         self.tongue_panel.update(state)
         self.pupil_panel.update(state)
         self.tongue_setup.update(state)
@@ -280,6 +290,9 @@ class DetectionLab:
         self.eye_details.set("\n".join(eye_lines))
         head=state["features"].get("head",{})
         self.head_details.set(f"Raw pitch: {self.fmt(head.get('value'))}°\nNormalized Y: {self.fmt(signals.get('head_y',{}).get('value'))}\nQuality: {head.get('quality',0):.2f}\n{state['reasons'].get('head','Waiting for face')}\n\nLearned references: " + (f"\nUp {state['head']['low']:.1f}° = 0\nNeutral {state['head']['center']:.1f}° = .5\nDown {state['head']['high']:.1f}° = 1" if state["head"] else "not calibrated"))
+        yaw=state["features"].get("head_x",{})
+        fit=state.get("head_x")
+        self.head_x_details.set(f"Raw yaw: {self.fmt(yaw.get('value'))}°\nNormalized X: {self.fmt(signals.get('head_x',{}).get('value'))}\nQuality: {yaw.get('quality',0):.2f}\n{state['reasons'].get('head_x','Waiting for face')}\n\nLearned references: " + (f"\nLeft {fit['low']:.1f}° = 0\nNeutral {fit['center']:.1f}° = .5\nRight {fit['high']:.1f}° = 1" if fit else "not calibrated"))
         pupil=state.get("pupil",{})
         self.pupil_details.set("Raw position (eye widths): "+str(pupil.get("xy"))+"\n"+state["reasons"].get("pupil",pupil.get("reason","Waiting"))+"\n"+
             "\n".join(f"{side.title()}: {v.get('xy')} · {v.get('reason')}" for side,v in pupil.get("eyes",{}).items()))
@@ -293,7 +306,7 @@ class DetectionLab:
             if worker["error"]:
                 crop_label += "\n" + worker["error"]
         self.tongue_details.set(f"{crop_label}\n{state['reasons'].get('tongue','Waiting for face')}\nRaw tip (mouth widths): {state['candidate']}\n" + "\n".join(f"{k}: {'PASS' if v['passed'] else 'FAIL'} ({v['detected_fraction']:.0%}, n={v['samples']})" for k,v in val.items()))
-        self.metrics.set("\n".join(f"{k:16} {self.fmt(signals.get(k,{}).get('value'))}   {'valid' if signals.get(k,{}).get('valid') else 'unavailable'}" for k in ("left_eye_open","right_eye_open","head_y","tongue_x","tongue_y","gaze_x","gaze_y")))
+        self.metrics.set("\n".join(f"{k:16} {self.fmt(signals.get(k,{}).get('value'))}   {'valid' if signals.get(k,{}).get('valid') else 'unavailable'}" for k in ("left_eye_open","right_eye_open","head_y","head_x","tongue_x","tongue_y","gaze_x","gaze_y")))
         if self.calibration_tabs.select()==str(self.eye_tab):
             draw_eye_scope(self.eye_scope,state)
             self.movement_scope_picker.pack_forget()
@@ -305,7 +318,7 @@ class DetectionLab:
         else:
             self.eye_scope_picker.pack_forget()
             self.movement_scope_picker.pack(fill="x",before=self.scope)
-            kind="pupil" if self.calibration_tabs.select()==str(self.pupil_tab) else "tongue" if self.calibration_tabs.select()==str(self.tongue_tab) else "head"
+            kind="pupil" if self.calibration_tabs.select()==str(self.pupil_tab) else "tongue" if self.calibration_tabs.select()==str(self.tongue_tab) else "head_x" if self.calibration_tabs.select()==str(self.head_x_tab) else "head"
             draw_position(self.eye_scope,state,kind)
             if self.movement_scope_mode.get()=="Calibrated positions":draw_calibrated_scope(self.scope,state)
             elif kind=="pupil":draw_pupil_scope(self.scope,state)
@@ -318,6 +331,7 @@ class DetectionLab:
             self.after_id=None
         self.eye_panel.close()
         self.head_panel.close()
+        self.head_x_panel.close()
         self.tongue_panel.close()
         self.pupil_panel.close()
 

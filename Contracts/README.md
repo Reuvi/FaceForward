@@ -1,5 +1,8 @@
 # Shared contracts — initial v1
 
+[HEAD_HORIZONTAL.md](HEAD_HORIZONTAL.md) activates calibrated head_x from yaw,
+with an independent guide and detector preset v7. Vertical pitch is unchanged.
+
 Current async camera scheduling and tongue sample origin fields are defined in
 [ASYNC_DETECTION.md](ASYNC_DETECTION.md).
 

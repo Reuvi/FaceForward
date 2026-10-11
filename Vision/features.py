@@ -30,6 +30,7 @@ class DetectionConfig:
     head_mode: str = "pitch"
     head_position_separation: float = 0.02
     head_pitch_separation: float = 3
+    head_yaw_separation: float = 3
     tongue_position_separation: float = 0.04
     position_check_tolerance: float = 0.2
     min_mouth_px: float = 28
@@ -52,7 +53,7 @@ class DetectionConfig:
             "min_brightness": (0, 120), "max_brightness": (130, 255),
             "max_clipped_fraction": (0.05, 0.9), "eye_separation": (0.001, 0.2),
             "endpoint_tolerance": (0, 0.1), "head_position_separation": (0.005, 0.2),
-            "head_pitch_separation": (1, 30), "min_mouth_px": (12, 200),
+            "head_pitch_separation": (1, 30), "head_yaw_separation": (1, 30), "min_mouth_px": (12, 200),
             "tongue_position_separation": (0.01, 0.3), "position_check_tolerance": (0.05, 0.35),
             "min_mouth_opening": (0.02, 0.5), "tongue_margin": (1, 30),
             "tongue_min_area": (0.005, 0.3), "tongue_max_area": (0.4, 0.95),
@@ -114,6 +115,17 @@ def pitch_degrees(rotation):
     if rotation is None:
         return None
     return math.degrees(math.atan2(-rotation[1][2], math.hypot(rotation[0][2], rotation[2][2])))
+
+
+def yaw_degrees(rotation):
+    """Horizontal face-forward direction; calibration establishes left/right sign."""
+    if rotation is None:
+        return None
+    x, z = rotation[0][2], rotation[2][2]
+    if not math.isfinite(x) or not math.isfinite(z) or math.hypot(x, z) < 1e-6:
+        return None
+    angle = math.degrees(math.atan2(x, z))
+    return angle if abs(angle) <= 90 else None
 
 
 def image_quality(bgr, bounds, config):
@@ -181,5 +193,10 @@ def analyze_features(bgr, observation, config):
         if head.value is None:
             head.quality, head.reason = 0, "Head transformation unavailable"
     result["head"] = head
+    yaw = Feature(value=yaw_degrees(observation.rotation), quality=face.quality,
+                  reason=face.reason, metrics=dict(face.metrics))
+    if yaw.value is None:
+        yaw.quality, yaw.reason = 0, "Head yaw transformation unavailable or unsupported"
+    result["head_x"] = yaw
     result["face"] = face
     return result

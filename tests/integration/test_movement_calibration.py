@@ -116,6 +116,9 @@ class MovementIntegrationTests(unittest.TestCase):
         self.assertEqual(self.core.head, fitted)
         for explicit in (True, False):
             old = deepcopy(original)
+            old.update(version=5, algorithm="color-tongue-tip-v5")
+            old.pop("head_x"); old.pop("pupil")
+            old["settings"].pop("head_yaw_separation")
             old["head"].update(low=.3, center=.5, high=.7)
             if explicit:
                 old["settings"]["head_mode"] = "position"
@@ -258,7 +261,7 @@ class MovementIntegrationTests(unittest.TestCase):
             path = Path(directory) / "movement.json"
             self.session.save_profile(path)
             data = read_profile(path)
-            self.assertEqual(data["detector"]["version"], 5)
+            self.assertEqual(data["detector"]["version"], 7)
             self.session.load_profile(path)
             self.assertEqual(self.core.tongue_range, original)
             self.assertFalse(
@@ -278,6 +281,7 @@ class MovementIntegrationTests(unittest.TestCase):
             legacy = deepcopy(data)
             legacy["detector"].pop("tongue_range")
             legacy["detector"].pop("tongue_measurement")
+            legacy["detector"].pop("head_x"); legacy["detector"].pop("pupil")
             legacy["detector"].update(
                 version=3, algorithm="frame-wink-eye-head-tongue-v3"
             )

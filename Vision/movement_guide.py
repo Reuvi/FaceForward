@@ -5,6 +5,7 @@ from .calibration import AxisCalibration
 from .signals import finite_number
 
 HEAD_TARGETS = (("neutral", (0.5,)), ("up", (0.0,)), ("down", (1.0,)))
+HEAD_X_TARGETS = (("neutral", (0.5,)), ("left", (0.0,)), ("right", (1.0,)))
 TONGUE_TARGETS = (
     ("center", (0.5, 0.5)),
     ("left", (0.0, 0.5)),
@@ -42,10 +43,11 @@ def validate_range(value, config, *, bounds=(-.8, .8), separation=None, label="T
 
 class MovementGuide:
     def __init__(self, kind, config, *, existing=None):
-        if kind not in ("head", "tongue", "pupil"):
-            raise ValueError("Movement guide must be head, tongue or pupil")
+        if kind not in ("head", "head_x", "tongue", "pupil"):
+            raise ValueError("Movement guide must be head, head_x, tongue or pupil")
         self.kind, self.config = kind, config
-        targets = HEAD_TARGETS if kind == "head" else TONGUE_TARGETS
+        self.label = "Head X" if kind == "head_x" else kind.title()
+        targets = HEAD_TARGETS if kind == "head" else HEAD_X_TARGETS if kind == "head_x" else TONGUE_TARGETS
         self.steps = [("absence", "absent", None)] if kind == "tongue" else []
         if existing is None:
             self.steps += [("train", name, target) for name, target in targets]
@@ -124,7 +126,7 @@ class MovementGuide:
         if role == "absence":
             sample = int(value is not None) if usable else None
         else:
-            dimensions = 1 if self.kind == "head" else 2
+            dimensions = 1 if self.kind in ("head", "head_x") else 2
             sample = (
                 tuple(value)
                 if usable
@@ -138,26 +140,29 @@ class MovementGuide:
     def normalized(self, value):
         if value is None or not self.fits:
             return None
-        names = ("y",) if self.kind == "head" else ("x", "y")
+        names = ("y",) if self.kind == "head" else ("x",) if self.kind == "head_x" else ("x", "y")
         result = tuple(self.fits[key].normalize(v) for key, v in zip(names, value))
         return result if all(v is not None for v in result) else None
 
     def _fit(self):
         c = self.config
-        if self.kind == "head":
+        if self.kind in ("head", "head_x"):
             separation = (
                 c.head_position_separation
                 if c.head_mode == "position"
                 else c.head_pitch_separation
             )
+            if self.kind == "head_x":
+                separation = c.head_yaw_separation
+            targets = ("left", "neutral", "right") if self.kind == "head_x" else ("up", "neutral", "down")
             fit = AxisCalibration.fit(
                 *(
                     [v[0] for v in self.groups[name]]
-                    for name in ("up", "neutral", "down")
+                    for name in targets
                 ),
                 min_separation=separation,
             )
-            self.fits = {"y": replace(fit, endpoint_tolerance=c.endpoint_tolerance)}
+            self.fits = {"x" if self.kind == "head_x" else "y": replace(fit, endpoint_tolerance=c.endpoint_tolerance)}
         else:
             for index, (key, low, high) in enumerate(
                 (("x", "left", "right"), ("y", "up", "down"))
@@ -220,7 +225,7 @@ class MovementGuide:
             if self.index == len(self.steps) - 1:
                 self.active = False
                 self.passed = True
-                self.report = f"{self.kind.title()} position calibration passed; inspect raw and calibrated positions"
+                self.report = f"{self.label} position calibration passed; inspect raw and calibrated positions"
                 return
             self.index += 1
             self.start_ms = None
@@ -265,6 +270,13 @@ class MovementGuide:
             instruction = (
                 "Open your mouth but keep the tongue hidden behind your teeth. Keep your head still."
             )
+        elif self.kind == "head_x":
+            instruction = (
+                "Rest in your comfortable NEUTRAL head position, facing the camera"
+                if name == "neutral"
+                else f"Turn your head toward YOUR {name.upper()} to a comfortable limit"
+            )
+            instruction += ". Keep your face visible and avoid tilting sideways."
         elif self.kind == "head":
             movement = (
                 "Move your whole head"

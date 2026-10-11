@@ -1,5 +1,9 @@
 # Test the new tongue and pupil joysticks
 
+The new [horizontal head guide](HEAD_HORIZONTAL_TESTING.md) is tab **3 Head X**;
+Tongue is now **4 Tongue**, Pupils **5 Pupils**. New detector saves use v7, retaining
+these v6 tongue/pupil fields plus independent yaw. Combined profiles remain v3.
+
 Restart the native app to load this update. Head pitch and its calibration are
 unchanged. Load your saved profile to recover eyes/head. Old color tongue ranges
 cannot be applied to the new detector; calibrate tongue positions again.

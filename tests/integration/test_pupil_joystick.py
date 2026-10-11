@@ -66,7 +66,7 @@ class JoystickIntegration(unittest.TestCase):
 
     def test_profile_roundtrip_recheck_and_atomic_validation(self):
         self.guide();self.core.head=AxisCalibration(-12,0,12,endpoint_tolerance=.05)
-        data=self.core.export_calibration();self.assertEqual(data['version'],6)
+        data=self.core.export_calibration();self.assertEqual(data['version'],7)
         self.core.disconnect();self.core.load_calibration(data)
         self.assertFalse(self.core.pupil_ready)
         self.assertFalse(self.feed()['faces'][0]['signals']['gaze_x']['valid'])
@@ -82,7 +82,7 @@ class JoystickIntegration(unittest.TestCase):
         self.core.tongue_model=SegmentedTongueModel('/not/installed.onnx')
         self.core.head=AxisCalibration(-12,0,12,endpoint_tolerance=.05)
         model=self.core.tongue_model
-        data=self.core.export_calibration();self.assertEqual(data['version'],6)
+        data=self.core.export_calibration();self.assertEqual(data['version'],7)
         bad=deepcopy(data);bad['tongue']['sha256']='0'*64
         with self.assertRaises(ValueError):self.core.load_calibration(bad)
         self.core.reset_tongue();self.assertIs(self.core.tongue_model,model)
@@ -115,7 +115,10 @@ class JoystickIntegration(unittest.TestCase):
         self.core.tongue_model=TongueModel(np.array([[40,160,140]],dtype=np.float32),
                                           np.array([[20,100,100]],dtype=np.float32),6,4,{})
         self.core.tongue_range={k:AxisCalibration(-.2,0,.2,endpoint_tolerance=.05) for k in ("x","y")}
-        legacy=self.core.export_calibration();self.assertEqual(legacy["version"],5)
+        legacy=self.core.export_calibration()
+        legacy.update(version=5,algorithm="color-tongue-tip-v5")
+        legacy.pop("head_x");legacy.pop("pupil")
+        legacy["settings"].pop("head_yaw_separation")
         model=SegmentedTongueModel()
         self.core.tongue_model=model
         self.core.load_calibration(legacy)

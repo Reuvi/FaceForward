@@ -708,3 +708,30 @@ Contract: `Contracts/HEAD_HORIZONTAL.md`, committed before implementation.
 Keep fast per-capture sampling and independent tongue worker; no mouse mapping or
 Drivers change. Acceptance: left/neutral/right normalized endpoints, saved-profile
 compatibility, matching views, invalid input, independent fits and native tests.
+
+### Horizontal head handoff
+
+- Contract landed first as `2a74bb1`. Horizontal yaw reuses the existing face
+  transformation and image-quality checks; no new model, inference pass or wait.
+  Head Y pitch and independent tongue scheduling remain intact.
+- Added **3 Head X**, an automatic neutral/left/right training and fresh-check
+  guide with preparation/rest countdowns and sound cues. Personal left/neutral/right
+  map to 0/.5/1, including unequal ranges or reversed raw signs. Retrying/resetting
+  yaw preserves pitch and other completed fits. Face loss retains completed fits.
+- Raw camera and calibration graphs share yaw in degrees and the same capture
+  trace. Horizontal raw/normalized indicators, learned references, Head X scope
+  and CSV fields expose the result. Unknown plots dark-hold prior values while
+  unavailable control measurements remain invalid.
+- New detector presets are v7 (`independent-head-axes-v7`), adding nullable
+  `head_x` while preserving vertical `head`. Versions 1–6 remain readable;
+  loading validates everything before mutating state. Combined profiles remain
+  v3. Existing mouse mapping/transfer functions and Drivers are unchanged.
+- Runbook: `docs/HEAD_HORIZONTAL_TESTING.md`. Remaining: user webcam validation
+  of comfortable range, cross-axis stability and partial-face visibility; a
+  future explicit Processing/device mapping for Head X.
+- Verification: 296 tests pass: 127 Vision (local MediaPipe, direct tongue and
+  spawned tongue model smoke checks included), 94 integration (native Tk enabled),
+  and 75 Processing. The 490-frame mouse demo accepted all captures, observed
+  both clicks, scrolling and pointer movement, and finished disabled/released.
+  Changed Python passes Ruff F; whitespace and integration scope checks pass.
+  Synthetic fixtures verify software behavior, not human detection accuracy.

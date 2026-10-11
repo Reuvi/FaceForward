@@ -1,12 +1,17 @@
 # One native lab: detection calibration + mouse processing
 
+New: [horizontal head calibration](../docs/HEAD_HORIZONTAL_TESTING.md) adds a
+separate **3 Head X** yaw guide beside **2 Head Y** pitch. Head X supplies personal
+left=0/neutral=.5/right=1, raw degrees, a horizontal indicator and shared scopes.
+New detector saves are v7 (v1–v6 readable); combined profiles remain v3.
+
 Current scheduling: [independent detector workers and testing](../docs/INDEPENDENT_DETECTOR_TESTING.md).
 Tongue latency no longer blocks eye/head/pupil samples; original capture times are preserved.
 
 Current update: [tongue segmentation + pupil joystick testing](../docs/TONGUE_PUPIL_TESTING.md).
 Camera tongue uses local neural masks; pupils have a full-screen range guide.
 Choose **Pointer joystick input** on the source tab. Detector preset v6 stores
-these fits; combined profile v3 is unchanged. Head pitch remains unchanged.
+these fits; v7 additionally stores head yaw. Combined profile v3 and head pitch remain unchanged.
 
 
 Run **one `App` window** for the complete testing workflow. The original Processing

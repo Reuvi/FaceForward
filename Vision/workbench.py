@@ -51,7 +51,7 @@ class DetectorWorkbench:
         self.winks = {}
         self.wink_vectors = {}
         self.wink_readings = {}
-        self.head = None
+        self.head = self.head_x = None
         self.pupil_range = self.pupil_pose = None
         self.pupil_ready = False
         self.pupil = PupilReading()
@@ -79,7 +79,7 @@ class DetectorWorkbench:
         self.eyes.clear()
         self.winks.clear()
         self.wink_readings.clear()
-        self.head = None
+        self.head = self.head_x = None
         self.pupil_range = self.pupil_pose = None
         self.pupil_ready = False
         self.pupil = PupilReading()
@@ -156,12 +156,13 @@ class DetectorWorkbench:
         return encode_preset(self)
 
     def load_calibration(self, data):
-        from .presets import decode_preset, decode_winks, decode_tongue_range, decode_pupil
+        from .presets import decode_preset, decode_winks, decode_tongue_range, decode_pupil, decode_head_x
         self._require_idle()
         config, eyes, head, tongue = decode_preset(data)
         winks = decode_winks(data)
         tongue_range = decode_tongue_range(data, config)
         pupil_range, pupil_pose = decode_pupil(data, config)
+        head_x = decode_head_x(data, config)
         active_segment = self.tongue_model if hasattr(self.tongue_model, "measurement") else None
         if active_segment is not None and not hasattr(tongue, "measurement"):
             tongue, tongue_range = active_segment, None
@@ -169,8 +170,9 @@ class DetectorWorkbench:
             tongue.path = active_segment.path
         self.expire()
         self._clear_calibration()
-        self._invalidate("left_eye_open", "right_eye_open", "head_y", "tongue_x", "tongue_y", "gaze_x", "gaze_y")
+        self._invalidate("left_eye_open", "right_eye_open", "head_y", "head_x", "tongue_x", "tongue_y", "gaze_x", "gaze_y")
         self.config, self.eyes, self.head, self.tongue_model = config, eyes, head, tongue
+        self.head_x = head_x
         self.winks = winks
         self.pupil_range, self.pupil_pose = pupil_range, pupil_pose
         self.tongue_range = tongue_range
@@ -193,6 +195,7 @@ class DetectorWorkbench:
     def _invalidate(self, *keys):
         guide=self.movement_guide
         if guide and not guide.active and (("head_y" in keys and guide.kind=="head")
+                or ("head_x" in keys and guide.kind=="head_x")
                 or ("tongue_x" in keys and guide.kind=="tongue")):
             self.movement_guide=None
         if self.frame:
@@ -299,8 +302,8 @@ class DetectorWorkbench:
     def start_movement_guide(self, kind, recheck=False):
         self._require_subject()
         self._require_idle()
-        if kind not in ("head","tongue","pupil") or type(recheck) is not bool:
-            raise ValueError("Choose head, tongue or pupil calibration")
+        if kind not in ("head","head_x","tongue","pupil") or type(recheck) is not bool:
+            raise ValueError("Choose head pitch, head yaw, tongue or pupil calibration")
         saved = self.pupil_range if kind == "pupil" else self.tongue_range if kind == "tongue" else None
         if recheck and saved is None:
             raise ValueError("A saved range is required for rechecking")
@@ -317,6 +320,9 @@ class DetectorWorkbench:
         elif kind=="head":
             self.head=None
             self._invalidate("head_y")
+        elif kind=="head_x":
+            self.head_x=None
+            self._invalidate("head_x")
         else:
             if not recheck:self.tongue_range=None
             self.validation.clear()
@@ -345,8 +351,8 @@ class DetectorWorkbench:
     def _guide_movement(self, timestamp):
         guide=self.movement_guide
         if not guide or not guide.active:return
-        if guide.kind=="head":
-            feature=self.features["head"]
+        if guide.kind in ("head", "head_x"):
+            feature=self.features[guide.kind]
             guide.feed(timestamp,(feature.value,),feature.quality>0)
         elif guide.kind == "pupil":
             guide.feed(timestamp, self.pupil.xy, self.pupil.xy is not None and pose_supported(self.pupil.pose, self.pupil_pose))
@@ -368,6 +374,8 @@ class DetectorWorkbench:
             if guide.passed:
                 if guide.kind=="head":
                     self.head=guide.fits["y"]
+                elif guide.kind=="head_x":
+                    self.head_x=guide.fits["x"]
                 elif guide.kind == "pupil":
                     self.pupil_range = dict(guide.fits)
                     self.pupil_ready = True
@@ -446,6 +454,15 @@ class DetectorWorkbench:
         self.validation.clear()
         self.frozen_crop = None
         self.notice = "Appearance model fitted. Inspect the mask, then start tongue position guide."
+
+    def reset_head_x(self):
+        if self.movement_guide and self.movement_guide.kind == "head_x":
+            self.movement_guide = None
+        self._require_idle()
+        self.head_x = None
+        self._invalidate("head_x")
+        self.generation += 1
+        self.notice = "Head X calibration cleared; vertical pitch and other completed fits retained."
 
     def reset_tongue(self):
         self.async_tongue.invalidate()
@@ -646,6 +663,14 @@ class DetectorWorkbench:
                 value = self.head.normalize(feature.value)
                 values["head_y"] = measurement(value, feature.quality)
                 self.reasons["head"] = "Calibrated head Y" if value is not None else "Outside calibrated head range"
+            feature = self.features["head_x"]
+            self.reasons["head_x"] = feature.reason
+            if self.head_x is None:
+                self.reasons["head_x"] = "Run guided horizontal head calibration"
+            elif feature.quality > 0 and feature.value is not None:
+                value = self.head_x.normalize(feature.value)
+                values["head_x"] = measurement(value, feature.quality)
+                self.reasons["head_x"] = "Calibrated head X" if value is not None else "Outside calibrated horizontal head range"
             self.reasons["pupil"] = self.pupil.reason
             if self.pupil.xy is not None:
                 if self.pupil_range and self.pupil_ready and pose_supported(self.pupil.pose, self.pupil_pose):
@@ -731,14 +756,15 @@ class DetectorWorkbench:
             eye = self.pupil.eyes.get(side, {})
             for axis, index in (("x", 0), ("y", 1)):
                 row[side+"_pupil_"+axis] = eye["xy"][index] if eye.get("xy") else None
-        for side in ("left", "right", "head"):
+        for side in ("left", "right", "head", "head_x"):
             feature = self.features.get(side)
             row[side + "_raw"] = feature.value if feature else None
             row[side + "_quality"] = feature.quality if feature else 0
             row[side + "_reason"] = self.reasons.get(side, "No selected subject")
             for key in ("brightness", "focus", "clipped_fraction"):
                 row[side + "_" + key] = feature.metrics.get(key) if feature else None
-        for key in ("left_eye_open", "right_eye_open", "head_y", "tongue_x", "tongue_y", "gaze_x", "gaze_y"):
+        row["head_x_raw_units"] = "degrees"
+        for key in ("left_eye_open", "right_eye_open", "head_y", "head_x", "tongue_x", "tongue_y", "gaze_x", "gaze_y"):
             item = signals.get(key, {})
             row[key] = item.get("value")
             row[key + "_valid"] = item.get("valid", False)
@@ -783,6 +809,7 @@ class DetectorWorkbench:
                 "wink_models": {side:model["report"] for side,model in self.winks.items()},
                 "features": {k: asdict(v) for k, v in self.features.items()}, "reasons": dict(self.reasons),
                 "eyes": {k: asdict(v) for k, v in self.eyes.items()}, "head": asdict(self.head) if self.head else None,
+                "head_x": asdict(self.head_x) if self.head_x else None,
                 "tongue_range": {k:asdict(v) for k,v in self.tongue_range.items()} if self.tongue_range else None,
                 "movement_guide": self.movement_guide.state(self.clock()) if self.movement_guide else None,
                 "samples": {k: len(v) for k, v in self.samples.items()},

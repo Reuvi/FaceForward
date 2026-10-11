@@ -12,7 +12,7 @@ from .tracking import Box
 
 def demo_image(*, left_closed=False, right_closed=False, head=0.5,
                tongue=False, tongue_x=0.5, tongue_y=0.5, left_ratio=None, right_ratio=None,
-               natural_blink=False, pupil_x=.5, pupil_y=.5):
+               natural_blink=False, pupil_x=.5, pupil_y=.5, head_x=.5):
     """Anatomical right is image-left. Head value shifts Y and supplies a fake pitch."""
     offset = (head - 0.5) * 80
     if natural_blink:left_closed=right_closed=True
@@ -62,7 +62,10 @@ def demo_image(*, left_closed=False, right_closed=False, head=0.5,
         cv2.circle(bgr,tuple(np.round(end).astype(int)),radius,(115,100,215),-1)
         cv2.circle(bgr,tuple(np.round(base).astype(int)),radius,(115,100,215),-1)
     angle = math.radians((head - 0.5)*40)
-    rotation = ((1., 0., 0.), (0., math.cos(angle), -math.sin(angle)), (0., math.sin(angle), math.cos(angle)))
+    yaw = math.radians((head_x - .5) * 40)
+    cp, sp, cy, sy = math.cos(angle), math.sin(angle), math.cos(yaw), math.sin(yaw)
+    # Ry(yaw) @ Rx(pitch), retaining the pitch fixture's signed zero at neutral.
+    rotation = ((cy, sy*sp, sy*cp), (0., cp, -sp), (-sy, cy*sp, cy*cp))
     observation = Observation(Box(165/640, (45+offset)/480, 310/640, 390/480), tuple(points), rotation=rotation)
     # Explicit synthetic coefficients for the native experiment fixture.
     for side in ('left','right'):

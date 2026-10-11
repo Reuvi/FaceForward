@@ -75,6 +75,7 @@ class UnifiedCalibrationTests(unittest.TestCase):
         legacy = deepcopy(original)
         legacy.update(version=4, algorithm="personal-head-tongue-ranges-v4")
         legacy.pop("tongue_measurement")
+        legacy.pop("head_x"); legacy.pop("pupil")
         legacy["tongue_range"] = {
             axis: dict(low=.2, center=.5, high=.8, endpoint_tolerance=.05)
             for axis in ("x", "y")
@@ -89,7 +90,7 @@ class UnifiedCalibrationTests(unittest.TestCase):
         migrated = self.core.export_calibration()
         for key in ("eyes", "winks", "head"):
             self.assertEqual(migrated[key], original[key])
-        self.assertEqual(migrated["version"], 5)
+        self.assertEqual(migrated["version"], 7)
         self.assertIsNone(migrated["tongue"])
         self.assertIsNone(migrated["tongue_range"])
         self.assertIn("repeat appearance and tip range", self.core.notice)
@@ -314,7 +315,7 @@ class UnifiedCalibrationTests(unittest.TestCase):
             write_profile(broken,corrupted)
             with self.assertRaises(ValueError):self.session.load_profile(broken)
             self.assertEqual(self.core.export_calibration(),detector)
-            self.assertEqual(detector["version"],5)
+            self.assertEqual(detector["version"],7)
             self.assertEqual(read_profile(path)["format"],"face_mouse_profile_v3")
             self.assertEqual(detector['settings']['eye_rest_ms'],100)
             self.session.load_profile(path)
@@ -328,6 +329,7 @@ class UnifiedCalibrationTests(unittest.TestCase):
             detector.pop("winks")
             detector.pop("tongue_range")
             detector.pop("tongue_measurement")
+            detector.pop("head_x"); detector.pop("pupil")
             for fit in detector["eyes"].values():
                 del fit["closed_limit"];del fit["open_limit"]
             _,eyes,_,_=decode_preset(detector)
@@ -345,6 +347,7 @@ class UnifiedCalibrationTests(unittest.TestCase):
                     legacy["detector"].pop("winks")
                     legacy["detector"].pop("tongue_range")
                     legacy["detector"].pop("tongue_measurement")
+                    legacy["detector"].pop("head_x"); legacy["detector"].pop("pupil")
                     legacy["research"]={"settings":settings(),"fits":{},"pose_bounds":{},"models":{},"gaze":None}
                 old_path=Path(directory)/f"legacy{version}.json"
                 write_profile(old_path,legacy)

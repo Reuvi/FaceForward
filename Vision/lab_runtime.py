@@ -124,6 +124,8 @@ class LabRuntime:
                 state=movement.state(self.clock())
                 if movement.kind=="head":
                     controls["head"]={"neutral":.5,"up":.2,"down":.8}[state["name"]]
+                elif movement.kind=="head_x":
+                    controls["head_x"]={"neutral":.5,"left":.2,"right":.8}[state["name"]]
                 elif movement.kind == "pupil":
                     x,y=dict(center=(.5,.5),left=(0,.5),right=(1,.5),up=(.5,0),down=(.5,1))[state["name"]]
                     controls.update(pupil_x=x,pupil_y=y,left_closed=False,right_closed=False,left_ratio=.25,right_ratio=.25)
@@ -211,8 +213,8 @@ class LabRuntime:
             # Include at most one older seed per plotted channel. A long unknown
             # interval can then retain its last display height after that capture
             # leaves the 8-second view, without sending the full history to Tk.
-            needed = {"left_raw", "right_raw", "head_raw", "left_closed_bit", "right_closed_bit",
-                      "head_y", "tongue_x", "tongue_y", "left_wink_bit", "right_wink_bit"}
+            needed = {"left_raw", "right_raw", "head_raw", "head_x_raw", "left_closed_bit", "right_closed_bit",
+                      "head_y", "head_x", "tongue_x", "tongue_y", "left_wink_bit", "right_wink_bit"}
             needed.update(side+"_"+key for side in ("left","right")
                           for key in ("blink","squint","cheek","brow","wink_score"))
             needed.update(("tongue_tip_x","tongue_tip_y","pupil_raw_x","pupil_raw_y","gaze_x","gaze_y"))
