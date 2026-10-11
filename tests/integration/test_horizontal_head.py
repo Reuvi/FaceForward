@@ -165,7 +165,7 @@ class HorizontalHeadTests(unittest.TestCase):
     def test_saved_yaw_only_profile_can_load_stopped_and_rejects_bad_fit_atomically(self):
         self.assertTrue(self.guide("head_x").passed); saved=self.core.head_x
         data=self.core.export_calibration()
-        self.assertEqual(data["version"],9); self.assertIsNone(data["head"])
+        self.assertEqual(data["version"],10); self.assertIsNone(data["head"])
         with tempfile.TemporaryDirectory() as folder:
             path=folder+"/profile.json";self.session.save_profile(path)
             self.session.stop();self.core.reset_calibration()

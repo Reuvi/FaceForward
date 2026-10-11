@@ -1,75 +1,124 @@
-# Direct MediaPipe pupil testing
+# Fixed pupil direction and square matrix
 
-Restart the native App from the repository root:
+Current pupil update: no calibration, no sensitivity controls, and an **11×11
+square matrix**. Downward response is stronger; left/right/up retain their prior
+default mapping. This supersedes adjustable pupil settings from detector v8/v9.
+Restart the native app from the repository root:
 
-```bash
+```sh
 Vision/.venv/bin/python -m App --source camera --model Vision/.local/face_landmarker.task
 ```
 
-1. Start the camera and face it with both eyes visible. No pupil calibration,
-   eye calibration, dot guide, saved range or head-pose reference is required.
-2. Open **Detection calibration → 5 Pupils**. Look left/right/up/down. The raw dot
-   shows iris displacement; the normalized dot shows the direct 0–1 output.
-   Directions refer to your body: left/up lower the value, right/down raise it.
-   Eye-corner center maps to (.5,.5); it need not equal your natural resting gaze.
-3. Select **Raw detector signals** to see the four per-eye traces, then
-   **Normalized positions** to see Pupil X/Y with the other normalized channels.
-   The source tab's combined raw pupil graph uses the same captured samples.
-4. If the output barely moves, increase the corresponding **sensitivity**. If it
-   reaches an edge too early, decrease it. Press **Apply pupil sensitivity**.
-   Defaults are 1; the range is .25–4. **Restore default sensitivity** resets only
-   these two scales. Applying stops mouse preview and preserves other detector fits.
-5. Blink/wink or cover an eye. Pupil output becomes unavailable while a reliable
-   two-eye estimate is missing. Graphs hold the prior position in the darker color;
-   unavailable observations do not drive the mouse. Reopening gives fresh samples.
-6. Move out of view, return, stop/restart the source, and load an old profile.
-   Pupils should resume without training. Preview never automatically re-arms.
+## Live test
+
+1. Start the camera with both eyes visible, then open
+   **Detection calibration → 5 Pupils**. There is no pupil setup or training step.
+   Other eyes/winks/head/tongue calibrations are independent and can be loaded.
+2. Look left, center, right, up and down while keeping your head comfortable and
+   fairly still. The cyan square marks the matrix cell; the small white dot is the
+   precise position. Matrix center is **row 5, column 5**. Top/left is index 0;
+   bottom/right is index 10. Left/right mean your own body, not the camera image.
+3. Pay particular attention to down. Positive vertical movement now reaches 1
+   with .065 eye widths of iris displacement rather than .1. You should need less
+   downward travel; up is unchanged. The raw graph remains in the original units.
+   No min/max learning, automatic centering or user sensitivity setting is involved.
+4. Inspect the per-eye readings below the matrix (scroll if needed): lid gap,
+   blink score, down-look score and the validity reason. A narrower eye opening
+   can remain usable when both its iris and MediaPipe down-look signal agree.
+   Unsupported narrowing, poor image quality and actual closure remain unavailable.
+5. Blink/wink and briefly leave the frame. Unknown graphs and the matrix display
+   hold the previous position in a darker color with **UNKNOWN display hold**.
+   The actual matrix becomes null/invalid, and unknown input cannot move the mouse.
+   Reopening/returning resumes fresh samples without retraining or auto-arming.
+6. Compare **Vision source & raw signals** with this tab: the source page shows
+   the same matrix row/column and capture data. Use **Raw detector signals** for
+   raw per-eye traces and **Normalized positions** for Pupil X/Y. Export CSV to
+   inspect the raw signals, quality/reasons and matrix indices while testing down.
 7. To test the existing simulated mouse, choose **Pupil direction** under
-   **Pointer joystick input** on the source tab, then open **Live lab**. If needed,
-   use Processing's **Calibrate current neutral** with a fresh resting gaze before
-   **Start preview**. That centers the mouse transfer function; it does not train
-   pupil detection. Click/wink and head-scroll calibrations remain independent.
+   **Pointer joystick input** on the source tab, then use **Live lab**. Its existing
+   mouse transfer functions still receive precise X/Y; they are separate from
+   detector calibration and do not train the pupil model. No new OS driver is added.
 
-Save active profile to retain pupil sensitivities and other settings. Detector
-preset v9 retains the v8 direct settings instead of pupil fits; combined profiles stay
-v3. v1–v8 are validated before loading; old pupil ranges/head references are then
-ignored, with direct sensitivity defaulting to 1. Other compatible fits survive.
-A profile can now be saved even when only direct pupils are in use.
+Eye-corner center maps to (.5,.5), which need not match natural resting gaze.
+Head movement can affect this eye-relative direction; it is not calibrated screen
+look position. The new down-look thresholds and scale are fixed experimental
+choices. Generated tests verify the logic, not accuracy on every person's eyes.
+If down still fails, compare **barely moves** (raw Y small), **unavailable** (read
+per-eye reason), and **wrong direction** (check raw Y sign); these are distinct.
 
-## Measurements
+## Measurement and downward checks
 
-The existing local MediaPipe inference supplies four iris-ring landmarks per eye.
-Their average estimates the iris center. Project displacement from the eye-corner
-midpoint onto that eye's horizontal/down axes and divide by eye width. Combine
-both usable eyes, then apply:
+Reuse the same MediaPipe inference and four iris-ring landmarks per eye. Project
+their center relative to the eye-corner midpoint onto horizontal/down axes, then
+divide by eye width. Average both usable eyes. No additional model or inference.
 
 ```text
-x = clip(.5 + raw_x * horizontal_sensitivity / .4, 0, 1)
-y = clip(.5 + raw_y * vertical_sensitivity / .2, 0, 1)
+x = clip(.5 + raw_x / .4, 0, 1)
+y = clip(.5 + raw_y / .2, 0, 1)    when raw_y <= 0
+    clip(.5 + raw_y / .13, 0, 1)   when raw_y > 0
 ```
 
-Default endpoints are ±.2 eye widths horizontally and ±.1 vertically. These are
-fixed engineering scales, not learned anatomical limits. There is no temporal
-min/max, automatic centering, smoothing or division by changing lid opening in
-this detector. Existing Processing settings handle device response separately.
+Left/right endpoints are ±.2 eye widths, up −.1 and down +.065. There are no
+configurable multipliers, rolling extrema, learned endpoints, smoothing or
+changing eyelid-gap denominators in this detector. Device response remains in
+Processing.
 
-Both eyes must pass image quality, fixed open-eye checks (lid ratio at least .16,
-MediaPipe eyeBlink below .4), iris-radius bounds .025–.25 eye widths, supported
-iris position and agreement within .18 eye widths. Eye/wink fits do not gate
-pupils. Missing head-pose matrices do not block otherwise usable iris geometry.
-Head turns can still move the signal: this measures eye-relative direction, not
-compensated screen gaze. Those limits require live user testing.
+The normal open-eye gate is lid gap / eye width ≥.16. A narrow down-looking eye
+may pass at ≥.10 only if raw iris Y>.015, MediaPipe eyeLookDown≥.2 and
+(eyeLookDown−eyeLookUp)≥.1. The exception requires valid blink/up/down scores.
+The existing eyeBlink<.4, image quality, iris radius .025–.25 eye widths, supported
+iris position and two-eye disagreement ≤.18 eye widths still apply. No wink/eye
+calibration fit can gate or change this pupil detector; click classification is
+unchanged. The down-look score supports validity, not replacement coordinates.
 
-Each frame keeps its original timestamp/sequence, gaze_x/y validity/confidence,
-and `gaze_measurement: mediapipe_iris_direction_v2`. CSV includes that measurement
-identifier, raw per-eye/combined iris coordinates, normalized gaze, and both
-sensitivity settings. No extra model, camera, download or inference pass is added;
-tongue processing remains independent.
+## Matrix data for other agents
 
-See [the contract](../Contracts/DIRECT_PUPILS.md). Synthetic tests cover scale,
-polarity, clipping, invalid eyes, geometry transforms, old-profile validation,
-sensitivity changes, lifecycle, shared traces and the native interface; they do
-not establish real-person tracking accuracy.
+Every calibrated workbench capture emits an additive `pupil_matrix`, including
+captures with missing/closed eyes or no face. Valid samples have an 11×11 array
+of integer zeros with exactly one 1, in `values[row][column]`:
 
-Implementation verification: 301 tests passed (129 Vision, 97 integration with
-native Tk, 75 Processing), plus the complete 490-frame mouse demo.
+```python
+sample = frame["pupil_matrix"]
+if sample["valid"]:
+    matrix = sample["values"]
+    row, column = sample["row"], sample["column"]
+    assert matrix[row][column] == 1
+```
+
+`column=floor(gaze_x*10+.5)`, `row=floor(gaze_y*10+.5)`. Quantization error is at
+most .05 per axis. An 11×11 odd-sized grid has an exact center cell. The format is
+`pupil_matrix_v1`; size, subject, confidence and original session/sequence/time
+are included. Invalid samples have null values/row/column, confidence 0 and
+valid=false. A displayed dark hold never enters this payload.
+
+Existing `gaze_x/y` stay continuous in SignalFrame v1; Processing continues using
+them. Its existing one-hot matrix parser can read the new `values` explicitly in
+a future adapter. This change does not silently quantize the current mouse driver
+input or change device transfer functions. CSV stores size, row, column and
+validity plus raw/continuous fields, rather than duplicating 121 cells per row.
+`gaze_measurement` is now `mediapipe_iris_direction_v3`.
+
+New detector presets are **v10**, `fixed-pupil-matrix-v10`, with pupil metadata
+`{"measurement":"mediapipe_iris_direction_v3"}` only. Old v1–v9 files validate
+fully before their pupil fits/sensitivities are discarded. Compatible eye/wink/
+head/tongue fits survive; explicit v9 tongue backend choice is preserved. Combined
+profiles remain v3, and pupil-only profiles still save without fitted detectors.
+See [the contract](../Contracts/PUPIL_MATRIX.md).
+
+## Developer checks
+
+```sh
+Vision/.venv/bin/python -m unittest discover -s tests/vision -p test_joystick_detectors.py -v
+RUN_TK_TESTS=1 Vision/.venv/bin/python -m unittest discover -s tests/integration -p test_pupil_joystick.py -v
+```
+
+Tests cover fixed directional scales, supported narrowed eyes versus closures,
+missing/malformed expression support, all 121 grid cells, capture identity,
+unknown/stop/load/stale matrices, continuous mouse input, profile migration and
+native square/dark-hold drawing without sensitivity controls. Camera and tongue
+scheduling are unchanged.
+
+Verification: 321 tests passed (140 Vision, 106 integration with native Tk,
+75 Processing). The 490-frame mouse demo accepted every frame, observed both
+clicks/scroll/pointer and ended stopped with buttons released. Changed Python
+passes Ruff F, whitespace and integration scope checks.

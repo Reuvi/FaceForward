@@ -1,5 +1,8 @@
 # Shared contracts — initial v1
 
+[PUPIL_MATRIX.md](PUPIL_MATRIX.md) supersedes adjustable pupil settings: fixed
+direction, supported downward detection, 11×11 matrices and detector presets v10.
+
 [LIP_BOUNDARY_HEAD_RELIABILITY.md](LIP_BOUNDARY_HEAD_RELIABILITY.md) is the current
 tongue backend/Head X recovery contract, with detector presets v9.
 

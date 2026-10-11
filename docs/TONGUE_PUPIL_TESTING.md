@@ -51,8 +51,8 @@ the mouth corners, spanning −.8 to +.8; the personal plot is 0–1.
 ## Pupils: direct MediaPipe direction
 
 Pupils now work without a calibration guide or saved head pose. Open **5 Pupils**,
-inspect the raw and normalized readings, and optionally adjust the two sensitivity
-scales. See [direct pupil testing](DIRECT_PUPIL_TESTING.md) for steps, math and limits.
+inspect the raw/normalized readings and the square 11×11 matrix. No sensitivity
+controls or calibration are needed. See [direct pupil testing](DIRECT_PUPIL_TESTING.md) for steps, math and limits.
 This supersedes the earlier full-screen pupil range guide.
 
 ## Use either input in the mouse preview

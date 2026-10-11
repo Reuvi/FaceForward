@@ -308,6 +308,10 @@ def draw_position(canvas, state, kind):
             x1 = (index + 1) * w / 2 - 15
             y0 = 40
             y1 = h - 30
+            if kind == "pupil":
+                size=min(x1-x0,y1-y0)
+                x0+=(x1-x0-size)/2
+                x1,y1=x0+size,y0+size
             canvas.create_text(
                 x0,
                 5,
@@ -340,10 +344,9 @@ def draw_position(canvas, state, kind):
                 return max(0, min(1, value+.5 if kind == "pupil" else (value+.8)/1.6)) if index==0 else value
             bounds = state.get("tongue_range") if kind != "pupil" else None
             if kind == "pupil":
-                from .pupil import HALF_RANGES
-                options = state["pupil_settings"]
-                bounds = {axis: dict(low=-span/options[axis+"_sensitivity"], high=span/options[axis+"_sensitivity"])
-                          for axis, span in zip(("x", "y"), HALF_RANGES)}
+                from .pupil import X_HALF_RANGE, UP_RANGE, DOWN_RANGE
+                bounds = dict(x=dict(low=-X_HALF_RANGE, high=X_HALF_RANGE),
+                              y=dict(low=-UP_RANGE, high=DOWN_RANGE))
             if index == 0 and bounds:
                 canvas.create_rectangle(
                     x0 + plot_value(bounds["x"]["low"]) * (x1 - x0),

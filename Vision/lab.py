@@ -104,10 +104,11 @@ class DetectionLab:
         self.mouth.bind("<Button-1>",self.mark_tongue)
         ttk.Label(tongue,textvariable=self.tongue_details,justify="left",wraplength=420,font=("Menlo",10)).pack(anchor="w",pady=6)
         self.pupil_tab=self.tab(tabs,"5 Pupils")
-        self.text(self.pupil_tab,"MediaPipe iris direction is available immediately: no pupil calibration or dot guide. Center is (.5, .5); left/up approach 0 and right/down approach 1. Keep both eyes open and visible. Head turns can still affect direction; this is not screen gaze.")
-        self.pupil_panel=PupilPanel(self.pupil_tab,root,self.call)
+        pupil_content=self.scroll_content(self.pupil_tab)
+        self.text(pupil_content,"MediaPipe iris direction is available immediately: no pupil calibration or dot guide. Center is (.5, .5); left/up approach 0 and right/down approach 1. Keep both eyes open and visible. Head turns can still affect direction; this is not screen gaze.")
+        self.pupil_panel=PupilPanel(pupil_content,root,self.call)
         self.pupil_details=tk.StringVar()
-        ttk.Label(self.pupil_tab,textvariable=self.pupil_details,wraplength=440,justify="left").pack(anchor="w",pady=8)
+        ttk.Label(pupil_content,textvariable=self.pupil_details,wraplength=440,justify="left").pack(anchor="w",pady=8)
         settings=self.tab(tabs,"Settings")
         self.text(settings,"Edit tunables below. Applying clears calibration; your face reconnects automatically. Saving stores these tunables only. Use Save active profile in the main App to save learned calibration. Head Y uses pitch; Head X uses yaw.")
         ttk.Button(settings,text="Reset all calibration",command=lambda:self.call("reset_calibration")).pack(fill="x",pady=5)
@@ -297,7 +298,7 @@ class DetectionLab:
         self.pupil_details.set("Raw position (eye widths): "+pair_text(pupil.get("xy"))+"\nNormalized X/Y: "+
             pair_text(tuple(signals.get(k,{}).get("value") for k in ("gaze_x","gaze_y")))+"\n"+
             state["reasons"].get("pupil",pupil.get("reason","Waiting"))+"\n"+
-            "\n".join(f"{side.title()}: {pair_text(v.get('xy'))} · {v.get('reason')}" for side,v in pupil.get("eyes",{}).items()))
+            "\n".join(f"{side.title()}: {pair_text(v.get('xy'))} · {v.get('reason')}\n  Lid gap {self.fmt(v.get('lid_gap'))} · blink {self.fmt(v.get('blink'))} · look down {self.fmt(v.get('look_down'))}" for side,v in pupil.get("eyes",{}).items()))
         val=state["validation"]
         worker = state.get("tongue_worker")
         crop_label = 'FROZEN — click tissue' if state['frozen'] else 'LIVE crop / green candidate mask'

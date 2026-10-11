@@ -35,16 +35,16 @@ class JoystickIntegration(unittest.TestCase):
     def test_direct_normalization_unknown_and_pointer_adapter(self):
         self.assertTrue(self.feed()['faces'][0]['signals']['gaze_x']['valid'])
         self.core.head=AxisCalibration(-12,0,12,endpoint_tolerance=.05)
-        for x,y in ((.5,.5),(0,.5),(1,.5),(.5,0),(.5,1),(.25,.75)):
+        for x,y,expected_y in ((.5,.5,.5),(0,.5,.5),(1,.5,.5),(.5,0,0),(.5,.825,1),(.25,.6625,.75)):
             frame=self.feed(pupil_x=x,pupil_y=y)
             values=frame['faces'][0]['signals']
             self.assertAlmostEqual(values['gaze_x']['value'],x)
-            self.assertAlmostEqual(values['gaze_y']['value'],y)
+            self.assertAlmostEqual(values['gaze_y']['value'],expected_y)
             sample=decode(frame,MouseConfig(pointer_source='gaze'),'single-user')
             self.assertAlmostEqual(sample.pointer[0],x)
-            self.assertAlmostEqual(sample.pointer[1],y)
+            self.assertAlmostEqual(sample.pointer[1],expected_y)
             self.assertEqual(self.runtime.snapshot()['trace'][-1]['gaze_x'],values['gaze_x']['value'])
-            self.assertEqual(frame['gaze_measurement'],'mediapipe_iris_direction_v2')
+            self.assertEqual(frame['gaze_measurement'],'mediapipe_iris_direction_v3')
         for kwargs in ({'left_closed':True},{'right_closed':True}):
             values=self.feed(**kwargs)['faces'][0]['signals']
             self.assertFalse(values['gaze_x']['valid'])
@@ -53,14 +53,65 @@ class JoystickIntegration(unittest.TestCase):
         self.assertEqual(self.core.head.center,0)
         self.assertFalse(self.session.lab.processor.armed)
 
+    def test_matrix_every_capture_matches_continuous_position_and_processing_adapter(self):
+        from Processing.mouse.signals import one_hot_matrix
+        # Cover every cell, including all boundaries and the exact center.
+        for row in range(11):
+            for column in range(11):
+                y=row/10
+                demo_y=y if y <= .5 else .5+(y-.5)*.65
+                frame=self.feed(pupil_x=column/10,pupil_y=demo_y)
+                grid=frame['pupil_matrix']
+                self.assertTrue(grid['valid'])
+                self.assertEqual((grid['row'],grid['column']),(row,column))
+                self.assertEqual(grid['size'],11)
+                self.assertEqual(grid['subject_id'],'single-user')
+                self.assertEqual(grid['format'],'pupil_matrix_v1')
+                for key in ('sequence','session_id','timestamp_ms'):
+                    self.assertEqual(grid[key],frame[key])
+                self.assertEqual(len(grid['values']),11)
+                self.assertTrue(all(len(r)==11 for r in grid['values']))
+                self.assertEqual(sum(sum(r) for r in grid['values']),1)
+                self.assertEqual(one_hot_matrix(grid['values']),(column/10,row/10))
+                trace=self.runtime.snapshot()['trace'][-1]
+                self.assertEqual((trace['pupil_matrix_row'],trace['pupil_matrix_column']),(row,column))
+        self.assertEqual(self.session.state(include_detector=True)['detector']['trace'],self.runtime.snapshot()['trace'])
+        # Fractional directions remain continuous in the existing mouse adapter.
+        frame=self.feed(pupil_x=.273,pupil_y=.25)
+        sample=decode(frame,MouseConfig(pointer_source='gaze'),'single-user')
+        self.assertAlmostEqual(sample.pointer[0],.273)
+        self.assertNotEqual(sample.pointer,one_hot_matrix(frame['pupil_matrix']['values']))
+
+    def test_matrix_unknown_loss_stop_load_and_csv_keep_validity_consistent(self):
+        import csv
+        self.feed(pupil_x=.8)
+        for kwargs in ({'blank':True},{'left_closed':True},{'right_closed':True}):
+            frame=self.feed(**kwargs);grid=frame['pupil_matrix']
+            self.assertFalse(grid['valid']);self.assertIsNone(grid['values'])
+            self.assertIsNone(grid['row']);self.assertIsNone(grid['column'])
+            self.assertEqual(grid['confidence'],0)
+        self.feed();self.core.disconnect()
+        self.assertIsNone(self.core.frame['pupil_matrix']['values'])
+        self.feed();data=self.core.export_calibration();self.core.load_calibration(data)
+        self.assertIsNone(self.core.frame['pupil_matrix']['values'])
+        self.feed(pupil_y=.825)
+        with tempfile.TemporaryDirectory() as folder:
+            path=folder+'/pupils.csv';self.runtime.export_trace(path)
+            with open(path) as handle:row=list(csv.DictReader(handle))[-1]
+            self.assertEqual(row['pupil_matrix_row'],'10')
+            self.assertEqual(row['pupil_matrix_valid'],'True')
+            self.assertEqual(row['pupil_matrix_size'],'11')
+            self.assertNotIn('pupil_x_sensitivity',row)
+        self.now+=self.core.config.stale_ms+1
+        self.assertIsNone(self.runtime.snapshot()['frame']['pupil_matrix']['values'])
+
     def test_profile_roundtrip_without_training_and_atomic_validation(self):
-        self.session.detector_command('set_pupil_sensitivity',2,.5)
-        data=self.core.export_calibration();self.assertEqual(data['version'],9)
+        data=self.core.export_calibration();self.assertEqual(data['version'],10)
         self.assertEqual(data['eyes'],{});self.assertIsNone(data['head'])
         self.core.disconnect();self.core.load_calibration(data)
         values=self.feed(pupil_x=.75,pupil_y=1)['faces'][0]['signals']
-        self.assertAlmostEqual(values['gaze_x']['value'],1)
-        self.assertEqual(values['gaze_y']['value'],.75)
+        self.assertAlmostEqual(values['gaze_x']['value'],.75)
+        self.assertEqual(values['gaze_y']['value'],1)
         for pupil in (None,dict(data['pupil'],x_sensitivity=float('nan')),dict(data['pupil'],extra=1),
                       dict(data['pupil'],measurement='wrong')):
             bad=deepcopy(data);bad['pupil']=pupil
@@ -102,27 +153,34 @@ class JoystickIntegration(unittest.TestCase):
             self.session.detector_command('start_movement_guide','pupil')
         self.assertIsNone(self.core.movement_guide)
 
-    def test_sensitivity_preserves_fits_and_invalidates_old_normalized_sample(self):
+    def test_legacy_sensitivity_is_validated_then_discarded_without_losing_fits(self):
         self.core.head=AxisCalibration(-12,0,12,endpoint_tolerance=.05)
         self.core.head_x=AxisCalibration(-15,0,20,endpoint_tolerance=.05)
-        self.feed(pupil_x=.75)
-        self.session.lab.processor.armed=True
-        self.session.detector_command('set_pupil_sensitivity',2,.5)
-        self.assertFalse(self.session.lab.processor.armed)
-        self.assertFalse(self.core.frame['faces'][0]['signals']['gaze_x']['valid'])
-        self.assertEqual(self.core.head.low,-12);self.assertEqual(self.core.head_x.high,20)
-        with self.assertRaises(ValueError):self.session.detector_command('set_pupil_sensitivity',0,1)
-        self.assertEqual(self.core.pupil_settings['x_sensitivity'],2)
-        values=self.feed(pupil_x=.75)['faces'][0]['signals']
-        self.assertAlmostEqual(values['gaze_x']['value'],1)
-        self.session.detector_command('set_pupil_sensitivity',1,1)
-        self.assertAlmostEqual(self.feed(pupil_x=.75)['faces'][0]['signals']['gaze_x']['value'],.75)
+        data=self.core.export_calibration()
+        for version,algorithm in ((8,'direct-mediapipe-pupils-v8'),(9,'lip-boundary-head-reliability-v9')):
+            old=deepcopy(data);old.update(version=version,algorithm=algorithm)
+            old['pupil']=dict(measurement='mediapipe_iris_direction_v2',x_sensitivity=4,y_sensitivity=.25)
+            self.core.load_calibration(old)
+            values=self.feed(pupil_x=.75,pupil_y=.825)['faces'][0]['signals']
+            self.assertAlmostEqual(values['gaze_x']['value'],.75)
+            self.assertAlmostEqual(values['gaze_y']['value'],1)
+            self.assertEqual(self.core.head.low,-12);self.assertEqual(self.core.head_x.high,20)
+            self.assertIn('Old pupil sensitivity removed',self.core.notice)
+            self.assertEqual(self.core.export_calibration()['pupil'],data['pupil'])
+            saved=self.core.export_calibration()
+            for value in (float('nan'),0,5,True):
+                bad=deepcopy(old);bad['pupil']['x_sensitivity']=value
+                with self.assertRaises(ValueError):self.core.load_calibration(bad)
+                self.assertEqual(self.core.export_calibration(),saved)
+        with self.assertRaisesRegex(ValueError,'Unsupported'):
+            self.session.detector_command('set_pupil_sensitivity',2,2)
+        self.assertFalse(hasattr(self.core,'set_pupil_sensitivity'))
 
     def test_neural_reset_identity_and_unavailable_cannot_pass_absence(self):
         self.core.tongue_model=SegmentedTongueModel('/not/installed.onnx')
         self.core.head=AxisCalibration(-12,0,12,endpoint_tolerance=.05)
         model=self.core.tongue_model
-        data=self.core.export_calibration();self.assertEqual(data['version'],9)
+        data=self.core.export_calibration();self.assertEqual(data['version'],10)
         bad=deepcopy(data);bad['tongue']['sha256']='0'*64
         with self.assertRaises(ValueError):self.core.load_calibration(bad)
         self.core.reset_tongue();self.assertIs(self.core.tongue_model,model)
@@ -195,12 +253,21 @@ class JoystickIntegration(unittest.TestCase):
             self.assertFalse(hasattr(ui.pupil_panel,'window'))
             self.assertIn('no calibration',ui.pupil_panel.message.get())
             self.assertIsNone(self.core.movement_guide)
-            ui.pupil_panel.values[0].set('2');ui.pupil_panel.apply_button.invoke()
             self.feed(pupil_x=.75);ui.tick();root.update()
-            self.assertEqual(self.core.pupil_settings['x_sensitivity'],2)
-            self.assertIn('Normalized X/Y: (1.000, 0.500)',ui.pupil_details.get())
-            ui.pupil_panel.reset_button.invoke();ui.tick();root.update()
-            self.assertEqual(self.core.pupil_settings['x_sensitivity'],1)
+            self.assertIn('Normalized X/Y: (0.750, 0.500)',ui.pupil_details.get())
+            self.assertFalse(hasattr(ui.pupil_panel,'apply_button'))
+            self.assertFalse(hasattr(ui.pupil_panel,'inputs'))
+            canvas=ui.pupil_panel.canvas
+            self.assertEqual(len(canvas.find_withtag('matrix-grid')),24)
+            self.assertEqual(len(canvas.find_withtag('pupil-cell')),1)
+            cell=canvas.coords(canvas.find_withtag('pupil-cell')[0])
+            self.assertAlmostEqual(cell[2]-cell[0],cell[3]-cell[1])
+            self.assertEqual(self.core.frame['pupil_matrix']['column'],8)
+            self.feed(blank=True);ui.tick();root.update()
+            from LabUI.traces import darker
+            item=canvas.find_withtag('pupil-cell')[0]
+            self.assertEqual(canvas.itemcget(item,'fill'),darker('#6ed7fe'))
+            self.assertIsNone(self.core.frame['pupil_matrix']['values'])
             ui.movement_scope_mode.set('Normalized positions');ui.tick();root.update()
             labels={ui.scope.itemcget(item,'text') for item in ui.scope.find_all() if ui.scope.type(item)=='text'}
             self.assertIn('Pupil X',labels)

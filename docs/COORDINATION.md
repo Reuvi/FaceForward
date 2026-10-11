@@ -804,7 +804,7 @@ working head Y, eye/wink behavior, direct pupils and independent tongue scheduli
   comfortable repeatable tongue ranges, and measured concurrent camera/model rates.
   No camera was opened and no personal samples/profile data were committed.
 
-## Fixed pupil matrix and downward response — active
+## Fixed pupil matrix and downward response — complete
 
 Reuvi integration, branch `work/reuvi/integration/pupil-matrix-down`, base
 `b5e0001`. Scope: Vision pupil measurement/UI/profile/frame/trace, App command
@@ -812,3 +812,32 @@ wiring, component/integration tests and contracts/docs. Remove pupil sensitivity
 configuration, improve downward usability, add an 11×11 pupil matrix without
 changing continuous Processing inputs. Preserve other detectors and scheduling.
 Contract: PUPIL_MATRIX.md, landed before implementation.
+
+### Fixed pupil matrix handoff
+
+- Contracts `3b611ff` and `91a4d46` landed first. Removed pupil sensitivity UI,
+  runtime command and mutable settings. No pupil fitting or hidden auto-calibration.
+  v10 metadata identifies `mediapipe_iris_direction_v3`; old valid fits/settings
+  are discarded. Compatible eye/wink/head/tongue state survives, including explicit
+  v9 tongue backend choice. Combined profiles remain v3.
+- Kept raw iris geometry and default left/right/up scales; downward full scale is
+  +.065 eye widths instead of +.1. Narrow eyes can pass only with geometric iris
+  down displacement, valid down/up blendshape support, blink<.4 and remaining
+  image/iris/two-eye checks. No change to wink/click classification or inference.
+- Every workbench capture carries `pupil_matrix_v1`: fixed 11×11 one-hot array,
+  validity/confidence, row/column and original subject/session/sequence/time.
+  Unknown values are null, including stop/load/stale/loss; actual continuous
+  gaze_x/y remain the mouse processor's input. No transfer-function/driver change.
+- Native pupil tab displays a square grid/precise dot without setup controls.
+  Dark holds are display-only with readable unknown text. Raw and normalized
+  position panels are square too. Source tab and CSV report matching matrix indices;
+  per-eye diagnostics expose lid gap/blink/down-look support for live debugging.
+- Verification: all 321 tests pass — 140 Vision (local model smoke checks included),
+  106 integration (native Tk enabled), and 75 Processing. All 121 matrix cells,
+  migration, capture provenance and downstream continuous values covered. The
+  490-frame demo accepted every frame, observed all four mouse actions and ended
+  disabled/released. Changed Python passes Ruff F; whitespace/scope checks pass.
+- Runbook: docs/DIRECT_PUPIL_TESTING.md. Remaining: user live check of downward
+  usable range versus tracking loss and blink rejection. Fixed scale/gates are
+  experimental engineering defaults; generated fixtures do not measure human accuracy.
+  No camera or personal recordings/profile data used for verification.

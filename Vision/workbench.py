@@ -7,7 +7,7 @@ from .features import DetectionConfig, analyze_features
 from .wink_guide import EyeCalibrationFlow
 from .movement_guide import MovementGuide
 from .wink_model import NAMES, measure as measure_winks, score as wink_score, classify as classify_wink
-from .pupil import PupilReading, measure as measure_pupils, normalize as normalize_pupils, settings as pupil_settings, MEASUREMENT as PUPIL_MEASUREMENT
+from .pupil import PupilReading, measure as measure_pupils, normalize as normalize_pupils, matrix_sample as pupil_matrix, MEASUREMENT as PUPIL_MEASUREMENT
 from .pipeline import VisionPipeline
 from .signals import SINGLE_SUBJECT, invalid, make_face, measurement, monotonic_ms
 from .tongue import TONGUE_MEASUREMENT, TongueModel, TongueResult, mouth_crop, sample_colors
@@ -52,7 +52,6 @@ class DetectorWorkbench:
         self.wink_vectors = {}
         self.wink_readings = {}
         self.head = self.head_x = None
-        self.pupil_settings = pupil_settings()
         self.pupil = PupilReading()
         self.tongue_range = None
         self.positives, self.negatives = [], []
@@ -79,7 +78,6 @@ class DetectorWorkbench:
         self.winks.clear()
         self.wink_readings.clear()
         self.head = self.head_x = None
-        self.pupil_settings = pupil_settings()
         self.pupil = PupilReading()
         self.tongue_range = None
         self.job = None
@@ -113,6 +111,7 @@ class DetectorWorkbench:
         self.notice = reason
         if self.frame is not None:
             self.frame = dict(self.frame, faces=[make_face(f["subject_id"]) for f in self.frame["faces"]])
+            self.frame["pupil_matrix"] = pupil_matrix(self.frame, SINGLE_SUBJECT)
             if "eye_intent" in self.frame:
                 self.frame["eye_intent"]=dict(self.frame["eye_intent"],
                     left=dict(value=None,known=False,state="unknown"),right=dict(value=None,known=False,state="unknown"))
@@ -154,12 +153,11 @@ class DetectorWorkbench:
         return encode_preset(self)
 
     def load_calibration(self, data):
-        from .presets import decode_preset, decode_winks, decode_tongue_range, decode_pupil_settings, decode_head_x
+        from .presets import decode_preset, decode_winks, decode_tongue_range, decode_head_x
         self._require_idle()
         config, eyes, head, tongue = decode_preset(data)
         winks = decode_winks(data)
         tongue_range = decode_tongue_range(data, config)
-        pupil_options = decode_pupil_settings(data)
         head_x = decode_head_x(data, config)
         migrated_neural = data["version"] < 9 and hasattr(tongue, "measurement")
         if migrated_neural:
@@ -176,7 +174,6 @@ class DetectorWorkbench:
         self.config, self.eyes, self.head, self.tongue_model = config, eyes, head, tongue
         self.head_x = head_x
         self.winks = winks
-        self.pupil_settings = pupil_options
         self.tongue_range = tongue_range
         self.pipeline.tracker.max_gap_ms = config.stale_ms
         self.notice = "Profile loaded. Check live readings; output remains stopped."
@@ -190,6 +187,8 @@ class DetectorWorkbench:
             self.notice += " Incompatible tongue range removed; this backend needs its own position guide."
         if migrated_neural:
             self.notice += " Old neural tongue range removed; inspect the new lip-boundary color detector and learn its range."
+        if data["version"] in (8,9):
+            self.notice += " Old pupil sensitivity removed; fixed direction needs no configuration."
         if tongue is not None:
             self.notice += (" Recheck saved tongue range." if tongue_range else
                             " Run tongue position guide to learn a personal range.")
@@ -217,6 +216,7 @@ class DetectorWorkbench:
                     values.update({key: invalid() for key in keys})
                 faces.append(make_face(face["subject_id"], values))
             self.frame = dict(self.frame, faces=faces)
+            self.frame["pupil_matrix"] = pupil_matrix(self.frame, SINGLE_SUBJECT)
 
     def collect(self, target):
         self._require_subject()
@@ -394,14 +394,6 @@ class DetectorWorkbench:
         self.reset_tongue()
         self.tongue_model = model
         self.notice = "Local tongue segmentation ready. Inspect its mask, then start the position guide."
-
-    def set_pupil_sensitivity(self, x, y):
-        self._require_idle()
-        options = pupil_settings(dict(measurement=PUPIL_MEASUREMENT, x_sensitivity=x, y_sensitivity=y))
-        self.pupil_settings = options
-        self._invalidate("gaze_x", "gaze_y")
-        self.generation += 1
-        self.notice = "Pupil sensitivity updated; direct measurements resume on the next capture. Other fits retained."
 
     def _require_idle(self):
         if self.calibrating:
@@ -673,7 +665,7 @@ class DetectorWorkbench:
                 self.reasons["head_x"] = ("Head X at calibrated limit · tracking remains valid"
                                            if bounded != feature.value else "Calibrated head X")
             self.reasons["pupil"] = self.pupil.reason
-            xy = normalize_pupils(self.pupil.xy, self.pupil_settings)
+            xy = normalize_pupils(self.pupil.xy)
             if xy is not None:
                 values["gaze_x"], values["gaze_y"] = [measurement(v, self.pupil.quality) for v in xy]
                 self.reasons["pupil"] = "Direct MediaPipe iris direction · no calibration"
@@ -699,6 +691,7 @@ class DetectorWorkbench:
         frame["position_space"] = "personal_tongue_tip_v1"
         frame["tongue_measurement"] = getattr(self.tongue_model, "measurement", TONGUE_MEASUREMENT)
         frame["gaze_measurement"] = PUPIL_MEASUREMENT
+        frame["pupil_matrix"] = pupil_matrix(frame, SINGLE_SUBJECT)
         if self.independent_tongue:
             frame["tongue_sample"] = self.async_tongue.sample(frame, SINGLE_SUBJECT)
         intent = dict(format="eye_intent_v1",subject_id=SINGLE_SUBJECT,
@@ -741,15 +734,18 @@ class DetectorWorkbench:
                "tongue_candidate_y": self.tongue.xy[1] if self.tongue.xy else None,
                "tongue_area_fraction": self.tongue.area_fraction, "tongue_quality": self.tongue.quality}
         row.update(gaze_measurement=PUPIL_MEASUREMENT,
-                   pupil_x_sensitivity=self.pupil_settings["x_sensitivity"],
-                   pupil_y_sensitivity=self.pupil_settings["y_sensitivity"],
                    pupil_raw_x=self.pupil.xy[0] if self.pupil.xy else None,
                    pupil_raw_y=self.pupil.xy[1] if self.pupil.xy else None,
                    pupil_reason=self.reasons.get("pupil", self.pupil.reason),
                    tongue_inference_ms=(self.tongue_model.report.get("inference_ms") if self.tongue_model else None),
                    tongue_model_confidence=(self.tongue_model.report.get("confidence") if self.tongue_model else None))
+        grid = frame["pupil_matrix"]
+        row.update(pupil_matrix_row=grid["row"], pupil_matrix_column=grid["column"],
+                   pupil_matrix_size=grid["size"], pupil_matrix_valid=grid["valid"])
         for side in ("left", "right"):
             eye = self.pupil.eyes.get(side, {})
+            for key in ("lid_gap", "blink", "look_down", "look_up", "down_supported"):
+                row[side+"_pupil_"+key] = eye.get(key)
             for axis, index in (("x", 0), ("y", 1)):
                 row[side+"_pupil_"+axis] = eye["xy"][index] if eye.get("xy") else None
         for side in ("left", "right", "head", "head_x"):
@@ -800,7 +796,7 @@ class DetectorWorkbench:
         self.expire()
         return {"frame": self.frame, "selected": self.selected, "notice": self.notice,
                 "scope_subject": SINGLE_SUBJECT,
-                "pupil": asdict(self.pupil), "pupil_settings": dict(self.pupil_settings),
+                "pupil": asdict(self.pupil),
                 "tongue_worker": self.async_tongue.state(self.clock()) if self.independent_tongue else None,
                 "tongue_backend": getattr(self.tongue_model,"backend","color"),
                 "wink_readings": dict(self.wink_readings),

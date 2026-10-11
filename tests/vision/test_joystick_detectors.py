@@ -10,7 +10,7 @@ if AVAILABLE:
     import numpy as np
     from Vision.demo_detection import demo_image
     from Vision.features import DetectionConfig, analyze_features
-    from Vision.pupil import measure, normalize, settings
+    from Vision.pupil import measure, normalize, matrix_cell
     from Vision.tongue import mouth_crop
     from Vision.tongue_segment import SegmentedTongueModel, decode_mask
 
@@ -47,19 +47,42 @@ class PupilMeasurements(unittest.TestCase):
     def test_fixed_normalization_clamps_without_training_or_history(self):
         for raw, want in (((0,0),(.5,.5)), ((-.2,-.1),(0,0)), ((.2,.1),(1,1)),
                           ((.1,-.05),(.75,.25)), ((-.3,.2),(0,1))):
-            self.assertEqual(normalize(raw,settings()),want)
+            self.assertEqual(normalize(raw),want)
         for raw in (None, (float('nan'),0), (0,float('inf'))):
-            self.assertIsNone(normalize(raw,settings()))
-        options=settings(dict(settings(), x_sensitivity=2, y_sensitivity=.5))
-        self.assertEqual(normalize((.1,.1),options),(1,.75))
+            self.assertIsNone(normalize(raw))
+        self.assertEqual(normalize((0,.065)),(.5,1))
+        self.assertEqual(normalize((0,.0325)),(.5,.75))
 
-    def test_settings_validate_and_do_not_share_defaults(self):
-        first=settings();first['x_sensitivity']=3
-        self.assertEqual(settings()['x_sensitivity'],1)
-        for value in (True, 0, .24, 4.01, float('nan'), float('inf')):
-            with self.assertRaises(ValueError):settings(dict(settings(), x_sensitivity=value))
-        for value in ({}, dict(settings(), extra=1), dict(settings(), measurement='old')):
-            with self.assertRaises(ValueError):settings(value)
+    def test_matrix_rounding_and_invalid_cells(self):
+        for xy,want in (((0,0),(0,0)),((.5,.5),(5,5)),((1,1),(10,10)),((.25,.75),(8,3))):
+            self.assertEqual(matrix_cell(xy),want)
+        for xy in (None,(True,0),(-.1,.5),(.5,1.1),(.5,float('nan'))):
+            self.assertIsNone(matrix_cell(xy))
+
+    def test_down_look_can_keep_a_narrow_eye_without_allowing_blinks(self):
+        b,obs=demo_image(pupil_y=.75,left_ratio=.12,right_ratio=.12)
+        o=obs[0]
+        features=analyze_features(b,o,DetectionConfig())
+        self.assertIsNone(measure(o,features).xy)
+        for side in ('Left','Right'):
+            o.expressions.update({"eyeLookDown"+side:.6,"eyeLookUp"+side:.05})
+        result=measure(o,features)
+        self.assertIsNotNone(result.xy,result.reason)
+        self.assertTrue(all(e['down_supported'] for e in result.eyes.values()))
+        self.assertGreater(normalize(result.xy)[1],.8)
+        for value in (.4,.95,float('nan')):
+            o.expressions['eyeBlinkLeft']=value
+            self.assertIsNone(measure(o,features).xy)
+        o.expressions['eyeBlinkLeft']=.08
+        for bad in (None,float('nan'),1.5):
+            o.expressions['eyeLookDownLeft']=bad
+            self.assertIsNone(measure(o,features).xy)
+        o.expressions.update(eyeLookDownLeft=.6,eyeLookUpLeft=.55)
+        self.assertIsNone(measure(o,features).xy)
+        # Down-look coefficients must never reopen an anatomically closed eye.
+        b,obs=demo_image(left_closed=True,pupil_y=.75)
+        o=obs[0];o.expressions.update(eyeLookDownLeft=.9,eyeLookUpLeft=0,eyeBlinkLeft=.05)
+        self.assertIsNone(measure(o,analyze_features(b,o,DetectionConfig())).xy)
 
     def test_direction_survives_translation_scale_roll_and_missing_pose(self):
         import math

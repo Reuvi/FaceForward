@@ -308,6 +308,8 @@ class IntegratedDesktop(DesktopLab):
                     lines.append(f"{key:5s} raw {reading}   quality {feature['quality']:.2f}")
             lines.append("Head units: pitch/yaw degrees")
             lines.append("Head X: " + detector_state["reasons"].get("head_x", "Waiting for face"))
+            matrix=(detector_state.get("frame") or {}).get("pupil_matrix", {})
+            lines.append("Pupil matrix 11×11: " + (f"row {matrix['row']}, column {matrix['column']}" if matrix.get("valid") else "unavailable"))
             candidate=detector_state.get("candidate")
             lines.append("Tongue raw tip X/Y (mouth widths): "+(f"{candidate[0]:.3f}, {candidate[1]:.3f}" if candidate else "unavailable; inspect Tongue calibration"))
             lines.append(detector_state["notice"])

@@ -1,33 +1,66 @@
 """Eye-relative iris direction, not screen gaze. No additional ML inference."""
+
 import math
 from dataclasses import dataclass, field
 from .geometry import eye_ratios, midpoint, sub
 from .landmarks import EYES
 from .signals import finite_number
 
-MEASUREMENT = "mediapipe_iris_direction_v2"
-HALF_RANGES = (.2, .1)  # Eye widths, independent of changing lid opening.
+MEASUREMENT = "mediapipe_iris_direction_v3"
+X_HALF_RANGE, UP_RANGE, DOWN_RANGE = 0.2, 0.1, 0.065
+MATRIX_SIZE = 11
 
 
-def settings(value=None):
-    if value is None:
-        return dict(measurement=MEASUREMENT, x_sensitivity=1., y_sensitivity=1.)
-    if (not isinstance(value, dict)
-            or set(value) != {"measurement", "x_sensitivity", "y_sensitivity"}
-            or value["measurement"] != MEASUREMENT):
-        raise ValueError("Unsupported direct pupil settings")
-    for key in ("x_sensitivity", "y_sensitivity"):
-        if not finite_number(value[key]) or not .25 <= value[key] <= 4:
-            raise ValueError(f"{key} must be a finite number from 0.25 to 4")
-    return dict(value)
-
-
-def normalize(xy, options):
-    """Fixed geometric scale, no training, temporal extrema or pose reference."""
+def normalize(xy):
+    """Fixed geometry only: no user settings, training, or temporal fitting."""
     if xy is None or len(xy) != 2 or not all(finite_number(v) for v in xy):
         return None
-    return tuple(max(0., min(1., .5+v*options[key]/(2*span)))
-                 for v, span, key in zip(xy, HALF_RANGES, ("x_sensitivity", "y_sensitivity")))
+    x, y = xy
+    return (
+        max(0.0, min(1.0, 0.5 + x / (2 * X_HALF_RANGE))),
+        max(0.0, min(1.0, 0.5 + y / (2 * (UP_RANGE if y <= 0 else DOWN_RANGE)))),
+    )
+
+
+def matrix_cell(xy):
+    if (
+        xy is None
+        or len(xy) != 2
+        or not all(finite_number(v) and 0 <= v <= 1 for v in xy)
+    ):
+        return None
+    return tuple(int(math.floor(v * (MATRIX_SIZE - 1) + 0.5)) for v in (xy[1], xy[0]))
+
+
+def matrix_sample(frame, subject):
+    """Additive one-hot sample; invalid evidence never becomes a center cell."""
+    signals = next(
+        (f["signals"] for f in frame["faces"] if f["subject_id"] == subject), {}
+    )
+    axes = [signals.get(k, {}) for k in ("gaze_x", "gaze_y")]
+    confidence = min((a.get("confidence", 0) for a in axes), default=0)
+    cell = (
+        matrix_cell(tuple(a.get("value") for a in axes))
+        if all(a.get("valid") for a in axes)
+        else None
+    )
+    values = None
+    if cell is not None and finite_number(confidence) and 0 < confidence <= 1:
+        values = [[0] * MATRIX_SIZE for _ in range(MATRIX_SIZE)]
+        values[cell[0]][cell[1]] = 1
+    else:
+        cell, confidence = None, 0.0
+    return dict(
+        format="pupil_matrix_v1",
+        size=MATRIX_SIZE,
+        **{key: frame[key] for key in ("session_id", "sequence", "timestamp_ms")},
+        subject_id=subject,
+        valid=cell is not None,
+        confidence=confidence,
+        row=cell[0] if cell else None,
+        column=cell[1] if cell else None,
+        values=values,
+    )
 
 
 @dataclass
@@ -42,9 +75,13 @@ class PupilReading:
 def pose_angles(rotation):
     if rotation is None:
         return None
-    return (math.degrees(math.atan2(rotation[0][2], rotation[2][2])),
-            math.degrees(math.atan2(-rotation[1][2], math.hypot(rotation[0][2], rotation[2][2]))),
-            math.degrees(math.atan2(rotation[1][0], rotation[1][1])))
+    return (
+        math.degrees(math.atan2(rotation[0][2], rotation[2][2])),
+        math.degrees(
+            math.atan2(-rotation[1][2], math.hypot(rotation[0][2], rotation[2][2]))
+        ),
+        math.degrees(math.atan2(rotation[1][0], rotation[1][1])),
+    )
 
 
 def measure(observation, features):
@@ -57,37 +94,78 @@ def measure(observation, features):
     qualities = []
     for side, (corners, pairs, ring) in EYES.items():
         f = features[side]
-        blink = observation.expressions.get("eyeBlink"+side.title(), 0)
-        opened = f.value is not None and f.value >= .16
-        entry = {"xy": None, "valid": False, "reason": "Open eye clearly to measure its iris"}
+        blink = observation.expressions.get("eyeBlink" + side.title(), 0)
+        look_down = observation.expressions.get("eyeLookDown" + side.title())
+        look_up = observation.expressions.get("eyeLookUp" + side.title())
+        entry = {
+            "xy": None,
+            "valid": False,
+            "reason": "Open eye clearly to measure its iris",
+            "lid_gap": f.value,
+            "blink": blink,
+            "look_down": look_down,
+            "look_up": look_up,
+            "down_supported": False,
+        }
         result.eyes[side] = entry
-        if not f.quality or not opened or blink >= .4:
+        if (
+            not f.quality
+            or f.value is None
+            or f.value < 0.10
+            or not finite_number(blink)
+            or not 0 <= blink < 0.4
+        ):
             continue
-        center = tuple(sum(points[i][axis] for i in ring)/4 for axis in (0, 1))
+        center = tuple(sum(points[i][axis] for i in ring) / 4 for axis in (0, 1))
         width = math.dist(points[corners[0]], points[corners[1]])
-        radius = sum(math.dist(center, points[i]) for i in ring)/4/max(width, 1e-6)
-        if not .025 <= radius <= .25:
+        radius = sum(math.dist(center, points[i]) for i in ring) / 4 / max(width, 1e-6)
+        if not 0.025 <= radius <= 0.25:
             entry["reason"] = "Iris shape too small or distorted"
             continue
         try:
-            ratios = eye_ratios(*(points[i] for i in corners),
-                                [(points[a], points[b]) for a, b in pairs], center, down)
+            ratios = eye_ratios(
+                *(points[i] for i in corners),
+                [(points[a], points[b]) for a, b in pairs],
+                center,
+                down,
+            )
         except ValueError:
             continue
-        xy = (ratios.horizontal-.5, ratios.vertical)
-        if not (-.45 <= xy[0] <= .45 and -.3 <= xy[1] <= .3):
+        xy = (ratios.horizontal - 0.5, ratios.vertical)
+        if not (-0.45 <= xy[0] <= 0.45 and -0.3 <= xy[1] <= 0.3):
             entry["reason"] = "Iris outside supported eye geometry"
             continue
-        entry.update(xy=xy, valid=True, reason="Visible open-eye iris")
+        down_supported = (
+            "eyeBlink" + side.title() in observation.expressions
+            and xy[1] > 0.015
+            and finite_number(look_down)
+            and finite_number(look_up)
+            and 0.2 <= look_down <= 1
+            and 0 <= look_up <= 1
+            and look_down - look_up >= 0.1
+        )
+        entry["down_supported"] = down_supported
+        if f.value < 0.16 and not down_supported:
+            entry["reason"] = "Narrow eye without supported downward iris direction"
+            continue
+        entry.update(
+            xy=xy,
+            valid=True,
+            reason="Supported down-looking iris"
+            if f.value < 0.16
+            else "Visible open-eye iris",
+        )
         qualities.append(f.quality)
     if not all(v["valid"] for v in result.eyes.values()):
-        result.reason = "Both pupils need clear, open eyes; closure pauses this joystick"
+        result.reason = (
+            "Both pupils need clear, open eyes; closure pauses this joystick"
+        )
         return result
     left, right = [result.eyes[s]["xy"] for s in ("left", "right")]
-    if max(abs(a-b) for a, b in zip(left, right)) > .18:
+    if max(abs(a - b) for a, b in zip(left, right)) > 0.18:
         result.reason = "Pupil directions disagree; face the camera and check lighting"
         return result
-    result.xy = tuple((a+b)/2 for a, b in zip(left, right))
+    result.xy = tuple((a + b) / 2 for a, b in zip(left, right))
     result.quality = min(qualities)
     result.reason = "Raw pupil direction available"
     return result

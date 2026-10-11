@@ -94,7 +94,6 @@ class BoundaryIntegration(unittest.TestCase):
             self.core.head,
             self.core.head_x,
             dict(self.core.eyes),
-            dict(self.core.pupil_settings),
         )
         self.core.tongue_model = SegmentedTongueModel("/unused.onnx")
         self.core.tongue_range = {k: AxisCalibration(-0.2, 0, 0.2) for k in ("x", "y")}
@@ -110,7 +109,6 @@ class BoundaryIntegration(unittest.TestCase):
                 self.core.head,
                 self.core.head_x,
                 self.core.eyes,
-                self.core.pupil_settings,
             ),
             old,
         )
@@ -121,7 +119,7 @@ class BoundaryIntegration(unittest.TestCase):
             for k in ("x", "y")
         }
         data = self.core.export_calibration()
-        self.assertEqual(data["version"], 9)
+        self.assertEqual(data["version"], 10)
         self.core.load_calibration(data)
         self.assertEqual(self.core.export_calibration(), data)
         self.assertEqual(self.core.validation, {})
@@ -141,6 +139,12 @@ class BoundaryIntegration(unittest.TestCase):
         self.assertIsInstance(
             self.core.tongue_model, SegmentedTongueModel
         )  # v9 explicit choice survives
+        legacy_nine=deepcopy(neural)
+        legacy_nine.update(version=9,algorithm="lip-boundary-head-reliability-v9")
+        legacy_nine["pupil"]=dict(measurement="mediapipe_iris_direction_v2",x_sensitivity=2,y_sensitivity=.5)
+        self.core.load_calibration(legacy_nine)
+        self.assertIsInstance(self.core.tongue_model,SegmentedTongueModel)
+        self.assertIsNotNone(self.core.tongue_range)
         for version, algorithm in (
             (8, "direct-mediapipe-pupils-v8"),
             (7, "independent-head-axes-v7"),
@@ -148,6 +152,7 @@ class BoundaryIntegration(unittest.TestCase):
         ):
             old = deepcopy(neural)
             old.update(version=version, algorithm=algorithm)
+            old["pupil"] = dict(measurement="mediapipe_iris_direction_v2", x_sensitivity=1., y_sensitivity=1.)
             if version < 8:
                 old["pupil"] = None
             if version < 7:
