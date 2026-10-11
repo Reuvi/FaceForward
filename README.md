@@ -1,3 +1,5 @@
+https://www.youtube.com/watch?v=lv5aPpC8HHo&t=2s
+
 ## Inspiration
 
 For someone with limited hand mobility, everyday computer tasks can become barriers to communication, work, entertainment, and independence. Current solutions are either to clanky to use, require additional hardware, or is too expensive and behind human trials. We wanted to explore how much control we could provide using hardware people already have: a computer and a webcam.
