@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Driver pointer delta probe</title>
+<style>
+  :root { color-scheme: dark; font: 16px system-ui, sans-serif; }
+  body { margin: 0; padding: 1.25rem; background: #111827; color: #e5e7eb; }
+  h1 { margin: 0 0 .5rem; font-size: 1.4rem; }
+  p { max-width: 70rem; line-height: 1.45; }
+  button { margin: .25rem .5rem .75rem 0; padding: .65rem .9rem; }
+  #status { font-weight: 700; color: #93c5fd; }
+  #stage { position: relative; height: 55vh; min-height: 18rem; overflow: hidden;
+           border: 2px solid #64748b; border-radius: .5rem; background: #0b1220; }
+  #dot { position: absolute; width: 1rem; height: 1rem; border-radius: 50%;
+         background: #f97316; transform: translate(-50%, -50%); pointer-events: none; }
+  #crosshair { display: none; position: absolute; inset: 50% auto auto 50%;
+               width: 1.4rem; height: 1.4rem; transform: translate(-50%, -50%); }
+  #crosshair::before, #crosshair::after { content: ""; position: absolute; background: #22d3ee; }
+  #crosshair::before { left: 50%; top: 0; width: 2px; height: 100%; }
+  #crosshair::after { top: 50%; left: 0; height: 2px; width: 100%; }
+  body.locked #dot { display: none; }
+  body.locked #crosshair { display: block; }
+  pre { white-space: pre-wrap; background: #030712; padding: .8rem; border-radius: .4rem; }
+</style>
+<body>
+  <h1>Driver mouse input probe</h1>
+  <p>Free mode displays the browser cursor's viewport position. Lock mode reports
+     relative <code>movementX/Y</code> deltas while keeping the cursor centered.
+     Press Escape to unlock. Focus this page before sending native Driver input.</p>
+  <button id="lock">Lock pointer for relative-delta test</button>
+  <button id="reset">Reset totals</button>
+  <span id="status">Free cursor</span>
+  <div id="stage" tabindex="0" aria-label="Pointer input test area">
+    <div id="dot"></div><div id="crosshair"></div>
+  </div>
+  <pre id="readout">Move the mouse or run the Driver's native velocity test.</pre>
+  <pre id="keys">Keyboard: no key transitions yet.</pre>
+<script>
+  const stage = document.querySelector("#stage");
+  const dot = document.querySelector("#dot");
+  const status = document.querySelector("#status");
+  const readout = document.querySelector("#readout");
+  const keys = document.querySelector("#keys");
+  let dxTotal = 0, dyTotal = 0, last = "No movement received yet.";
+
+  function render() {
+    const locked = document.pointerLockElement === stage;
+    document.body.classList.toggle("locked", locked);
+    status.textContent = locked ? "POINTER LOCKED — relative mode" : "Free cursor — position mode";
+    readout.textContent = `${last}\nCumulative movementX/Y: ${dxTotal} / ${dyTotal}`;
+  }
+  document.querySelector("#lock").addEventListener("click", async () => {
+    try {
+      stage.focus();
+      await stage.requestPointerLock();
+    } catch (error) {
+      status.textContent = `Pointer lock failed: ${error.message}`;
+    }
+  });
+  document.querySelector("#reset").addEventListener("click", () => {
+    dxTotal = 0; dyTotal = 0; last = "Totals reset."; render();
+  });
+  document.addEventListener("pointerlockchange", render);
+  document.addEventListener("pointerlockerror", () => {
+    status.textContent = "Pointer lock was rejected by the browser.";
+  });
+  document.addEventListener("mousemove", event => {
+    dxTotal += event.movementX;
+    dyTotal += event.movementY;
+    last = document.pointerLockElement === stage
+      ? `Locked relative delta: ${event.movementX} / ${event.movementY}`
+      : `Free cursor position (viewport): ${event.clientX} / ${event.clientY}; ` +
+        `movement: ${event.movementX} / ${event.movementY}`;
+    if (document.pointerLockElement !== stage) {
+      dot.style.left = `${event.clientX - stage.getBoundingClientRect().left}px`;
+      dot.style.top = `${event.clientY - stage.getBoundingClientRect().top}px`;
+    }
+    render();
+  });
+  document.addEventListener("keydown", event => {
+    if (["w", "a", "s", "d", " "].includes(event.key.toLowerCase())) event.preventDefault();
+    keys.textContent = `Key down: ${event.key}${event.repeat ? " (repeat)" : ""}`;
+  });
+  document.addEventListener("keyup", event => {
+    keys.textContent = `Key up: ${event.key}`;
+  });
+  render();
+</script>
+</body>
+</html>
