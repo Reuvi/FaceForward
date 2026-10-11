@@ -31,7 +31,8 @@ before converting settings to pitch and removing only the incompatible head fit.
 Compatible eyes/winks/tongue data are retained under their existing rules. Older
 presets without an explicit mode are interpreted as the old position default.
 New saves explicitly name pitch; preset v5 and combined profile v3 are unchanged.
-Head X is reserved and remains unavailable.
+Head X is now independently calibrated as yaw; see HEAD_HORIZONTAL.md, which
+also defines detector preset v7. The pitch behavior above is unchanged.
 
 Tongue appearance remains experimental local color segmentation with manual
 tongue-only marking. The current measurement is the middle of its visible front

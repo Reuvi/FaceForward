@@ -697,3 +697,14 @@ Head/eye/pupil measurements and Drivers behavior remain otherwise unchanged.
   Profiles remain detectorv6/combinedv3. Shared CPU/memory/thermal contention can
   still influence rates; independent processes remove the blocking dependency.
   Live user testing and emulator integration remain separate next steps.
+
+## Horizontal head detection — active
+
+Reuvi integration, branch `work/reuvi/integration/horizontal-head`, base `43b3005`.
+Scope: Vision features/calibration/presets/shared UI/trace, App calibration command
+wiring, relevant Vision/integration tests, contracts, runbooks and agent notes.
+Implement independent yaw calibration and normalized head_x beside working pitch.
+Contract: `Contracts/HEAD_HORIZONTAL.md`, committed before implementation.
+Keep fast per-capture sampling and independent tongue worker; no mouse mapping or
+Drivers change. Acceptance: left/neutral/right normalized endpoints, saved-profile
+compatibility, matching views, invalid input, independent fits and native tests.

@@ -71,3 +71,10 @@ Read Contracts/ASYNC_DETECTION.md relative to the repository root. It supersedes
 older same-worker/no-second-worker instructions for neural tongue inference.
 Keep one camera and shared trace; isolate independent models in bounded workers,
 preserve original sample timestamps, and never wait for tongue on the fast path.
+
+## Horizontal head update
+
+Read Contracts/HEAD_HORIZONTAL.md relative to the repository root. Add independent
+yaw/head_x beside pitch/head_y; the pitch-only measurement-mode rule remains for
+vertical detection. Guides and fits are separate. New detector presets are v7,
+with v1–v6 readable; combined profiles remain v3. No implicit device remapping.
