@@ -96,3 +96,12 @@ failed retries. Head Y stays unchanged. Camera tongue defaults to an experimenta
 local color extension outside MediaPipe's outer lips, in the independent worker;
 ONNX remains an explicit option. Presets v9 validate/migrate older files, preserving
 compatible other fits. Combined files stay v3.
+
+## Fixed pupil matrix update
+
+Read Contracts/PUPIL_MATRIX.md relative to the repository root. Pupil detection
+requires no calibration or adjustable sensitivity. Presets v10 validate and
+discard old pupil settings, retaining compatible other fits. Add an 11×11
+one-hot pupil matrix on every capture while retaining precise gaze_x/y for
+Processing. Unknown matrix values are null; dark display holds are presentation
+only. Preserve independent eyes/winks, head axes and tongue scheduling.

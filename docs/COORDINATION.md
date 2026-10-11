@@ -803,3 +803,12 @@ working head Y, eye/wink behavior, direct pupils and independent tongue scheduli
   lip-outline accuracy/contrast, false tongue candidates while smiling/talking,
   comfortable repeatable tongue ranges, and measured concurrent camera/model rates.
   No camera was opened and no personal samples/profile data were committed.
+
+## Fixed pupil matrix and downward response — active
+
+Reuvi integration, branch `work/reuvi/integration/pupil-matrix-down`, base
+`b5e0001`. Scope: Vision pupil measurement/UI/profile/frame/trace, App command
+wiring, component/integration tests and contracts/docs. Remove pupil sensitivity
+configuration, improve downward usability, add an 11×11 pupil matrix without
+changing continuous Processing inputs. Preserve other detectors and scheduling.
+Contract: PUPIL_MATRIX.md, landed before implementation.
