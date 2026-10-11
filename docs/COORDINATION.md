@@ -905,7 +905,7 @@ Handoff:
   final output disabled, buttons released, velocities neutral. Changed Python
   passes Ruff F; whitespace and integration scope checks pass. No camera opened.
 
-## Head Y individual step retries — in progress
+## Head Y individual step retries — complete
 
 - Owner: Reuvi integration conversation; branch `work/reuvi/integration/head-y-step-retry`.
 - Base: `54558656fd323e5e0121e4c4e379edde3820062d`.
@@ -913,3 +913,22 @@ Handoff:
 - Contract: Head Y step correction in `Contracts/MOVEMENT_CALIBRATION.md`.
 - Goal: redo one reference or check while keeping other poses and the last working
   fit; fresh validation after changing a reference. Preserve all other channels.
+
+Handoff:
+- Contract landed first as `976e709`. Head Y has Retry current step plus explicit
+  neutral/up/down capture/check selection, including from loaded profiles.
+- `HeadPitchGuide` retains other captures/saved scalar references, clears dependent
+  checks after reference edits, and prevents bypassing failed required checks.
+  Saved values never count as captured samples. A failed attempt/full restart/cancel
+  retains the last completed pitch fit. Other detector channels remain untouched.
+- Native controls use existing rest/countdown/sound and generation-aware prompt
+  acknowledgments. App routes edits through its disarming calibration commands.
+  Preset v12, signal formats, raw pitch and normalization behavior are unchanged.
+- Verification: 154 Vision tests (152 passed, 2 optional legacy model skips; local
+  MediaPipe smoke passed), 100 integration tests including native Tk. Total 252
+  passed, 2 optional skips. All 490 mouse-demo frames accepted at ~30 Hz, all four
+  actions observed, final output disabled/released/neutral. Ruff F, whitespace and
+  integration scope checks passed. No live camera opened; no accuracy claims.
+- User instructions: `docs/HEAD_Y_RETRY_GUIDE.md`. Restart App, select Detection
+  calibration → 2 Head Y. Cancel/loss still discards unfinished captures, retaining
+  completed fits; a first-ever incomplete guide has no saved references to reuse.

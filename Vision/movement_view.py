@@ -447,9 +447,26 @@ class MovementPanel:
         ttk.Button(row, text="Cancel", command=lambda: call("cancel")).pack(
             side="left", padx=5
         )
-        if kind == "head_x":
+        if kind in ("head", "head_x"):
             self.retry = ttk.Button(self.frame, text="Retry this pose", command=lambda: call("retry_movement_step"))
             self.retry.pack(fill="x", pady=3)
+        if kind == "head":
+            self.retry.configure(text="Retry current step")
+            redo_row = ttk.Frame(self.frame)
+            redo_row.pack(fill="x", pady=3)
+            self.step_choice = tk.StringVar(value="Capture neutral")
+            self.step_picker = ttk.Combobox(redo_row, textvariable=self.step_choice, state="readonly", width=18,
+                values=[f"{role} {name}" for role in ("Capture", "Check") for name in ("neutral", "up", "down")])
+            self.step_picker.pack(side="left")
+            self.redo = ttk.Button(redo_row, text="Redo selected step", command=self.redo_selected)
+            self.redo.pack(side="left", padx=5)
+            self.retained = tk.StringVar()
+            ttk.Label(self.frame, textvariable=self.retained, wraplength=440).pack(anchor="w", pady=3)
+            ttk.Label(self.frame, text="Changing a capture keeps the other references, then rechecks all three poses. A check retry does not retrain the fit.", wraplength=440).pack(anchor="w", pady=3)
+
+    def redo_selected(self):
+        role, name = self.step_choice.get().split()
+        self.call("redo_head_y_step", "train" if role == "Capture" else "check", name)
 
     def update(self, state):
         guide = state.get("movement_guide")
@@ -458,13 +475,23 @@ class MovementPanel:
             if state["calibrating"]
             else "normal"
         )
+        if self.kind == "head":
+            ours = guide and guide["kind"] == self.kind
+            editable = bool(state.get("selected")) and (not state["calibrating"] or ours and guide["active"])
+            self.retry.configure(state="normal" if editable and ours and not guide["passed"] else "disabled")
+            self.redo.configure(state="normal" if editable else "disabled")
+            self.step_picker.configure(state="readonly" if editable else "disabled")
+            sources = guide.get("reference_sources", {}) if ours else {}
+            if not sources:
+                sources = {name: "saved" if state.get("head") else "needed" for name in ("neutral", "up", "down")}
+            self.retained.set("References: " + " · ".join(f"{name.title()}: {value}" for name,value in sources.items()))
         if self.kind == "head_x":
             ours = guide and guide["kind"] == self.kind
             self.retry.configure(state="normal" if ours and not guide["active"] and not guide["passed"] and not state["calibrating"] else "disabled")
         if not guide or guide["kind"] != self.kind:
             self.title.set(self.label + " position guide")
             self.instruction.set(
-                "Neutral → up → down, followed by new checks."
+                "Neutral → up → down, followed by new checks. Retry the current step or choose a specific capture/check below."
                 if self.kind == "head"
                 else "Neutral → your left → your right, followed by new checks. Small comfortable turns (about 10–20°); keep both eyes visible. A failed pose can be retried alone."
             )

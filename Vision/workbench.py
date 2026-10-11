@@ -6,6 +6,7 @@ from .calibration import AxisCalibration, EyeCalibration
 from .features import DetectionConfig, analyze_features
 from .wink_guide import EyeCalibrationFlow
 from .movement_guide import MovementGuide
+from .head_guide import HeadPitchGuide
 from .pupil_guide import PupilGuide
 from .pupil_calibration import normalize as normalize_pupils, SPACE as PUPIL_SPACE
 from .wink_model import NAMES, measure as measure_winks, score as wink_score, classify as classify_wink
@@ -255,12 +256,12 @@ class DetectorWorkbench:
         if kind not in ("head", "head_x") or recheck:
             raise ValueError("Choose head pitch or head yaw calibration")
         if kind=="head":
-            self.head=None
+            # Keep a completed fit until every check of its replacement passes.
             self._invalidate("head_y")
         elif kind=="head_x":
             # A failed retry must not discard a previously usable horizontal fit.
             self._invalidate("head_x")
-        self.movement_guide=MovementGuide(kind,self.config)
+        self.movement_guide=HeadPitchGuide(self.config) if kind=="head" else MovementGuide(kind,self.config)
         self.generation+=1
         self.notice=f"Guided {kind}: follow the target at comfortable limits"
 
@@ -271,10 +272,35 @@ class DetectorWorkbench:
         if self.movement_guide:
             self.movement_guide.present(index,self.clock(),phase)
 
+    def _require_head_y_edit(self):
+        self._require_subject()
+        if (self.job or self.eye_guide and self.eye_guide.active
+                or self.pupil_guide and self.pupil_guide.active
+                or self.movement_guide and self.movement_guide.active and self.movement_guide.kind != "head"):
+            raise ValueError("Finish or cancel the other calibration first")
+
+    def redo_head_y_step(self, role, name):
+        self._require_head_y_edit()
+        guide = self.movement_guide
+        if not isinstance(guide, HeadPitchGuide):
+            guide = HeadPitchGuide(self.config, existing=self.head)
+        guide.redo(role, name)
+        self.movement_guide = guide
+        self._invalidate("head_y")
+        self.generation += 1
+        self.notice = f"Redo Head Y {name} {role}: other references and the last working fit are retained."
+
     def retry_movement_step(self):
         self._require_subject()
-        self._require_idle()
         guide = self.movement_guide
+        if isinstance(guide, HeadPitchGuide):
+            self._require_head_y_edit()
+            guide.retry()
+            self._invalidate("head_y")
+            self.generation += 1
+            self.notice = "Retry this Head Y step; other accepted poses are retained."
+            return
+        self._require_idle()
         if guide is None or guide.kind != "head_x" or guide.passed:
             raise ValueError("There is no failed Head X pose to retry")
         guide.retry()

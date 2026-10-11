@@ -1,5 +1,9 @@
 # Head and tongue calibration, raw views, and the device boundary
 
+> Head Y now supports [individual capture/check retries](HEAD_Y_RETRY_GUIDE.md).
+> For current pupil calibration use [the head-compensated pupil guide](PUPIL_HEAD_CALIBRATION_GUIDE.md).
+> Presets remain v12; older fixed-pupil/tongue instructions below are historical.
+
 > Current MVP: tongue has been removed from App and Vision lab. Use
 > [App's current testing/profile guide](../App/README.md) and
 > [pupil matrix testing](../docs/DIRECT_PUPIL_TESTING.md). Eyes and head axes remain;

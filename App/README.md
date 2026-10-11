@@ -33,7 +33,11 @@ camera/demo/replay. No second application is required.
    A recognized wink remains ON while held. Eyes are independent; there is no
    opposite-eye or duration gate. [Eye testing guide](../docs/EYE_CALIBRATION_GUIDE.md).
 3. **2 Head Y**: run **Start head pitch guide**. Comfortable up/neutral/down map
-   to 0/.5/1. Pitch controls vertical scroll in mouse mode.
+   to 0/.5/1. Pitch controls vertical scroll in mouse mode. **Retry current step**
+   repeats a capture/check; choose a pose beside **Redo selected step** to redo
+   just neutral, up or down, including from a loaded profile. Other references and
+   the last working fit stay intact; changed references require fresh checks.
+   [Head Y retry instructions](../docs/HEAD_Y_RETRY_GUIDE.md).
 4. **3 Head X**: run **Start head yaw guide**. Comfortable left/neutral/right map
    to 0/.5/1. **Retry this pose** keeps successful prior captures and a previous
    completed fit. Head X is observable but is not mapped to the mouse yet.

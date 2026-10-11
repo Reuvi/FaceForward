@@ -73,7 +73,7 @@ class MouseSession:
         allowed = {"start_eye_guide", "start_wink_guide", "present_eye_step",
                    "start_movement_guide", "present_movement_step", "reset_head_x",
                    "start_pupil_guide", "present_pupil_step", "retry_pupil_step", "reset_pupils",
-                   "retry_movement_step", "collect", "cancel", "configure", "reset_calibration"}
+                   "redo_head_y_step", "retry_movement_step", "collect", "cancel", "configure", "reset_calibration"}
         if name not in allowed:
             raise ValueError("Unsupported calibration command")
         with self.lock:
