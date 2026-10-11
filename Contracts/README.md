@@ -1,5 +1,9 @@
 # Shared contracts — initial v1
 
+[MOUTH_BUTTON_RELATIVE.md](MOUTH_BUTTON_RELATIVE.md) adds the mouth-open bit,
+persisted button routing and Mouse test's W/left-click/Space assignments while
+using the existing relative velocity driver mode.
+
 [TARGET_GAME.md](TARGET_GAME.md) adds actual cursor/head telemetry and repeated
 target trials for measured personal response defaults. Practice and invalid trials
 cannot tune; mappings, detector/face profiles and driver ABI retain their formats.
