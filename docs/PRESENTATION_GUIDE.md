@@ -11,7 +11,7 @@ Eye open/closed geometry and both head axes. Mouth opening needs no calibration.
 | Open mouth wider | More resistance; wide opening stops the pointer |
 | Close left eye / reopen | Mouse button down immediately / mouse button up |
 | Keep left eye closed | Keep mouse button held; move head to drag |
-| Close/reopen right eye | One Enter press (default minimum closure 120 ms) |
+| Close/reopen right eye | One Return press (default minimum closure 120 ms) |
 | Hold both eyes closed | Toggle dictation after 450 ms; reopen between toggles |
 
 Both-eye gestures release the mouse and suppress solo actions until both reopen.
@@ -28,7 +28,7 @@ closure presses instead. Open the left eye once to prepare each press. Uncertain
 closing frames before the press do not erase that baseline or fabricate a press;
 a later valid match can still press. Once pressed, unknown/nonmatching left
 evidence releases it and requires an actual reopen before another press. There
-is no left-click or drag delay. Right-eye Enter still occurs on reopening.
+is no left-click or drag delay. Right-eye Return still occurs on reopening.
 
 ## Build and run
 
@@ -53,7 +53,7 @@ starting point, not a claim of measured improvement from mouth braking.
 1. Load your camera profile. Head X, Head Y and Eye open/closed should have valid
    readings. You can skip Wink action calibration with the default plain-eye mode.
 2. Click **Set up dictation** once. Allow Speech Recognition and Microphone for
-   Face Controller Dictation/the launching host if macOS requests them. A setup
+   **Face Controller Dictation** if macOS requests them. A setup
    error stays visible. The helper requires on-device speech support for your
    system language; if unavailable, enable/download that language under System
    Settings → Keyboard → Dictation, then retry setup. There is no cloud fallback.
@@ -61,11 +61,22 @@ starting point, not a claim of measured improvement from mouth braking.
    comfortable resting pose with both eyes open and click **Center head & start**.
    Live output requires Camera and Accessibility permission for the Python host.
 4. Move to the browser/text field and left-click it. Hold both eyes closed, then
-   reopen and speak. The pointer and other actions pause during dictation.
-5. Hold both eyes closed again and reopen to finish. The finalized text is sent
-   through the driver one printable Unicode character every 35 ms. No Enter is
+   reopen and wait for the **rising two-note sound**, then speak. It means the
+   microphone actually started. The pointer and other actions pause during dictation.
+5. Hold both eyes closed again and reopen to finish. The **falling two-note sound**
+   means recording stopped. The finalized text is sent
+   through the driver one printable Unicode character every 35 ms. No Return is
    appended. Return your head to center before moving again; use the right eye
-   to press Enter when ready.
+   to press Return when ready.
+
+An uncertain frame while closing does not erase the previous both-open baseline.
+The hold still requires 450 ms of fully known both-closed input; an unknown frame
+restarts that timer. Reopen both eyes between start and finish. Wink mode applies
+only to solo actions; dictation uses anatomical closure.
+
+The Return key is macOS's main Return key, not keypad Enter. It inserts a newline
+in a multiline field or invokes the focused field's normal submit action. No
+additional key mapping is needed in Drivers.
 
 Dictation doesn't open/activate another window. Keep the intended text field
 focused while speaking and sending. Native target applications must accept Quartz
@@ -77,7 +88,18 @@ your finish gesture before sending. After two minutes without finishing it cance
 Stop/Escape cancels speech and discards unsent characters. Already-entered
 characters remain in the focused application. Errors never send a partial speech
 hypothesis. Audio and transcripts are not saved to disk or diagnostic logs; a
-short live transcript is visible in Signals while dictating.
+short live transcript is visible in Signals while dictating. The falling cue also
+plays if recording finishes early, is cancelled, or fails after listening began.
+
+If dictation produces nothing, click **Set up dictation** and wait for **On-device
+dictation ready**. The helper now launches as its own app: the old direct executable
+launch could crash during permission setup because macOS attributed the request
+to the terminal/IDE host. Rebuild the helper and restart App after this update.
+If no rising cue plays, no recording has started: inspect the both-eyes row and
+the dictation status. Permission/language/helper errors appear there; diagnostic
+logs retain only a stable error code, listening state and character counts.
+A Driver dry run recognizes speech but does not type into other applications;
+select **Live mouse + keyboard** for actual field entry.
 
 ## Connected adjustments
 
@@ -87,8 +109,8 @@ removes existing momentum and reduces requested velocity. It never reverses the
 pointer. Closing releases the brake and restores speed through the existing head
 acceleration/filter. Head response settings remain separate.
 
-**Live curves → Eye gesture timing** adjusts the plain-mode right-eye Enter minimum
-and both-eye hold. The Enter minimum is hidden in wink mode because wink recognition
+**Live curves → Eye gesture timing** adjusts the plain-mode right-eye Return minimum
+and both-eye hold. The Return minimum is hidden in wink mode because wink recognition
 already qualifies the action. Old saved drag delay values remain compatible but
 are no longer applied or shown. **Require calibrated wink for eye actions** selects wink vs
 plain anatomical input for solo actions; both-eye dictation always uses anatomical
@@ -115,9 +137,21 @@ observations. `left_presses`/`left_releases` count gesture requests;
 Processing tests cover braking, gestures, missing input, reopening, migration and
 saved curves. Integration tests inject synthetic camera-compatible measurements,
 a fake speech service and the actual compiled dry-run driver to verify character
-ordering, cancellation, click/Enter separation and watchdog drag release. Native
-Tk tests cover mapping/curve/setup controls. These checks do not use a real camera,
+ordering, cancellation, click/Return separation and watchdog drag release. Native
+Tk tests cover mapping/curve/setup controls. Socket lifecycle tests cover background
+bundle launching, cancellation/EOF and stale-result rejection. These checks do not use a real camera,
 microphone or live OS input and do not establish human accuracy.
+
+For an explicit native driver check in temporary local text fields (it sends real
+keys only while its own field is focused, and aborts if focus changes):
+
+```bash
+Vision/.venv/bin/python tools/check_native_text.py --live
+```
+
+This verifies accented/emoji text, Return newline insertion and a single-line
+field's Return handler. Run it without other GUI tests or mouse-control apps
+actively moving focus. It does not submit anything to a website.
 
 Apple references: [on-device recognition](https://developer.apple.com/documentation/speech/sfspeechrecognizer/supportsondevicerecognition),
 [Speech permission](https://developer.apple.com/documentation/speech/sfspeechrecognizer/requestauthorization(_:)),

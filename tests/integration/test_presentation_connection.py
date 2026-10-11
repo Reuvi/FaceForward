@@ -179,6 +179,49 @@ class PresentationConnectionTests(unittest.TestCase):
         self.assertFalse(self.lab.processor.dictating)
         self.assertTrue(state['snapshot']['enabled'])
 
+    def test_sounds_follow_actual_listening_once_and_stop_on_finish(self):
+        cues=[];self.session.dictation.cue=cues.append
+        self.hold(left='closed',right='closed')
+        self.assertEqual(cues,[])  # Starting does not claim the mic is ready.
+        self.feed();self.speech.emit('listening');self.feed()
+        self.speech.emit('partial','Hi');self.feed()
+        self.speech.emit('partial','Hi there');self.feed()
+        self.assertEqual(cues,[True])
+        self.finish_speech('Hi there');self.hold(30)
+        self.assertEqual(cues,[True,False])
+
+    def test_recording_end_error_and_stop_each_emit_one_off_sound(self):
+        for end in ('captured','error','stop'):
+            with self.subTest(end=end):
+                self.lab.action({'action':'stop'});self.lab.action({'action':'arm'});self.feed()
+                self.speech.starts=self.speech.finishes=0
+                cues=[];self.session.dictation.cue=cues.append
+                self.start_speech()
+                if end=='stop':self.lab.action({'action':'stop'})
+                else:self.speech.emit(end,'Hi');self.feed()
+                if end=='captured':
+                    self.speech.emit('partial','Hi there');self.feed()
+                    self.assertEqual(self.session.dictation.state,'captured')
+                self.session.dictation.cancel()
+                self.assertEqual(cues,[True,False])
+
+    def test_permission_failure_is_visible_without_a_false_listening_sound(self):
+        cues=[];self.session.dictation.cue=cues.append
+        self.hold(left='closed',right='closed')
+        self.speech.events.append(dict(state='error',message='Allow Speech Recognition',code='speech_permission'))
+        state=self.feed()
+        self.assertEqual(cues,[])
+        self.assertEqual(state['snapshot']['dictation']['error_code'],'speech_permission')
+        self.assertIn('Allow',state['snapshot']['dictation']['message'])
+        self.assertEqual(state['output']['event_counts'].get(12,0),0)
+
+    def test_uncertain_closing_transition_still_starts_and_finishes_dictation(self):
+        self.feed(left='unknown',right='unknown')
+        self.start_speech()
+        self.feed(left='unknown',right='unknown')
+        self.finish_speech('Hello');state=self.hold(20)[-1]
+        self.assertEqual(state['output']['event_counts'].get(12),5)
+
     def test_independent_watchdog_releases_drag_and_aux_calls_cannot_refresh_it(self):
         self.hold(35,left='closed')
         output=self.lab.output

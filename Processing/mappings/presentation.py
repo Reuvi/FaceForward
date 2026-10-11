@@ -46,7 +46,7 @@ class HeldLeftEye:
 
 
 class EyeGestures:
-    """Independent held-left input; capture-timed right Enter and both-eye chord."""
+    """Independent held-left input; capture-timed right Return and both-eye chord."""
     def __init__(self):
         self.reset()
 
@@ -59,6 +59,7 @@ class EyeGestures:
         self.side = None
         self.since = self.both_since = None
         self.blocked = False
+        self.chord_seen = False
         self.drag = self.click = self.enter = self.toggle = False
         self.reason = 'Open both eyes to prepare gestures'
 
@@ -72,20 +73,25 @@ class EyeGestures:
     def _sample_combined(self, left, right, timestamp, settings, eligible, require_wink):
         self.click = self.enter = self.toggle = False
         if left is None or right is None:
-            self._reset_combined()
-            self.reason = 'Eye open/closed unknown — Enter/dictation cancelled'
+            # Preserve a prior real open baseline, but discard uncertain solo
+            # actions and restart the full chord timer. Unknown cannot toggle,
+            # rearm a consumed chord or supply any part of its closed duration.
+            self.side = self.since = self.both_since = None
+            self.reason = 'Eye open/closed unknown — Return cancelled; dictation hold reset'
             return
         if not left and not right:
             if self.ready and not self.blocked and self.side == 'right' and self.since is not None:
                 self.enter = require_wink or timestamp-self.since >= settings.solo_ms
-            self.reason = 'Enter requested' if self.enter else 'Eyes open — ready'
+            self.reason = 'Return requested' if self.enter else 'Eyes open — ready'
             self.ready = True
             self.side = self.since = self.both_since = None
             self.blocked = False
+            self.chord_seen = False
             return
         if not self.ready:
             return
         if left and right:
+            self.chord_seen = True
             self.side = self.since = None
             if self.blocked:
                 return
@@ -100,6 +106,9 @@ class EyeGestures:
             return
         if self.both_since is not None or self.blocked:
             self.blocked = True
+            return
+        if self.chord_seen:
+            self.reason = 'Both-eye gesture interrupted — reopen both eyes or restart the hold'
             return
         if left:
             if self.side == 'right':
@@ -116,7 +125,7 @@ class EyeGestures:
             return
         if self.since is None:
             self.since = timestamp
-        self.reason = 'Right eye recognized — reopen for Enter'
+        self.reason = 'Right eye recognized — reopen for Return'
 
 
 class BrakedHeadFilter(HeadPointerFilter):
@@ -276,7 +285,7 @@ class PresentationProcessor(HeadMouseProcessor):
                      filtered=int(snap['left_click'] or snap['presentation']['drag_left']), threshold=eye_mode,
                      instruction=snap['diagnostics']['eye_gesture']['left_status']),
                 dict(id='eye_right', input='Right eye', raw=snap['diagnostics']['right_closed'],
-                     filtered=int(snap['presentation']['enter']), threshold=eye_mode, instruction=status+' · right eye: Enter'),
+                     filtered=int(snap['presentation']['enter']), threshold=eye_mode, instruction=status+' · right eye: Return'),
                 dict(id='mouth_brake', input='Mouth opening', raw=brake['openness'], filtered=brake['resistance'],
                      threshold='Wider = slower', instruction='Pointer paused: unknown mouth' if not brake['known'] else f"Resistance {brake['resistance']:.0%}"),
                 dict(id='both_eyes', input='Both eyes', raw=None, filtered=None,

@@ -1,5 +1,51 @@
 # Main chat and agent coordination hub
 
+## Return and working audible dictation handoff
+
+- Lane/task: Reuvi integration, owned isolated `codex/integration/presentation-wink-fix`
+  checkout, base `08319d4`. User requested main Return, listening/stopped sounds,
+  actual speech validation and verification of driver key support. Contract
+  clarification `251955c` precedes implementation; main merge/push authorized.
+- Root cause: direct speech-executable setup reproduced a macOS TCC abort. The
+  crash identified a missing speech usage description on the responsible launcher,
+  even though the signed helper bundle contains it. LaunchServices background app
+  launch uses the helper's own permission identity and successfully completed setup.
+  Private ephemeral Unix-socket IPC replaces inherited stdin/stdout; EOF cancels
+  recording. No speech audio/transcripts are stored by App or added to Git.
+- Behavior: rising/falling two-note cues follow listening/stopped transitions,
+  including early capture, cancellation and errors; repeated partials stay quiet.
+  The helper retains required on-device recognition. UI exposes actionable errors;
+  bounded logs add a whitelisted error code/listening flag, never dictated text.
+  Unknown closing frames retain the observed open baseline for a later known
+  both-closed hold but reset its entire duration. Consumed chords still require
+  actual reopening; interrupted chords cannot leak a solo Return.
+- Driver: main macOS Return was already key code 36; now explicitly named 0x24
+  and labeled Return throughout active UI/runbooks. Existing `enter` wire/event/API
+  names and ABI v3 remain compatible. Unicode scalars use the existing text API.
+  Left mouse hold/release, head tuning, mouth response and saved profiles unchanged.
+- Changed paths: App provider/Swift helper/sounds/transport/diagnostics; Processing
+  presentation gesture/display labels; macOS driver key constant; corresponding
+  tests, native field verification tool, readmes, contract and presentation guide.
+- Validation: full Processing **224 passed** before the final chord isolation
+  case; final presentation subset **21 passed**. Compiled-driver presentation
+  **22 passed**, speech transport **4 passed**, scalar diagnostics **10 passed**,
+  native Tk Signals/curves **19 passed**, and **5/5 CTest groups passed**.
+  Swift helper built/signed and its actual LaunchServices/socket setup reported
+  ready. Changed Python paths pass Ruff F; diff and integration scope checks pass.
+- Native evidence: on-device recognition transcribed a generated synthetic phrase;
+  the actual microphone also recognized a Mac-spoken test phrase and finalized it.
+  `tools/check_native_text.py --live` verified real driver Unicode (accent/emoji),
+  Return newline insertion, and exactly one single-line field submit handler.
+  These controlled local checks establish the speech and OS-input paths, not
+  human eye-gesture accuracy or every browser/app's acceptance. The native tool
+  aborts if focus changes; don't run it alongside GUI tests or live head control.
+- Run: rebuild driver/helper in main, restart App, load the existing profile,
+  choose Presentation and Live output, use Set up dictation, Center head & start.
+  Focus the destination first. Hold both eyes/reopen; wait for the rising cue,
+  speak, then hold both/reopen again to finish (falling cue). Right close/reopen
+  sends Return afterward. See [presentation guide](PRESENTATION_GUIDE.md).
+
+
 ## Held-left mouse correction handoff
 
 - Lane/task: Reuvi integration, continuing the owned isolated

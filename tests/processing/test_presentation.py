@@ -52,6 +52,35 @@ class PresentationTests(unittest.TestCase):
         self.hold(40,left='closed',right='closed')
         self.assertEqual(self.core.dictation_toggle,2)
 
+    def test_unknown_closing_preserves_baseline_but_resets_full_chord_hold(self):
+        self.feed(left='unknown',right='unknown')
+        self.hold(15,left='closed',right='closed')
+        self.feed(left='unknown',right='closed')
+        self.hold(15,left='closed',right='closed')
+        self.assertEqual(self.core.dictation_toggle,0)
+        self.hold(10,left='closed',right='closed')
+        self.assertEqual(self.core.dictation_toggle,1)
+        self.feed(left='unknown',right='unknown')
+        self.hold(30,left='closed',right='closed')
+        self.assertEqual(self.core.dictation_toggle,1)  # No rearm without reopen.
+        self.feed();self.feed(left='unknown',right='unknown')
+        self.hold(30,left='closed',right='closed')
+        self.assertEqual(self.core.dictation_toggle,2)
+
+    def test_unknown_during_right_action_never_replays_return(self):
+        self.hold(10,right='closed');self.feed(right='unknown')
+        self.assertFalse(self.feed()['presentation']['enter'])
+        self.feed(right='unknown')
+        self.hold(10,right='closed')
+        self.assertTrue(self.feed()['presentation']['enter'])
+
+    def test_interrupted_chord_cannot_turn_into_a_solo_return(self):
+        self.hold(10,left='closed',right='closed')
+        self.feed(left='unknown',right='closed')
+        snaps=self.hold(10,right='closed')+[self.feed()]
+        self.assertFalse(any(s['presentation']['enter'] for s in snaps))
+        self.assertEqual(self.core.dictation_toggle,0)
+
     def test_drag_releases_on_reopen_unknown_stop_and_stale(self):
         self.assertTrue(self.hold(35,left='closed')[-1]['presentation']['drag_left'])
         snap=self.feed();self.assertFalse(snap['presentation']['drag_left']);self.assertFalse(snap['left_click'])

@@ -94,8 +94,10 @@ public:
         const auto access = ready();
         if (access != FID_OK) return access;
         if (event.type == FID_EVENT_ENTER || event.type == FID_EVENT_TEXT) {
-            Event down(CGEventCreateKeyboardEvent(nullptr, event.type == FID_EVENT_ENTER ? 36 : 0, true));
-            Event up(CGEventCreateKeyboardEvent(nullptr, event.type == FID_EVENT_ENTER ? 36 : 0, false));
+            // Main Return (kVK_Return), not numeric-keypad Enter (0x4c).
+            constexpr CGKeyCode return_key = 0x24;
+            Event down(CGEventCreateKeyboardEvent(nullptr, event.type == FID_EVENT_ENTER ? return_key : 0, true));
+            Event up(CGEventCreateKeyboardEvent(nullptr, event.type == FID_EVENT_ENTER ? return_key : 0, false));
             if (event.type == FID_EVENT_TEXT && down && up) {
                 uint32_t scalar = static_cast<uint32_t>(event.x);
                 UniChar units[2]; size_t count = 1;

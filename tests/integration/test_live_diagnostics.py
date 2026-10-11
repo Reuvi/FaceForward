@@ -149,6 +149,18 @@ class LiveDiagnosticsTests(unittest.TestCase):
             log.record_error("logging disabled")
             log.close()
 
+    def test_dictation_logs_codes_but_never_transcript_or_provider_message(self):
+        source,lab=self.feed()
+        lab['snapshot']['dictation']=dict(state='error',error_code='speech_permission',
+            listening=False,remaining=0,sent=0,text='private-words',message='private-error')
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'dictation.jsonl'
+            log=DiagnosticLog(path);log.record(source,lab);log.close()
+            row=json.loads(path.read_text().splitlines()[1])
+            self.assertEqual(row['dictation']['error_code'],'speech_permission')
+            self.assertFalse(row['dictation']['listening'])
+            self.assertNotIn('private-',path.read_text())
+
     def test_gesture_counts_and_wink_status_logged_without_face_features(self):
         source,lab=self.feed()
         lab['snapshot']['diagnostics']['eye_gesture']={

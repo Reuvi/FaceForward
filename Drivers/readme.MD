@@ -1,4 +1,4 @@
-**Presentation extension:** ABI v3 layouts remain stable; additive `fid_set_presentation` and `fid_type_character` support Enter/drag and individual Unicode characters. macOS and dry-run support text; Linux explicitly rejects Unicode text. Auxiliary calls require fresh enabled input and never refresh the watchdog. Rebuild before selecting Presentation. [Contract](../Contracts/PRESENTATION_MODE.md).
+**Presentation extension:** ABI v3 layouts remain stable; additive `fid_set_presentation` and `fid_type_character` support Return/drag and individual Unicode characters (including accented letters and emoji on macOS). macOS and dry-run support text; Linux explicitly rejects Unicode text. The legacy `enter` API/event name emits main Return (`kVK_Return`, 0x24) on macOS: newline in multiline fields and the focused control’s submit action. Auxiliary calls require fresh enabled input and never refresh the watchdog. Rebuild before selecting Presentation. [Contract](../Contracts/PRESENTATION_MODE.md).
 
 # Face input driver — phase 1
 

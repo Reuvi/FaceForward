@@ -1,15 +1,18 @@
 """Bounded local speech provider and cancellable presentation text orchestration."""
 from collections import deque
-import json
 from pathlib import Path
 import platform
 import queue
-import subprocess
 import threading
 
 from .paths import DICTATION_BUNDLE
+from .speech_transport import SpeechProcess
+from .dictation_sounds import DictationSounds
 
 HELPER = DICTATION_BUNDLE/'Contents/MacOS/FaceControllerDictation'
+ERROR_CODES = frozenset(('dictation_failure', 'provider_failure', 'helper_exit', 'speech_failure',
+    'speech_permission', 'microphone_permission', 'on_device_unavailable', 'recognition_failed',
+    'microphone_unavailable', 'microphone_start', 'finalize_timeout', 'file_timeout', 'launch_required'))
 
 
 class MacSpeechProvider:
@@ -42,44 +45,34 @@ class MacSpeechProvider:
             terminal = False
             try:
                 if platform.system() != 'Darwin':
-                    raise ValueError('Dictation currently requires macOS; head, click and Enter remain available.')
+                    raise ValueError('Dictation currently requires macOS; head, click and Return remain available.')
                 if not self.helper.is_file():
                     raise ValueError('Build dictation first: python3 tools/build_dictation.py, then click Set up dictation.')
-                process = subprocess.Popen([str(self.helper)]+(['--check'] if check else []),
-                    stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                    text=True, encoding='utf-8', bufsize=1)
+                process = SpeechProcess(self.helper)
                 with self.lock:
                     if generation != self.generation:
-                        process.terminate()
+                        process.cancel()
                     else:
                         self.process = process
-                        if self.finish_requested:
-                            process.stdin.write('finish\n'); process.stdin.flush()
-                for line in process.stdout:
-                    if len(line) > 65536:
-                        raise ValueError('Speech provider exceeded its message limit')
-                    item = json.loads(line)
+                for item in process.events('check' if check else 'start'):
                     if not isinstance(item, dict) or item.get('state') not in (
                             'partial','listening','captured','finalizing','final','ready','error'):
                         raise ValueError('Invalid speech provider response')
                     if not isinstance(item.get('text',''), str) or len(item.get('text','')) > 10000:
                         raise ValueError('Speech text exceeded its limit')
+                    if not isinstance(item.get('message',''), str) or len(item.get('message','')) > 2000:
+                        raise ValueError('Invalid speech provider message')
                     terminal |= item['state'] in ('final','ready','error')
                     self.post(generation, item)
-                process.wait(timeout=2)
+                    if item['state'] == 'listening':
+                        with self.lock:
+                            if self.finish_requested:process.send('finish')
                 if not terminal:
-                    self.post(generation, dict(state='error', message='Speech helper stopped before completion. Nothing was sent.'))
+                    self.post(generation, dict(state='error', message='Speech app stopped before completion. Rebuild the helper and use Set up dictation; nothing was sent.', code='helper_exit'))
             except Exception as exc:
-                self.post(generation, dict(state='error', message=str(exc)))
+                self.post(generation, dict(state='error', message=str(exc), code='provider_failure'))
             finally:
-                if process is not None:
-                    if process.poll() is None:
-                        process.terminate()
-                        try:process.wait(timeout=1)
-                        except subprocess.TimeoutExpired:
-                            process.kill(); process.wait(timeout=1)
-                    for stream in (process.stdin, process.stdout):
-                        if stream:stream.close()
+                if process is not None:process.cancel()
                 with self.lock:
                     if generation == self.generation:self.process = None
         threading.Thread(target=run, name='local-dictation-provider', daemon=True).start()
@@ -87,9 +80,7 @@ class MacSpeechProvider:
     def finish(self):
         with self.lock:
             self.finish_requested = True
-            if self.process and self.process.poll() is None:
-                self.process.stdin.write('finish\n')
-                self.process.stdin.flush()
+            if self.process:self.process.send('finish')
 
     def poll(self):
         result = []
@@ -102,8 +93,7 @@ class MacSpeechProvider:
         with self.lock:
             self.generation += 1
             self.finish_requested = False
-            if self.process is not None and self.process.poll() is None:
-                self.process.terminate()
+            if self.process is not None:self.process.cancel()
             self.process = None
             while True:
                 try:self.events.get_nowait()
@@ -114,8 +104,11 @@ class DictationController:
     """Called under Lab's lock; nonblocking start/poll and one character per tick."""
     BUSY = ('starting','listening','captured','finalizing','sending')
 
-    def __init__(self, provider=None, *, allow_capture=None):
+    def __init__(self, provider=None, *, allow_capture=None, cue=None):
         self.provider = provider or MacSpeechProvider()
+        self.cue = cue if cue is not None else (DictationSounds() if provider is None else lambda active: None)
+        self.listening = False
+        self.error_code = None
         self.allow_capture = allow_capture or (lambda: provider is not None)
         self.state = 'idle'
         self.message = 'Set up dictation once, then hold both eyes closed to speak.'
@@ -128,6 +121,12 @@ class DictationController:
         self.sent = 0
         self.setup_requested = False
 
+    def set_listening(self, listening):
+        if listening != self.listening:
+            self.listening = listening
+            try:self.cue(listening)
+            except Exception:pass  # Audio feedback must never stop output cleanup.
+
     def setup(self):
         self.cancel('Checking microphone and speech permissions…')
         self.state = 'setup'
@@ -136,6 +135,8 @@ class DictationController:
 
     def cancel(self, message='Dictation cancelled; unsent text discarded.'):
         self.provider.cancel()
+        self.set_listening(False)
+        self.error_code = None
         self.pending.clear()
         self.text = ''
         self.request_active = False
@@ -143,9 +144,10 @@ class DictationController:
         self.message = message
         self.setup_requested = False
 
-    def fail(self, message, processor):
+    def fail(self, message, processor, code="dictation_failure"):
         self.cancel(message)
         self.state = 'error'
+        self.error_code = code if isinstance(code, str) and code in ERROR_CODES else 'speech_failure'
         if hasattr(processor, 'cancel_dictation'):
             processor.cancel_dictation()
 
@@ -155,7 +157,7 @@ class DictationController:
         except Exception as exc:
             self.fail('Dictation stopped: '+str(exc), processor)
         snap['dictation'] = dict(state=self.state, message=self.message, text=self.text,
-                                 remaining=len(self.pending), sent=self.sent)
+                                 remaining=len(self.pending), sent=self.sent, listening=self.listening, error_code=self.error_code)
         if self.state in ('finalizing','sending') and hasattr(processor, 'gestures'):
             processor.gestures.reset()  # Discard actions attempted while the text queue owns output.
         if self.state in self.BUSY or self.request_active:
@@ -186,6 +188,7 @@ class DictationController:
                 elif output is None or not output.snapshot().get('text_supported'):
                     self.fail('Connect the rebuilt Driver dry run or Live mouse + keyboard output before dictation.', processor)
                 else:
+                    self.error_code = None
                     self.provider.start()
                     self.state, self.message = 'starting', 'Starting on-device dictation…'
                     self.text = ''; self.pending.clear(); self.sent = 0
@@ -193,13 +196,15 @@ class DictationController:
                     self.started_at = now
             elif self.request_active and self.state in ('starting','listening','captured'):
                 self.provider.finish()
+                self.set_listening(False)
                 self.state, self.message = 'finalizing', 'Finishing recognition…'
                 self.finish_at = now
                 self.request_active = False
         for event in self.provider.poll():
             state = event['state']
             if state == 'error':
-                self.fail(event.get('message', 'Speech failed; nothing was sent.'), processor)
+                self.fail(event.get('message', 'Speech failed; nothing was sent.'), processor,
+                          event.get('code', 'speech_failure'))
                 break
             if self.state == 'setup':
                 if state == 'ready':
@@ -210,7 +215,8 @@ class DictationController:
                 continue
             if state in ('listening','partial','captured'):
                 if self.state != 'finalizing':
-                    self.state = 'captured' if state == 'captured' else 'listening'
+                    if state in ('listening', 'captured'):self.set_listening(state == 'listening')
+                    self.state = 'captured' if state == 'captured' or self.state == 'captured' else 'listening'
                     self.message = event.get('message', 'Listening — close both eyes to finish')
                 if 'text' in event:self.text = event['text']
             elif state == 'final' and self.state == 'finalizing':
@@ -238,5 +244,5 @@ class DictationController:
         self.sent += 1
         self.next_character = now+35
         if not self.pending:
-            self.state, self.message = 'idle', 'Text entered. Close and reopen your right eye to press Enter.'
+            self.state, self.message = 'idle', 'Text entered. Close and reopen your right eye to press Return.'
             self.text = ''

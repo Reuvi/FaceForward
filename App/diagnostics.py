@@ -186,7 +186,7 @@ class DiagnosticLog:
                      "mouth_open":signals.get("mouth_open"), "button_actions":diag.get("button_actions"),
                      "keys":snap.get("keys"), "mouth_brake":diag.get("mouth_brake"),
                      "presentation":snap.get("presentation"),
-                     "dictation":{k:snap.get("dictation",{}).get(k) for k in ("state","remaining","sent")},
+                     "dictation":{k:snap.get("dictation",{}).get(k) for k in ("state","remaining","sent","listening","error_code")},
                      "tuning_revision":lab.get("tuning_revision", 0),
                      "target_jitter":diag.get("target_jitter"), "min_confidence":lab["config"]["min_confidence"],
                      "pointer_gain":(lab.get("mapping") or {}).get("pointer_gain",1),
