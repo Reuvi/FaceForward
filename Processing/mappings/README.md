@@ -23,6 +23,11 @@ repeat clicks or drag. The raw command button fields remain activation levels.
 
 ## Mouse test
 
+For evidence-based tuning, use **Signals → Target game…**. It records actual
+head-controlled cursor paths, tests one data-supported response change in repeated
+A/B rounds, and saves a personal default only from usable live data. The existing
+curve editor can load that default or restore factory settings. [Game guide](../../docs/TARGET_GAME_GUIDE.md).
+
 Select **Mouse test** on Signals, or pass `--mapping mouse-test`. Calibrated head X/Y form one pointer vector: turn left/right and nod up/down; both can move together diagonally. Calibrated left/right Wink actions activate the matching mouse button. Pupils, keyboard actions and scroll are ignored. Both head axes must be valid. Center your head, release eye actions and explicitly Start; either missing axis stops the pointer immediately. Face loss/staleness and Stop require another Start.
 
 Mouse test now enables **Speed-aware acceleration and return braking**. Quick

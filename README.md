@@ -1,5 +1,9 @@
 # Face-controlled accessibility interface
 
+Measured tuning: **Signals → Target game…** measures head-controlled travel speed,
+small-target re-entry, precision and smoothness. Repeated baseline/adjustment rounds
+select a local personal default; physical-mouse practice cannot tune. [Play and inspect results](docs/TARGET_GAME_GUIDE.md).
+
 Latest recovery: **Mouse test → Center head & start** captures your current resting pose. In **Live curves**, uncheck **Require calibrated wink for clicks** for plain open/closed eye clicks (ordinary blinks also click). Save the choice and center in a tuning profile.
 
 Current editor: **Signals → Live curves…** adjusts response curves and timing with connected sliders. Save/load named tuning profiles or restore the tuned defaults. [Live curve editor guide](docs/LIVE_CURVE_EDITOR_GUIDE.md).

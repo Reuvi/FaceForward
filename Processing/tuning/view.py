@@ -42,7 +42,7 @@ class CurveEditor:
         ttk.Label(bar,text='Tuning profile').pack(side='left')
         self.name=tk.StringVar(value='My tuning')
         ttk.Entry(bar,textvariable=self.name,width=27).pack(side='left',padx=8)
-        for text,fn in (('Save as…',self.save),('Load…',self.load),('Default profile',self.defaults)):
+        for text,fn in (('Save as…',self.save),('Load…',self.load),('Personal default',self.personal_default),('Factory defaults',self.defaults)):
             ttk.Button(bar,text=text,command=lambda f=fn:self.guarded(f)).pack(side='left',padx=3)
         options=ttk.Frame(outer);options.pack(fill='x',pady=(8,0))
         self.require_wink=tk.BooleanVar(value=True)
@@ -291,6 +291,14 @@ class CurveEditor:
             self.name.set(data['name'])
             self.refresh(self.lab.state(),force=True)
             self.notice.set('Profile loaded. Output stopped; center/release inputs and press Start on Signals.')
+
+    def personal_default(self):
+        from Processing.target_game.storage import DEFAULT_PATH, read_personal_default
+        data=read_personal_default(DEFAULT_PATH)
+        self.lab.apply_tuning_profile(data)
+        self.name.set(data['name'])
+        self.refresh(self.lab.state(),force=True)
+        self.notice.set('Personal measured default loaded. Output stopped; press Start when ready.')
 
     def defaults(self):
         data=default_profile(self.lab.state())

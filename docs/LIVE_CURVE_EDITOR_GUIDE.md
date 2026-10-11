@@ -51,7 +51,14 @@ outward, holds, and starts returning at .8 seconds. It shows how motion ramps an
 settles as you adjust settings. This simulation never enters live control. A wink
 or closure preview shows the activation level; the driver still clicks only on its rising edge.
 
-## Useful adjustments
+## Measured adjustments
+
+Use **Signals → Target game…** to measure travel speed, small-target precision and
+roughness, then test one supported adjustment against your baseline. Repeated
+rounds can save an improved personal default. [Game guide](TARGET_GAME_GUIDE.md).
+The manual controls below remain available for experiments.
+
+## Manual adjustments
 
 - For finer small movements, raise **Curve exponent** a little. Reduce **Rest dead
   zone** only if intentional small movements are being ignored.
@@ -79,7 +86,8 @@ separately for eye/head calibration. Mapping export also retains live-tuned valu
 
 **Load…** validates the entire file before applying it and selecting its mapping.
 It stops output; center/release your inputs and press Start on Signals afterward.
-**Default profile** restores the built-in family's response and default speed
+**Personal default** loads the head mouse profile selected in the Target game.
+**Factory defaults** restores the built-in family's response and default speed
 limits, preserving your mapping name, identity, bindings, pointer mode, eye-click enable and wink/closure
 choice. It also stops output. Save custom tuning before resetting if you want it
 back. Each mapping can have multiple named local tuning files.

@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import sys
 from pathlib import Path
 import time
 
@@ -18,8 +19,10 @@ def main():
     parser.add_argument("--camera-id", type=int, default=0)
     parser.add_argument("--fps", type=float, default=30)
     parser.add_argument("--config", type=Path, help="Processing JSON settings")
-    parser.add_argument("--mapping", choices=("mouse", "gaming-keyboard-mouse-1", "mouse-test"), default="gaming-keyboard-mouse-1",
-                        help="initial mapping; mappings remain selectable on Signals")
+    parser.add_argument("--mapping", choices=("mouse", "gaming-keyboard-mouse-1", "mouse-test"), default=None,
+                        help="initial mapping; otherwise use a measured personal default when available")
+    parser.add_argument("--factory-defaults", action="store_true",
+                        help="ignore the personal target-game default for this run")
     parser.add_argument("--output", choices=("preview", "dry-run", "native"), default="preview",
                         help="native sends real OS input and requires the camera source")
     parser.add_argument("--driver-library", type=Path, help="compiled face_input_driver library (default Drivers/build)")
@@ -37,7 +40,14 @@ def main():
     if not options.no_diagnostics:
         session.diagnostics = DiagnosticLog(options.diagnostic_log)
     try:
-        session.lab.select_mapping(options.mapping)
+        from Processing.target_game.storage import configure_startup
+        try:
+            options.tuning_status = configure_startup(session.lab, options.mapping, factory=options.factory_defaults)
+        except (ValueError,OSError) as exc:
+            session.lab.select_mapping(options.mapping or "gaming-keyboard-mouse-1")
+            options.tuning_status = "Personal default could not load: "+str(exc)
+            print(options.tuning_status, file=sys.stderr)
+        options.mapping = session.lab.mapping_id
         if options.config:
             data = json.loads(options.config.read_text())
             # Input ownership/subject come from App; preserve processor tunables.

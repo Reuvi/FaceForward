@@ -6,10 +6,23 @@ model or background worker runs. Gaming uses pupils for the mouse pointer; Mouse
 is local Python/Tk. Output is selectable: Preview, Driver dry run, or Live mouse +
 keyboard. Native output is explicitly enabled with the Camera source; Stop and
 closing App release it. [Build and live-output instructions](../docs/DRIVER_CONNECTION_GUIDE.md).
-The default is **gaming keyboard mouse mapping 1**: left/right eye actions →
+Without a measured personal default, the default is **gaming keyboard mouse mapping 1**: left/right eye actions →
 left/right mouse, head down/up/left/right → W/Space/Shift/S, pupils → an approximate
 screen destination where the cursor stops. **Mouse test** combines calibrated head X/Y into precise pointer velocity and uses left/right calibrated winks (or optional plain eye closures) for matching clicks; pupils, keys and scroll are ignored. The previous **Mouse and scroll** mode remains selectable. See
 [the Processing runbook](../Processing/mappings/README.md) for tuning and saved mappings.
+
+## Measured target game
+
+Open **Signals → Target game…** with Camera, Mouse test and Live mouse + keyboard
+connected. Move between targets and hold for 600 ms; the game records travel,
+small-target exits/re-entries, accuracy and roughness. A → B → B → A rounds test
+one supported adjustment and save the winner as a local personal default. Native
+output still requires explicit Start. A physical-mouse Practice mode cannot tune.
+[Game instructions and recorded data](../docs/TARGET_GAME_GUIDE.md).
+
+Normal startup and `--mapping mouse-test` use a valid saved personal default;
+explicit other mappings override it. `--factory-defaults` ignores it for this run.
+The default file contains response settings, not face calibration or armed state.
 
 ## Live curve editor
 
@@ -17,7 +30,7 @@ Open **Signals → Live curves…** to adjust the active mapping with connected 
 See actual response curves/live markers and a synthetic ramp/settling preview.
 Pointer velocity/target, head-key gates and scroll expose the controls they use;
 calibrated winks show independent binary click states. Live response edits preserve
-running control. **Save as…**, **Load…** and **Default profile** manage named local
+running control. **Save as…**, **Load…**, **Personal default** and **Factory defaults** manage local
 tuning files; loading/defaults stop output. Uncheck **Require calibrated wink for clicks**
 for immediate plain open/closed input; ordinary blinks also click. Changing the flag
 stops output. **Center head & start** captures a new resting center in Mouse test

@@ -55,6 +55,7 @@ class IntegratedDesktop(DesktopLab):
         self.calibration_ui = None
         self.source_request = 0
         self.camera_settings = None
+        self.target_game = None
         super().__init__(root, session.lab)
         root.title("Face controller — Signals and Calibration")
         root.geometry("1280x900")
@@ -62,6 +63,8 @@ class IntegratedDesktop(DesktopLab):
         self.start_source()
         if getattr(options, "output", "preview") != "preview":
             self.guarded(lambda: self.session.configure_output(options.output, getattr(options, "driver_library", None)))
+        if not self.message.get():
+            self.message.set(getattr(options, "tuning_status", ""))
         self.refresh_vision()
         self.notebook.bind("<<NotebookTabChanged>>", self.open_calibration, add="+")
 
@@ -126,6 +129,7 @@ class IntegratedDesktop(DesktopLab):
         self.button(output_row, "Connect output", self.connect_output).pack(side="left", padx=6)
         self.driver_text = tk.StringVar()
         label(output_row, textvariable=self.driver_text, foreground=GREEN, wraplength=700).pack(side="left")
+        self.button(output_row, "Target game…", self.show_target_game).pack(side="right", padx=6)
         self.source_status = tk.StringVar()
         label(self.vision_page, textvariable=self.source_status, foreground=GREEN).pack(anchor="w")
         self.source_detail = tk.StringVar()
@@ -295,6 +299,17 @@ class IntegratedDesktop(DesktopLab):
         self.source_request += 1
         self.session.stop()
 
+    def show_target_game(self):
+        from Processing.target_game.view import TargetGame
+        if self.target_game is None or self.target_game.closed:
+            def source():
+                with self.session.lock:
+                    return dict(mode=self.session.mode,error=self.session.error,source_generation=self.session.generation,
+                                calibration_generation=self.session.detector_runtime.workbench.generation
+                                if self.session.detector_runtime else None)
+            self.target_game=TargetGame(self.root,self.lab,source)
+        else:self.target_game.show()
+
     def connect_output(self):
         self.session.configure_output(self.output_choices[self.output_var.get()],getattr(self.options,"driver_library",None))
 
@@ -398,6 +413,7 @@ class IntegratedDesktop(DesktopLab):
                 set_var(self.raw_capture,"Raw camera measurements appear with Camera or Detector demo")
 
     def close(self):
+        if self.target_game is not None and not self.target_game.closed:self.target_game.close()
         if not self.closed:
             self.source_request += 1
             if self.calibration_ui is not None:

@@ -18,7 +18,7 @@ Each round repeats 16 directional/distance/size conditions, including small targ
 and diagonals. Start from a home target, then move into the destination and hold
 for 600 ms. Clicks are not part of this movement test. Record first arrival,
 settling/acquisition time, exits/re-entries, path efficiency, overshoot, transverse
-variability and hold accuracy. A timestamp-resampled speed-variation heuristic
+variability and hold accuracy. A timestamp-resampled velocity-variation heuristic
 reports roughness separately from data gaps. This is a dwell task inspired by
 pointing-device research, not ISO throughput or a clinical skill score.
 
@@ -38,6 +38,9 @@ change calibration/routing or add a neural model. Repeated A rounds expose pract
 or fatigue effects. Require sufficient matched successful conditions and agreement
 in both comparisons, with speed/precision/smoothness regression guards, to select B.
 Otherwise keep A. Results show component metrics and the decision rationale.
+Speed comparisons remove the fixed hold and normalize by each trial's actual
+departure-distance/target-width difficulty. Remember rejected candidate settings
+for a matching baseline so later sessions can test another supported hypothesis.
 
 A completed comparison saves the selected profile as the local personal default;
 an incomplete comparison never promotes a candidate. Restore A on cancel only
@@ -45,11 +48,13 @@ while the app still uses this experiment's settings; do not overwrite unrelated
 user edits. Applying profiles releases output, and stopping never auto-arms.
 Normal app startup can load a valid personal default without arming; explicit
 other mappings/config remain authoritative. Factory settings remain unchanged
+and `--factory-defaults` bypasses personal loading for reproducible runs. Live curves
+offers separate Personal default and Factory defaults actions. No selection occurs
 until user data exists. Mapping v7, tuning profile v1, face v3, detector v13 and
 driver ABI are unchanged. Keep a machine-readable analysis command so later
 iterations can inspect local results without rerunning the game.
 
 Reference: MacKenzie, Kauppinen & Silfverberg (CHI 2001), target re-entry and path
-accuracy measures: https://www.yorku.ca/mack/CHI01.htm . Our resampled speed roughness
+accuracy measures: https://www.yorku.ca/mack/CHI01.htm . Our resampled velocity roughness
 and conservative comparison thresholds are project heuristics, not that paper's
 validated measures. Synthetic tests verify software, not human improvement.

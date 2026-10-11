@@ -1,5 +1,69 @@
 # Main chat and agent coordination hub
 
+## Measured target-game tuning handoff
+
+- Task / lane / branch / worktree: Reuvi integration,
+  `codex/integration/target-game-tuning`, isolated
+  `.worktrees/reuvi-integration-target-game-tuning`. Explicit user assignment
+  spans App wiring, Processing measurement/tuning and corresponding tests/docs.
+- Base: `5046028`. Contract first: `15f5e74`,
+  [TARGET_GAME.md](../Contracts/TARGET_GAME.md). Implementation follows in the
+  focused target-game commit on this branch.
+- Changed paths: `Processing/target_game/**`, `Processing/tuning/view.py`,
+  `App/{__main__,desktop}.py`, corresponding App/Processing READMEs, root/owning
+  AGENTS notices, Contracts index, root README, curve/game guides, this handoff,
+  `tests/processing/test_target_game.py`, `tests/integration/test_target_game.py`
+  and `tests/integration/test_simple_signals.py`.
+- Before → after: arbitrary manual tuning now has an optional measured native
+  game. Actual cursor positions accompany head capture sequence/time, demand,
+  validity and full response settings. Sixteen dwell targets measure arrival,
+  settling, small-target re-entry, accuracy, path efficiency and velocity roughness.
+  A-B-B-A rounds test one evidence-supported bounded response change. B must win
+  both comparisons with precision/smoothness/completion guards; otherwise retain A.
+  Failed candidate fingerprints are remembered for later matching baselines.
+  Personal defaults load without arming; explicit other mappings and
+  `--factory-defaults` override that loading. No personal data/default was added.
+- Run: restart from main using
+  `Vision/.venv/bin/python -m App --source camera --output native --mapping mouse-test`;
+  load head calibration, Start live control, then **Signals → Target game…**.
+  See [game runbook](TARGET_GAME_GUIDE.md). Physical-mouse Practice is separate
+  and cannot tune. Read saved data with
+  `python3 -m Processing.target_game .local/target-game/<session-id>`.
+- Verification actually run: `python3 -m unittest discover -s tests/processing -q`
+  passed **187 tests**. All `test_*.py` integration modules were run in separate
+  processes with `RUN_TK_TESTS=1`, Vision's Python and `FID_LIBRARY` pointing to
+  main's existing compiled library: **163 tests passed**, no skipped modules.
+  Target-game tests were rerun after the final stop/resume and practice-label fixes:
+  **18 Processing + 5 native Tk checks passed**. Tests cover A/B selection, rejected
+  history, sample gaps, invalid/null capture, camera/calibration/layout changes,
+  external edits, canceled starts, Stop, focus, profile loading and actual App entry.
+- Driver smoke: Vision Python `-m App --source demo --mapping mouse-test
+  --factory-defaults --headless --frames 490 --output dry-run --driver-library
+  <main>/Drivers/build/libface_input_driver.dylib` accepted **490/490** source
+  frames and emitted **648 movement, 3 left-click and 3 right-click events**, no
+  key/scroll events, ending disabled with no held keys or errors. These are
+  compiled dry-run events, not native OS movement or human performance.
+- Performance: `python3 -m Processing.mouse.benchmark --steps 10000` reported
+  **48.08 µs mean / 69.71 µs p95**, decoding + processor only. A separate
+  10,000-frame fixture loop using `ExperimentTests.begin/tick` in a temporary
+  directory measured synthetic ingest + game telemetry/JSONL at **287.72 µs mean /
+  358.54 µs p95**, excluding camera, GUI and native driver latency. Ruff F checks,
+  `git diff --check` and `python3 tools/check_scope.py --base 5046028 --lane integration`
+  passed. No Vision or Drivers source changes.
+- Contract impact: additive private `pointer_game_trace_v1` and
+  `pointer_game_round_v1`; existing tuning v1, mapping v7, detector v13, face v3
+  and driver ABI unchanged. Actual monotonic timestamps and unknown/null input are
+  preserved. Live loss/staleness/error/geometry or settings changes pause and
+  disarm; Resume is explicit. Stop/close cancels and restores baseline only while
+  the experiment still owns current settings. Completed defaults never auto-arm.
+- Remaining untested/dependencies: real head-controlled trials are required.
+  No measured human improvement, ISO throughput or NN training is claimed.
+  Concurrent physical-mouse assistance cannot be detected reliably; the game
+  instructs head-only movement for live rounds. Comparison thresholds are
+  experimental, and repeated A exposes practice/fatigue rather than eliminating it.
+  Main and origin/main were both clean at the agreed base before landing; preserve
+  all other agents' worktrees and existing private profiles/logs.
+
 
 ## Pupil quality and Mouse test handoff
 

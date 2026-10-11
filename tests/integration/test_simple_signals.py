@@ -213,6 +213,11 @@ class SimpleSignalsWindowTests(unittest.TestCase):
         self.assertEqual(editor.name.get(),'My precise head')
         self.assertAlmostEqual(self.session.lab.state()['mapping']['pointer_gain'],2.2)
         self.assertFalse(self.session.lab.processor.armed)
+        editor.defaults()
+        with patch('Processing.target_game.storage.DEFAULT_PATH',path):
+            editor.personal_default()
+        self.assertAlmostEqual(self.session.lab.state()['mapping']['pointer_gain'],2.2)
+        self.assertFalse(self.session.lab.processor.armed)
         editor.selector.current(0);editor.select_channel()
         editor.widgets['gain'][2].set(3)
         self.session.lab.select_mapping('gaming-keyboard-mouse-1')
@@ -231,6 +236,19 @@ class SimpleSignalsWindowTests(unittest.TestCase):
         editor.show();self.root.update()
         editor.stop()
         self.assertFalse(self.session.lab.processor.armed)
+
+    def test_target_game_entry_reuses_window_and_keeps_two_main_tabs(self):
+        from Processing.target_game.view import TargetGame
+        with patch('Processing.target_game.view.TargetGame',wraps=TargetGame) as create:
+            self.ui.show_target_game();self.root.update()
+            game=self.ui.target_game
+            self.ui.show_target_game();self.root.update()
+            self.assertEqual(create.call_count,1)
+            self.assertEqual(len(self.ui.notebook.tabs()),2)
+            self.assertEqual(game.source()['mode'],self.session.mode)
+            self.assertFalse(self.session.lab.processor.armed)
+            game.close()
+            self.assertTrue(game.closed)
 
     def test_eye_source_checkbox_and_head_recovery_buttons_are_connected(self):
         from Vision.mouse_demo import mouse_demo_records

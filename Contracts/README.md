@@ -1,5 +1,9 @@
 # Shared contracts — initial v1
 
+[TARGET_GAME.md](TARGET_GAME.md) adds actual cursor/head telemetry and repeated
+target trials for measured personal response defaults. Practice and invalid trials
+cannot tune; mappings, detector/face profiles and driver ABI retain their formats.
+
 [LIVE_CURVE_EDITOR.md](LIVE_CURVE_EDITOR.md) adds connected live response sliders,
 curve/timing previews and signal_tuning_profile_v1 files. Only response hot edits
 keep output running; mapping/profile/source changes still stop.
