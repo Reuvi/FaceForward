@@ -1,0 +1,239 @@
+"""Profile/source recovery and the compact App; no physical camera or OS events."""
+
+import importlib.util
+import os
+from pathlib import Path
+import tempfile
+import threading
+import time
+from types import SimpleNamespace
+import unittest
+from unittest.mock import patch
+
+from App.mouse_runtime import MouseSession
+from App.paths import DEFAULT_MODEL, PROFILE_DIRECTORY
+
+PIXELS = all(importlib.util.find_spec(name) for name in ('cv2','numpy'))
+
+
+@unittest.skipUnless(PIXELS,'Vision dependencies required')
+class SourcePreparationTests(unittest.TestCase):
+    def setUp(self):
+        self.session = MouseSession()
+        self.addCleanup(self.session.close)
+
+    def test_camera_profile_loads_before_camera_opens_and_survives_same_source_start(self):
+        from Vision.calibration import EyeCalibration
+        self.session.prepare_source('camera')
+        core = self.session.ensure_detector_runtime().workbench
+        core.eyes['left'] = EyeCalibration(.04,.25,.5)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)/'profile.json'
+            model = Path(directory)/'model.task'
+            model.touch()
+            self.session.save_profile(path)
+            self.session.prepare_source('demo')
+            self.session.prepare_source('camera')
+            self.session.load_profile(path)
+            self.assertIsNone(self.session.thread)
+            self.assertIn('left',core.eyes)
+            self.assertTrue(self.session.state()['profile_bound'])
+            self.assertFalse(self.session.lab.processor.armed)
+            with patch.object(self.session,'_camera') as camera:
+                self.session.start('camera',model=model,count=1)
+                self.session.thread.join(2)
+                camera.assert_called_once()
+            self.assertIn('left',core.eyes)
+            self.assertTrue(self.session.state()['profile_bound'])
+
+    def test_missing_model_does_not_erase_calibration_or_spawn_worker(self):
+        from Vision.calibration import EyeCalibration
+        self.session.prepare_source('camera')
+        core = self.session.ensure_detector_runtime().workbench
+        core.eyes['left'] = EyeCalibration(.04,.25,.5)
+        with self.assertRaisesRegex(ValueError,'Camera model not found'):
+            self.session.start('camera',model='/missing/face-model.task')
+        self.assertIsNone(self.session.thread)
+        self.assertIn('left',core.eyes)
+
+    def test_cannot_select_another_source_while_worker_still_owns_camera(self):
+        self.session.start('demo')
+        with self.assertRaisesRegex(ValueError,'Wait for the current source'):
+            self.session.prepare_source('camera')
+        self.assertEqual(self.session.mode,'demo')
+
+    def test_camera_failure_is_actionable_and_releases_output(self):
+        from Vision.capture import CaptureError
+        with tempfile.TemporaryDirectory() as directory:
+            model = Path(directory)/'model.task'
+            model.touch()
+            with patch.object(self.session,'_camera',side_effect=CaptureError('cannot open camera 0')):
+                self.session.start('camera',model=model)
+                self.session.thread.join(2)
+            state = self.session.state()
+            self.assertIn('camera permissions',state['error'])
+            self.assertIn('Camera ID',state['error'])
+            self.assertFalse(state['running'])
+            self.assertFalse(self.session.lab.state()['message']['enabled'])
+
+    def test_default_asset_paths_do_not_depend_on_launch_directory(self):
+        self.assertTrue(DEFAULT_MODEL.is_absolute())
+        self.assertEqual(DEFAULT_MODEL.parent.parent.parent,PROFILE_DIRECTORY.parent)
+        self.assertEqual(PROFILE_DIRECTORY.parent,Path(__file__).resolve().parents[2])
+
+
+@unittest.skipUnless(PIXELS and os.environ.get('RUN_TK_TESTS')=='1','native Tk check')
+class SimpleSignalsWindowTests(unittest.TestCase):
+    def setUp(self):
+        import tkinter as tk
+        from App.desktop import IntegratedDesktop
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.model = Path(self.directory.name)/'model.task'
+        self.model.touch()
+        self.session = MouseSession()
+        self.session.lab.select_mapping('gaming-keyboard-mouse-1')
+        self.root = tk.Tk()
+        self.errors = []
+        self.root.report_callback_exception = lambda *error:self.errors.append(error)
+        options = SimpleNamespace(source='demo',replay=None,model=str(self.model),fps=30,camera_id=0,no_preview=True,subject=None)
+        with patch.object(IntegratedDesktop,'start_source'):
+            self.ui = IntegratedDesktop(self.root,self.session,options)
+        self.root.update()
+        self.addCleanup(self.close)
+
+    def close(self):
+        self.ui.closed = True
+        self.session.close()
+        if self.ui.calibration_ui:
+            self.ui.calibration_ui.close_panels()
+        for timer in self.root.tk.splitlist(self.root.tk.call('after','info')):
+            self.root.after_cancel(timer)
+        self.root.destroy()
+        self.assertEqual(self.errors,[])
+
+    def until(self,predicate):
+        deadline = time.monotonic()+3
+        while not predicate() and time.monotonic()<deadline:
+            self.root.update()
+            time.sleep(.01)
+        self.assertTrue(predicate())
+
+    def profile(self):
+        from Vision.calibration import EyeCalibration
+        session = MouseSession()
+        try:
+            session.prepare_source('camera')
+            session.ensure_detector_runtime().workbench.eyes['left'] = EyeCalibration(.04,.25,.5)
+            path = Path(self.directory.name)/'camera.json'
+            session.save_profile(path)
+            return path
+        finally:
+            session.close()
+
+    def load(self,path):
+        with patch('App.desktop.filedialog.askopenfilename',return_value=str(path)):
+            self.ui.load_profile()
+
+    def test_two_tabs_mapping_rows_and_pointer_settings_share_signals(self):
+        from Vision.mouse_demo import mouse_demo_records
+        from Processing.mappings.demo import gaming_demo_frame
+        frame = next(mouse_demo_records(count=1))
+        frame['timestamp_ms'] = self.session.clock()
+        self.session.deliver(gaming_demo_frame(frame,30))
+        self.ui.refresh()
+        self.root.geometry('1280x850')
+        self.root.update()
+        self.assertEqual([self.ui.notebook.tab(t,'text') for t in self.ui.notebook.tabs()],['Signals','Calibration'])
+        panel = self.ui.mapping_page
+        self.assertEqual(len(panel.table.get_children()),8)
+        self.assertTrue(panel.table.winfo_ismapped())
+        self.assertGreaterEqual(self.ui.raw_canvas.winfo_height(),160)
+        self.assertTrue(self.ui.error_label.winfo_ismapped())
+        self.assertLess(self.ui.error_label.winfo_rooty(),self.root.winfo_rooty()+self.root.winfo_height())
+        last_row = panel.table.bbox('pupil_y')
+        self.assertTrue(last_row)
+        self.assertLessEqual(last_row[1]+last_row[3],panel.table.winfo_height())
+        self.assertFalse(panel.settings_window.winfo_ismapped())
+        panel.show_settings()
+        self.root.update()
+        self.assertTrue(panel.settings_window.winfo_ismapped())
+        self.session.lab.processor.armed = True
+        panel.pointer_fields['deadzone'].set('.22')
+        panel.fields[('head_y','activation')].set('.4')
+        panel.apply()
+        self.assertEqual(self.session.lab.state()['config']['pointer']['deadzone'],.22)
+        self.assertEqual(self.session.lab.state()['mapping']['head_y']['activation'],.4)
+        self.assertFalse(self.session.lab.processor.armed)
+        panel.pointer_fields['deadzone'].set('bad')
+        self.ui.guarded(panel.apply)
+        self.assertIn('bad',panel.settings_notice.get())
+        self.assertEqual(self.session.lab.state()['config']['pointer']['deadzone'],.22)
+
+    def test_loading_camera_profile_while_stopped_selects_camera_without_opening_it(self):
+        with patch.object(self.session,'_camera') as camera:
+            self.load(self.profile())
+            self.root.update()
+            camera.assert_not_called()
+        self.assertEqual(self.session.mode,'camera')
+        self.assertIn('left',self.session.detector_runtime.workbench.eyes)
+        self.assertEqual(self.ui.source_var.get(),self.ui.source_name('camera'))
+        self.assertFalse(self.session.lab.processor.armed)
+        self.assertTrue(self.session.state()['profile_bound'])
+
+    def test_loading_profile_from_running_demo_starts_matching_camera_with_fits(self):
+        path = self.profile()
+        opened = threading.Event()
+        def camera(*args):
+            opened.set()
+            self.session.stop_event.wait(3)
+        with patch.object(self.session,'_camera',side_effect=camera):
+            self.session.start('demo')
+            self.load(path)
+            self.until(opened.is_set)
+            self.assertEqual(self.session.mode,'camera')
+            self.assertIn('left',self.session.detector_runtime.workbench.eyes)
+            self.assertTrue(self.session.state()['profile_bound'])
+            self.assertFalse(self.session.lab.processor.armed)
+            self.ui.stop_source()
+            self.session.thread.join(2)
+
+    def test_source_picker_switches_without_second_worker_and_stop_cancels_pending_switch(self):
+        old_worker_released = threading.Event()
+        old_worker_entered = threading.Event()
+        def camera(*args):
+            old_worker_entered.set()
+            old_worker_released.wait(3)
+        with patch.object(self.session,'_camera',side_effect=camera):
+            self.session.start('camera',model=self.model)
+            self.until(old_worker_entered.is_set)
+            old = self.session.thread
+            self.ui.source_var.set(self.ui.source_name('demo'))
+            self.ui.source_picker.event_generate('<<ComboboxSelected>>')
+            self.root.update()
+            self.assertIs(self.session.thread,old)
+            self.ui.stop_source()
+            old_worker_released.set()
+            old.join(2)
+            self.root.after(100,lambda:None)
+            self.root.update()
+            self.assertIs(self.session.thread,old)
+            self.assertEqual(self.session.mode,'camera')
+            self.assertFalse(self.session.lab.processor.armed)
+
+    def test_bad_profile_does_not_stop_running_source_or_clear_fits(self):
+        bad = Path(self.directory.name)/'invalid.json'
+        bad.write_text('{bad json')
+        self.session.start('demo')
+        worker = self.session.thread
+        self.load(bad)
+        self.assertTrue(self.session.state()['running'])
+        self.assertIs(self.session.thread,worker)
+        self.assertIn('not valid JSON',self.ui.message.get())
+
+    def test_nested_guard_keeps_missing_model_error_visible(self):
+        self.ui.source_var.set(self.ui.source_name('camera'))
+        self.ui.model_var.set('/missing/face-model.task')
+        self.ui.guarded(self.ui.start_source)
+        self.assertIn('Camera model not found',self.ui.message.get())
+        self.assertFalse(self.session.state()['running'])

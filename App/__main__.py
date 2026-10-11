@@ -6,18 +6,19 @@ from pathlib import Path
 import time
 
 from .mouse_runtime import MouseSession
+from .paths import DEFAULT_MODEL
 
 
 def main():
     parser = argparse.ArgumentParser(description="Native Vision + Processing mouse/keyboard preview")
     parser.add_argument("--source", choices=("demo", "replay", "camera", "detector-demo"), default="demo")
     parser.add_argument("--replay", help="SignalFrame NDJSON file")
-    parser.add_argument("--model", default="Vision/.local/face_landmarker.task", help="local MediaPipe model")
+    parser.add_argument("--model", default=str(DEFAULT_MODEL), help="local MediaPipe model")
     parser.add_argument("--camera-id", type=int, default=0)
     parser.add_argument("--fps", type=float, default=30)
     parser.add_argument("--config", type=Path, help="Processing JSON settings")
     parser.add_argument("--mapping", choices=("mouse", "gaming-keyboard-mouse-1"), default="gaming-keyboard-mouse-1",
-                        help="initial mapping; both remain selectable in Signal mapping")
+                        help="initial mapping; both remain selectable on Signals")
     parser.add_argument("--output", choices=("preview", "dry-run", "native"), default="preview",
                         help="native sends real OS input and requires the camera source")
     parser.add_argument("--driver-library", type=Path, help="compiled face_input_driver library (default Drivers/build)")

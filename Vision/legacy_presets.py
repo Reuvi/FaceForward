@@ -158,7 +158,6 @@ def decode_pupil(data, config):
 
 
 def decode_pupil_settings(data):
-    from .pupil import MEASUREMENT
     values = data.get("pupil")
     if data.get("version") in (8,9):
         _keys(values, ("measurement", "x_sensitivity", "y_sensitivity"), "Legacy pupil settings")
@@ -169,6 +168,8 @@ def decode_pupil_settings(data):
             raise ValueError("Invalid legacy pupil sensitivity")
     elif data.get("version") == 10:
         _keys(values, ("measurement",), "Fixed pupil identity")
-        if values["measurement"] != MEASUREMENT:
+        # v10 existed before and after the downward-direction geometry update.
+        # Both historical identities are valid; neither becomes a current fit.
+        if values["measurement"] not in ("mediapipe_iris_direction_v2", "mediapipe_iris_direction_v3"):
             raise ValueError("Unsupported fixed pupil measurement")
     # Old valid settings are deliberately discarded, never applied.

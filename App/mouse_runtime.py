@@ -96,7 +96,7 @@ class MouseSession:
             raise ValueError("Unsupported calibration command")
         with self.lock:
             if self.mode not in ("camera", "detector-demo"):
-                raise ValueError("Choose Camera or Detector demo in Vision source first")
+                raise ValueError("Choose Camera or Detector demo on Signals first")
             runtime = self.ensure_detector_runtime()
             self.lab.disconnect("Calibration changed; start preview again when ready",
                                 clear_eye_history=name in ("start_eye_guide", "start_wink_guide", "configure", "collect", "reset_calibration"))
@@ -112,7 +112,7 @@ class MouseSession:
             self._expire_detector()
             state = runtime.snapshot()
             if self.mode not in ("camera", "detector-demo"):
-                state["notice"] = "Choose Camera or Detector demo on the Vision source tab to calibrate"
+                state["notice"] = "Choose Camera or Detector demo on Signals to calibrate"
             if state["selected"] is None and self.mode in ("camera", "detector-demo"):
                 self.lab.disconnect("Waiting for the single user's face; calibration retained")
             state["source"] = self.status
@@ -176,13 +176,7 @@ class MouseSession:
             self.profile_binding = (self.mode, core.generation)
 
     def load_profile(self, path):
-        from Processing.mouse.profiles import read_profile
-        from Vision.presets import decode_preset
-        data = read_profile(path)
-        decode_preset(data["detector"])
-        if "research" in data:
-            from .research_runtime import validate_profile
-            validate_profile(data["research"])
+        data = self.read_profile(path)
         with self.lock:
             kind = "camera" if self.mode == "camera" else "synthetic" if self.mode == "detector-demo" else None
             if data["source_kind"] != kind:
@@ -195,6 +189,45 @@ class MouseSession:
                                "runtime": dict(data["preview"], subject_id=SINGLE_SUBJECT, source="external")})
             self.profile_label = Path(path).name
             self.profile_binding = (self.mode, core.generation)
+
+    @staticmethod
+    def read_profile(path):
+        """Validate before the UI stops or changes an existing source."""
+        from Processing.mouse.profiles import read_profile
+        from Vision.presets import decode_preset
+        data = read_profile(path)
+        decode_preset(data["detector"])
+        if "research" in data:
+            from .research_runtime import validate_profile
+            validate_profile(data["research"])
+        return data
+
+    def prepare_source(self, mode):
+        """Select an idle source without opening hardware; supports paused loading."""
+        if mode not in ("demo", "replay", "camera", "detector-demo"):
+            raise ValueError("source must be demo, replay, camera, or detector-demo")
+        with self.lock:
+            if self.closed:
+                raise ValueError("Session is closed")
+            if self.thread is not None and self.thread.is_alive():
+                raise ValueError("Wait for the current source to close before switching")
+            if mode == self.mode:
+                return
+            if mode in ("camera", "detector-demo"):
+                self.ensure_detector_runtime()
+            if mode != "camera" and self.lab.state()["output"]["mode"] == "native":
+                self.lab.set_output(None)
+            if self.detector_runtime is not None:
+                self.detector_runtime.workbench.reset_calibration()
+            self.mode, self.status, self.error = mode, "Source stopped", None
+            self.frame, self.preview, self.observations = None, None, {}
+            self.received = self.accepted = 0
+            self.received_at = self.inference_ms = None
+            self.times.clear()
+            self.profile_binding, self.profile_label = None, "Unsaved calibration"
+            self.generation += 1
+            subject = SINGLE_SUBJECT if mode in ("camera", "detector-demo") else SUBJECT if mode == "demo" else "select-a-subject"
+            self.lab.settings({"runtime": {"source": "external", "subject_id": subject}})
 
     def deliver(self, frame, *, observations=None, preview=None, inference_ms=None):
         """Synchronous public handoff, also usable with injected clocks in tests."""
@@ -265,6 +298,8 @@ class MouseSession:
             raise ValueError("Choose a SignalFrame NDJSON replay file")
         if mode == "camera" and not model:
             raise ValueError("Choose the local face_landmarker.task model")
+        if mode == "camera" and not Path(model).expanduser().is_file():
+            raise ValueError(f"Camera model not found: {model}. Choose face_landmarker.task in Camera settings.")
         # Validate options before starting any thread or camera.
         if type(fps) not in (int, float) or not 1 <= fps <= 120:
             raise ValueError("source FPS must be between 1 and 120")
@@ -277,22 +312,15 @@ class MouseSession:
                 raise RuntimeError("Session is closed")
             if self.thread is not None and self.thread.is_alive():
                 raise ValueError("Stop the current source and wait for it to close before restarting")
-            if mode != "camera" and self.lab.state()["output"]["mode"] == "native":
-                self.lab.set_output(None)
             if mode in ("camera", "detector-demo"):
                 self.ensure_detector_runtime()
-            changed_source = mode != self.mode
+            self.prepare_source(mode)
             if self.detector_runtime is not None:
                 core = self.detector_runtime.workbench
-                if changed_source:
-                    core.reset_calibration()
                 core.disconnect("Source starting; calibration retained. Waiting for the face.")
                 self.detector_runtime.preview = None
                 self.detector_runtime.preview_due = 0
                 self.detector_runtime.previous_timestamp = None
-            if changed_source:
-                self.profile_binding = None
-                self.profile_label = "Unsaved calibration"
             self.stop_event.clear()
             self.mode, self.status, self.error = mode, "Starting " + mode, None
             self.frame, self.preview, self.observations = None, None, {}
@@ -336,9 +364,14 @@ class MouseSession:
         except SourceStopped:
             reason = "Vision source stopped"
         except Exception as exc:
-            reason = "Vision source error: " + str(exc)
+            detail = str(exc)
+            if isinstance(exc, ImportError):
+                detail += ". Launch with Vision/.venv/bin/python after installing Vision/requirements.txt."
+            elif mode == "camera" and "camera" in detail.lower():
+                detail += ". Check camera permissions for the launching app, close other camera apps, and check Camera ID in Camera settings."
+            reason = "Vision source error: " + detail
             with self.lock:
-                self.error = str(exc)
+                self.error = detail
         finally:
             with self.lock:
                 if self.stop_event.is_set():
@@ -370,6 +403,7 @@ class MouseSession:
                     if self.stop_event.is_set():
                         raise SourceStopped()
                     self.deliver_detection(captured, observations, inference_ms=inference_ms, preview=preview)
+                    self.status = "Camera running"
                 index += 1
 
     def _detector_demo(self, fps, preview, count):

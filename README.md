@@ -13,7 +13,7 @@ signal processing, and device output so three teammates can develop independentl
 **Repository status:** one native lab with detector calibration and Processing
 in the same window. **gaming keyboard mouse mapping 1** maps independent eyes
 to mouse buttons, head down/up/left/right to W/Space/Shift/S, and pupils to pointer
-velocity. The Signal mapping tab shows raw values, filters, thresholds and readable
+velocity. The Signals tab shows raw values, filters, thresholds and readable
 commands, with named mapping copies and local import/export. Saved face profiles
 keep detector fits and mouse response settings together. The merged driver now
 connects through selectable Preview, Driver dry run and Live mouse + keyboard
@@ -23,7 +23,7 @@ and live game behavior still need operator testing.
 ## Calibrate and test in one window
 
 ```bash
-# Interactive fake face: calibrate, then open Live lab.
+# Interactive fake face: calibrate, then open Signals.
 Vision/.venv/bin/python -m App --source detector-demo
 
 # Same workflow using the camera.
@@ -49,10 +49,12 @@ python3 -m App
 ```
 
 The default is a labeled synthetic Vision gaming demo. Click **Start preview**,
-then **Signal mapping** to watch independent left/right mouse commands, pointer
+then **Signals** to watch independent left/right mouse commands, pointer
 motion and W/Space/Shift/S. Use `--mapping mouse` for the previous scroll mode.
-**Vision source & raw signals** shows measurements,
-validity, actual source timing, and optional camera diagnostics. There is no
+The same **Signals** page shows the camera, input/filtered/command values and
+graphs. **Calibration** holds the independent guides; **Mapping settings…** opens
+thresholds, pointer tuning and bindings. Choosing Camera switches sources in one
+action; loading a profile selects its matching source. There is no
 browser, JavaScript or network service. Real OS input requires Camera plus the
 explicit Live mouse + keyboard output choice and Start.
 

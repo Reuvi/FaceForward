@@ -1,5 +1,12 @@
 # Application integration
 
+**Current App UI:** two main tabs, Signals and Calibration. Signals combines source,
+profile and output controls with the mapping table and shared graphs. Mapping
+tuning opens a dialog; standalone Processing keeps its developer tabs. Source
+switches wait asynchronously for the prior worker to close. Profile loading
+validates before selecting the matching source, preserves a stopped camera,
+and never arms output. See README.md and ../Contracts/MOUSE_MVP.md.
+
 **Latest pupil update:** follow `Contracts/PUPIL_HEAD_CALIBRATION.md` (relative to repository root). Personal pupil endpoints and head-angle compensation supersede fixed/no-calibration mapping below. Tongue remains retired.
 
 **Current user decision — tongue retired:** read [../Contracts/TONGUE_RETIREMENT.md](../Contracts/TONGUE_RETIREMENT.md).

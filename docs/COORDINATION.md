@@ -982,3 +982,52 @@ Handoff:
   released. No camera or OS injection was used; human/game behavior remains untested.
 - Landing includes the completed Processing mapping and the teammate's driver
   history. Other active worktrees and detector code are preserved.
+
+## Camera/profile recovery and combined Signals — complete
+
+Task / lane / branch: Reuvi integration, `work/reuvi/integration/simple-signals-camera`.
+Worktree: `.worktrees/reuvi-integration-simple-signals-camera`, based on `c7bd26d`.
+Final commit: find `Fix camera profile startup and combine App signal views` in history.
+
+Changed paths: App lifecycle, native UI, asset paths and instructions; shared
+Processing desktop shell and mapping view; Vision's read-only v10 validator;
+integration tests, MOUSE_MVP contract and current runbooks. Drivers unchanged.
+
+Before → after:
+- Selecting Camera previously left the synthetic worker running until manually
+  stopped; the UI now releases/stops it and waits asynchronously before switching.
+  Stop cancels a pending switch. Camera ID/FPS/model controls are in Camera settings.
+- Profile loading previously rejected a valid camera file when the demo source was
+  selected. The UI validates the full file before selecting its matching source.
+  A running source switch resumes capture; paused loading stays paused, needs no
+  face, and preserves fits on subsequent same-source startup. Output stays disarmed.
+- Historical v10 iris v2 profiles failed against the newer v3 constant. Both known
+  historical identities now validate before old pupil state is discarded. Eye/head
+  fits survive; unknown identities still fail without changing calibration.
+- Signals combines camera, source/profile/output controls, input/filtered/command
+  rows and raw/processed graphs. Calibration is the only other main tab. Mapping
+  tuning opens a dialog with independent head gates/bindings and pupil response.
+  The standalone Processing developer tabs remain available. Startup errors remain
+  visible, and local asset paths resolve from the checkout rather than launch cwd.
+
+Run: `Vision/.venv/bin/python -m App --source camera`; load a profile on Signals,
+then choose output and explicitly Start. Older profiles may need the pupil guide.
+
+Checks actually run with the existing Vision venv and main's compiled library:
+- `RUN_TK_TESTS=1 FID_LIBRARY=<main>/Drivers/build/libface_input_driver.dylib <venv-python> -m unittest discover -s tests/integration -v`: **125 passed**.
+- `<venv-python> -m unittest discover -s tests/processing`: **98 passed**.
+- `<venv-python> -m unittest discover -s tests/vision`: **154 run, 151 passed, 3 optional skips**.
+- `<venv-python> -m App --source demo --headless --frames 490 --output dry-run --driver-library <main>/Drivers/build/libface_input_driver.dylib`: **490/490 accepted**, both clicks and W/S/Space/Shift observed, driver ended disabled with held-key mask 0. 3 left/3 right clicks, 4 key downs/4 ups; no OS events.
+- Native Tk checks cover pending-switch cancellation, paused/running profile load,
+  malformed-file preservation, missing-model errors, visible errors/all eight rows
+  at 1280×850, dialog application and Stop on settings changes. Synthetic native
+  preview inspected visually; standalone developer window constructed/refreshed.
+- All four existing local user files loaded read-only with output stopped; none
+  were changed or committed. Initial hardware diagnosis opened the actual camera
+  for five frames without errors (~11.4 Hz), with no recording or OS output.
+- Ruff F, compile checks, `git diff --check`, and integration scope check passed.
+
+Contract impact: additive idle source selection/lifecycle, unchanged profile and
+command formats, signal values/units/validity and detector/Processing algorithms.
+Remaining: operator comfort and live OS/game behavior; automated output checks
+use the actual driver's dry-run mode. No teammate checkout or personal data changed.

@@ -210,3 +210,24 @@ Four low tones announce rest; after the closed pose, two high reopen tones prece
 them. The next pose has its own ready/close/reopen cue, and three high tones mark
 sampling. Cancellation/source loss still dismisses the same native popup. No
 separate program, camera stream, recording, or dependency is introduced.
+
+## Simplified App and source-aware profile loading
+
+App presents Signals and Calibration. Signals combines camera/source/profile/output
+controls with normalized input → filtered → command rows and shared capture graphs.
+Mapping tuning opens a separate settings window; standalone developer tabs remain
+in Processing. No signal, driver, eye timing or detection algorithm changes.
+
+`MouseSession.prepare_source(mode)` selects an idle source without opening hardware,
+releases output and resets incompatible source calibration only on a kind change.
+It refuses a still-active worker. UI switching stops/releases the old source and
+waits asynchronously for that worker to close before preparing/starting the new one.
+Stop cancels a pending switch. Same-source restart preserves completed fits.
+
+The UI fully validates a face profile before changing sources, selects its matching
+camera/synthetic source, then applies it through the existing strict load boundary.
+Loading an already stopped source stays stopped and requires no visible face; a
+switch from a running source resumes capture after loading. Output always remains
+disarmed. Current profile and command formats are unchanged. v10 presets using
+either historical iris identity v2 or v3 validate, discard old pupil state and
+retain compatible eye/head fits; unknown identities still fail atomically.

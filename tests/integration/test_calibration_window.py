@@ -334,7 +334,7 @@ class SingleUserWindowTests(unittest.TestCase):
                 ui.load_profile()
             root.update()
             self.assertIn("left", core.eyes)
-            self.assertIsNotNone(ui.calibration_ui)
+            self.assertEqual(ui.notebook.select(),str(ui.vision_page))
             self.assertFalse(session.lab.processor.armed)
             ui.refresh_vision()
             self.assertIn("saved calibration active", ui.profile_text.get())
@@ -344,7 +344,7 @@ class SingleUserWindowTests(unittest.TestCase):
             image,observations=demo_image()
             for sequence in range(3):
                 session.deliver_detection(CapturedImage(Envelope("scope-test",sequence,session.clock()),image),observations,preview=False)
-            ui.notebook.select(ui.calibration_page);root.update()
+            ui.notebook.select(ui.calibration_page);ui.open_calibration();root.update()
             for mode in ui.calibration_ui.eye_scope_picker["values"]:
                 ui.calibration_ui.eye_scope_mode.set(mode)
                 ui.calibration_ui.tick();root.update()

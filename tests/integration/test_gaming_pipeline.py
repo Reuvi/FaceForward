@@ -132,7 +132,7 @@ class CalibratedGamingPipeline(GamingHarness):
         try:
             self.capture()
             self.lab.action({"action":"arm"});self.capture()
-            ui.notebook.select(ui.mapping_page)
+            ui.notebook.select(ui.vision_page)
             ui.refresh();root.update()
             panel = ui.mapping_page
             self.assertEqual(len(panel.table.get_children()),8)
@@ -144,7 +144,8 @@ class CalibratedGamingPipeline(GamingHarness):
             self.assertFalse(self.lab.processor.armed)
             ui.refresh();root.update()
             self.lab.select_mapping("mouse");ui.refresh();root.update()
-            self.assertEqual(panel.table.get_children(),())
+            self.assertEqual(len(panel.table.get_children()),5)
+            self.assertIn('scroll',panel.table.get_children())
             self.assertEqual(errors,[])
         finally:
             ui.closed = True

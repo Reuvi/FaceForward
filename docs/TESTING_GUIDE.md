@@ -1,5 +1,13 @@
 # Mouse MVP testing companion
 
+> Current App UI: **Signals** combines camera/source/profile/output controls,
+> input → filtered → command rows and graphs. **Calibration** contains the guides;
+> **Mapping settings…** holds thresholds, bindings and pointer tuning. Choose
+> Camera to switch from the default synthetic demo; no manual stop is needed.
+> Loading a profile selects its matching source; paused capture stays paused and
+> output stays disarmed. The older tab names below describe the dated baseline.
+> See [App instructions](../App/README.md) for the current workflow.
+
 > Driver integration is now available: [build, dry-run and live-output tests](DRIVER_CONNECTION_GUIDE.md).
 > Automated tests exercise the compiled driver's dry-run backend. Native output
 > is explicit, Camera-only, and stops on App close; older preview-only statements

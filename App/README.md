@@ -33,13 +33,17 @@ Vision/.venv/bin/python -m App --source demo --output dry-run
 ```
 
 Restart an already-open app to get these changes. A sole visible face attaches as
-`single-user`; there is no identity recognition. Stop the source before switching
-camera/demo/replay. No second application is required.
+`single-user`; there is no identity recognition. Choosing a source stops the old
+worker before starting the new one. No second application is required. The
+default is a labeled synthetic demo; choose **Camera** to open your camera.
 
-1. **Vision source & raw signals** shows the image, actual capture rate, raw eye
-   geometry, pitch/yaw degrees and pupil direction before device mapping. Its raw
-   graphs and the calibration tabs share the same captured samples.
-2. **Detection calibration → 1 Eyes**: run **Start eye open/closed**, then
+1. **Signals** combines the camera preview, source/profile/output controls,
+   normalized input → filtered signal → command table, and graphs. Choose raw
+   detector graphs, Head processing or Pointer processing from the graph picker.
+   Raw graphs and calibration share the same captured samples. The App has only
+   two main tabs: **Signals** and **Calibration**. The standalone Processing lab
+   retains its developer playground, full transfer settings and JSON inspector.
+2. **Calibration → 1 Eyes**: run **Start eye open/closed**, then
    **Start wink action**. The separate full-screen guides provide dots, rest
    countdowns and sound cues. Restarting wink training keeps eye geometry.
    A recognized wink remains ON while held. Eyes are independent; there is no
@@ -61,18 +65,19 @@ camera/demo/replay. No second application is required.
    or **Reset pupils only** leave eyes and head fits intact. An **11×11 square
    matrix** highlights the cell; a white dot shows continuous position.
    [Full guide and engineering details](../docs/PUPIL_HEAD_CALIBRATION_GUIDE.md).
-6. Open **Signal mapping**, center your head/pupil direction, open both eyes,
+6. Open **Signals**, center your head/pupil direction, open both eyes,
    and press **Start**. Inspect raw → filtered → instruction for each
-   input. Head X/Y have separate activation/release thresholds, smoothing and
-   confirmation settings. Change key bindings or use **Copy as…** to make another
-   named mapping; **Export mapping** saves it locally. **Live lab** also shows
-   the simulated pointer. Pupil movement requests relative velocity, not the
+   input. **Mapping settings…** opens Head X/Y activation/release thresholds,
+   smoothing, confirmation, key bindings and pointer response controls. Use
+   **Copy as…** to make another named mapping; **Export mapping** saves it locally.
+   Pupil movement requests relative velocity, not the
    screen location you are looking at.
-7. **Transfer settings** changes pointer dead zones, smoothing, acceleration and
-   preview speeds. These device response functions are separate from detection.
-   Applying changes stops preview. Its pointer source is fixed to `gaze` (pupils).
+7. **Mapping settings…** also changes pupil dead zone, activation margin,
+   smoothing, response curve, acceleration and deceleration. Applying changes
+   stops output. Pointer input stays fixed to pupils. Detector setup remains
+   independent in Calibration.
 8. To control the OS, build Drivers and choose **Output → Live mouse + keyboard →
-   Connect output** on the source tab, then **Start live control**. Native eyes
+   Connect output** on Signals, then **Start live control**. Native eyes
    produce one complete click per activation (no dragging); head keys stay held
    until neutral/invalid. **Driver dry run** exercises the actual library without
    OS input. Any driver error stops output and remains visible in the UI.
@@ -85,9 +90,20 @@ Face loss, stale input, source stop and profile loading never auto-arm preview.
 
 ## Save or reuse calibration
 
-Use **Save active profile** and **Load saved profile** on the source tab. Files
-are private local JSON under ignored `local-profiles/` by default. Loading works
-while stopped or without a face, but camera and synthetic profiles remain separate.
+Use **Save profile…** and **Load profile…** on Signals. Files
+are private local JSON under the checkout's ignored `local-profiles/` by default.
+Loading validates the entire file before changing source, selects Camera or
+Detector demo to match the file, and disarms output. If the previous source was
+running, switching starts the matching source after the old worker closes.
+If already stopped, loading stays stopped and needs no face or camera. Press
+**Start camera** to resume capture, then explicitly Start control. Camera and
+synthetic profiles remain separate; one never calibrates the other source.
+
+**Camera settings…** contains camera ID, requested FPS and the local model path.
+The default model and profile folder resolve from the checkout, even when launched
+from another directory. Startup errors remain visible beside the preview. If the
+camera cannot open, check camera permissions for the launching app and close other
+camera apps. Dependencies must be installed in the Python environment running App.
 A pupil-only profile can save without any fitted eye/head detector. Pupil calibration
 uses raw same-frame head angles; Head X/Y calibration is not a prerequisite.
 Raw pupils remain visible before calibration, but normalized pointer values are invalid.
@@ -97,7 +113,9 @@ New combined files remain `face_mouse_profile_v3`; their detector section is
 models, head pitch/yaw fits, settings, pupil endpoints and learned head compensation.
 No tongue data/settings, images, trace history, tracking IDs or armed state are
 saved. Profiles from detector v1–v11 are validated fully, then retired tongue
-state and old pupil calibration/settings are discarded. Compatible eyes/winks
+state and old pupil calibration/settings are discarded. Both historical v10
+pupil measurement identities (v2 and v3) are accepted before discarding that old
+pupil setting. Compatible eyes/winks
 and head fits survive; run the new pupil guide before using the pointer. A legacy image-position head fit needs the pitch guide;
 old geometry-only eye files need Wink action training for clicks.
 
@@ -108,7 +126,7 @@ Save the migrated profile to preserve the new format. Existing files are not
 rewritten automatically.
 
 Gaming names, head thresholds, key bindings and pointer gain use separate
-`input_mapping_v1` files exported from **Signal mapping**. Face profiles continue
+`input_mapping_v1` files exported from **Signals → Mapping settings…**. Face profiles continue
 to contain detector fits and the existing mouse response settings. Loading a face
 profile applies its response to the selected mapping and stops output; it keeps
 that mapping's name, head settings and bindings. Export mapping settings separately

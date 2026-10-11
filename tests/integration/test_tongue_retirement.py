@@ -110,6 +110,19 @@ class TongueRetirement(unittest.TestCase):
                 self.assertFalse(any('tongue' in key or 'mouth' in key for key in saved['settings']))
                 self.assertFalse(hasattr(self.core, 'tongue_model'))
 
+    def test_both_historical_v10_pupil_identities_migrate_without_losing_other_fits(self):
+        baseline = self.core.export_calibration()
+        for identity in ('mediapipe_iris_direction_v2','mediapipe_iris_direction_v3'):
+            old = legacy_profile(baseline,10)
+            old['pupil']['measurement'] = identity
+            self.core.load_calibration(old)
+            self.assertEqual(self.core.export_calibration(),baseline)
+            self.assertIsNone(self.core.pupil_model)
+        old['pupil']['measurement'] = 'unrecognized-geometry'
+        with self.assertRaises(ValueError):
+            self.core.load_calibration(old)
+        self.assertEqual(self.core.export_calibration(),baseline)
+
     def test_neural_and_lip_profiles_validate_then_discard_without_loading_models(self):
         from Vision.tongue_segment import MEASUREMENT, MODEL_SHA256
         from Vision.lip_boundary import MEASUREMENT as LIP_MEASUREMENT, ALGORITHM
@@ -191,11 +204,11 @@ print(json.dumps([key for key in sys.modules if key.startswith(('Vision.tongue',
             self.addCleanup(ui.calibration_ui.close_panels) if ui.calibration_ui else None
             self.feed(0,pupil_x=.75)
             ui.refresh_vision();root.update()
-            self.assertNotIn('tongue_x',ui.signal_table.get_children())
-            self.assertNotIn('tongue_y',ui.signal_table.get_children())
+            self.assertNotIn('tongue_x',ui.mapping_page.table.get_children())
+            self.assertNotIn('tongue_y',ui.mapping_page.table.get_children())
             self.assertNotIn('Tongue',ui.raw_ratios.get())
-            var,choices=ui.setting_vars['config.pointer_source']
-            self.assertEqual(choices,('gaze',));self.assertEqual(var.get(),'gaze')
+            self.assertEqual(ui.lab.state()['config']['pointer_source'],'gaze')
+            self.assertNotIn('config.pointer_source',ui.setting_vars)
             self.assertFalse(hasattr(ui,'pointer_picker'))
             self.assertEqual(errors,[])
             ui.closed=True

@@ -34,7 +34,7 @@ python3 -m App --source demo --output dry-run
 python3 -m App --source demo --output dry-run --headless --frames 490
 ```
 
-Press **Start dry run**, then open **Signal mapping**. This loads the compiled C
+Press **Start dry run**, then open **Signals**. This loads the compiled C
 library and executes its control loop, click/key transitions and watchdog with
 the dry-run backend. The panel shows actual driver event counts. Both eye clicks,
 all four gaming keys and mouse movement should appear. End-of-source output is
@@ -49,7 +49,7 @@ Vision/.venv/bin/python -m App --source camera --model Vision/.local/face_landma
 
 1. Load your saved camera profile or complete the independent eye action, head
    X/Y and pupil guides. Inspect the valid raw/normalized values first.
-2. On **Vision source & raw signals**, choose **Output → Live mouse + keyboard**
+2. On **Signals**, choose **Output → Live mouse + keyboard**
    and press **Connect output**. This connects while stopped.
 3. Center your head and pupil direction, open your eyes, then press **Start live
    control**. The panel must say **LIVE MOUSE + KEYBOARD** and running. Preview
@@ -87,7 +87,7 @@ with no keyboard keys.
 
 Processing owns thresholds, gain, noise filtering and eye intent. The adapter
 sets the driver's additional dead zone and dwell to zero to avoid applying these
-twice. Driver pointer speed follows Transfer settings' pointer speed in device
+twice. Driver pointer speed follows the profile's pointer speed in device
 units/second; mouse-mode scroll speed converts the preview's pixels/second to
 detents/second at 40 pixels per detent. Gaming scroll stays neutral. Pupils are a
 direction/speed control, not absolute screen gaze.

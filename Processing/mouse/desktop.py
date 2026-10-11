@@ -192,9 +192,11 @@ class DesktopLab:
     def build(self):
         header = ttk.Frame(self.root, padding=(22, 17, 22, 8))
         header.pack(fill="x")
-        label(header, "FACE CONTROLLER / PROCESSING", foreground=GREEN, font=("Menlo", 9)).grid(row=0, column=0, sticky="w")
+        if not getattr(self, "compact_shell", False):
+            label(header, "FACE CONTROLLER / PROCESSING", foreground=GREEN, font=("Menlo", 9)).grid(row=0, column=0, sticky="w")
         label(header, self.heading, style="Title.TLabel").grid(row=1, column=0, sticky="w")
-        label(header, self.subtitle, foreground=MUTED).grid(row=2, column=0, sticky="w", pady=(3, 0))
+        if not getattr(self, "compact_shell", False):
+            label(header, self.subtitle, foreground=MUTED).grid(row=2, column=0, sticky="w", pady=(3, 0))
         header.columnconfigure(0, weight=1)
         self.start_button = self.button(header, "Start preview", lambda: self.action("arm"), style="Start.TButton")
         self.start_button.grid(row=1, column=1, padx=5)
@@ -205,6 +207,17 @@ class DesktopLab:
         label(status, textvariable=self.status, foreground=GREEN).pack(side="left")
         label(status, textvariable=self.timing, foreground=MUTED, font=("Menlo", 9)).pack(side="right")
         self.notebook = ttk.Notebook(self.root); self.notebook.pack(fill="both", expand=True, padx=18, pady=6)
+        self.build_pages()
+        self.message = tk.StringVar()
+        footer = ttk.Frame(self.root)
+        footer.pack(side="bottom",fill="x",before=self.notebook)
+        self.error_label = label(footer, textvariable=self.message, foreground="#ffa79c", wraplength=1100)
+        self.error_label.pack(fill="x", padx=22)
+        label(footer, self.footer,
+              foreground=MUTED, font=("Menlo", 9)).pack(anchor="w", padx=22, pady=(4, 10))
+
+    def build_pages(self):
+        """Standalone developer tools; App supplies its focused two-page view."""
         self.live = ttk.Frame(self.notebook, padding=12)
         self.settings_page = ttk.Frame(self.notebook, padding=18)
         self.inspect_page = ttk.Frame(self.notebook, padding=18)
@@ -217,10 +230,6 @@ class DesktopLab:
         from Processing.mappings.view import MappingPanel
         self.mapping_page = MappingPanel(self.notebook, self)
         self.notebook.insert(0, self.mapping_page, text="Signal mapping")
-        self.message = tk.StringVar()
-        label(self.root, textvariable=self.message, foreground="#ffa79c", wraplength=1300).pack(fill="x", padx=22)
-        label(self.root, self.footer,
-              foreground=MUTED, font=("Menlo", 9)).pack(anchor="w", padx=22, pady=(4, 10))
 
     def build_live(self):
         self.live.columnconfigure(1, weight=1)

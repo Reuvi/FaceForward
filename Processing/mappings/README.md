@@ -36,11 +36,11 @@ Vision/.venv/bin/python -m App --source camera --model Vision/.local/face_landma
 python3 -m App --mapping mouse
 ```
 
-Use **Signal mapping**. Center your head and pupil direction, open both eyes, and
+In App, use **Signals**. In the standalone Processing lab, use **Signal mapping**. Center your head and pupil direction, open both eyes, and
 press **Start preview**. The eight rows show the usable raw normalized value,
 filtered value, threshold and instruction. Unknown stays unknown in the numeric
-readout; a darker plot hold is display history only. Head scopes show raw versus
-smoothed input. **Live lab** retains the simulated pointer playground.
+readout; a darker plot hold is display history only. The graph picker shows raw detector, head or pointer processing traces. The standalone
+Processing lab retains its simulated pointer playground and developer tabs.
 
 For camera use, load a compatible profile or finish the independent eye action,
 head X/Y and pupil guides. Partial calibration is supported: an unavailable
@@ -66,9 +66,10 @@ Invalid input releases immediately, bypassing smoothing, and that axis must
 return to actual neutral before another activation.
 
 Pupils use the existing radial dead zone: start above .19 signed displacement,
-release at .16 with default settings. **Transfer settings** exposes the response
-curve, interpolation (50 ms by default), smoothing and acceleration limits.
-**Signal mapping → Pointer gain** scales only the motion beyond the dead zone
+release at .16 with default settings. **Signals → Mapping settings…** exposes the response
+curve, smoothing and acceleration limits; standalone **Transfer settings** also
+exposes interpolation (50 ms by default) and other developer settings.
+**Mapping settings… → Pointer gain** scales only the motion beyond the dead zone
 (.1–4×, capped at full velocity). A gain increase cannot amplify neutral jitter
 past the threshold. Jump boost is disabled by default in gaming mode. These
 defaults are starting values for personal tuning, not measured human accuracy.
@@ -86,8 +87,8 @@ preview. Calibration fits survive these output lifecycle changes.
 
 ## Save more mappings
 
-Choose **Copy as…**, give the copy a name, change the four head bindings and
-independent filter settings, then **Apply mapping settings**. Bindings support
+In **Mapping settings…**, choose **Copy as…**, give the copy a name, change the four head bindings and
+independent filter settings, then **Apply settings**. Bindings support
 W/A/S/D/Space/left Shift/none. Multiple directions assigned to the same key are
 combined as a held state. Pointer and independent mouse-button bindings remain
 fixed in this first mapping family. Apply increments the mapping revision and
