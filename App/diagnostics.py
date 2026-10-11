@@ -70,8 +70,6 @@ def pointer_status(source, lab):
     speech=snap.get('dictation',{})
     if speech.get('state') in ('starting','listening','captured','finalizing','sending','submitting'):
         return 'Pointer paused for dictation: '+speech.get('state','')
-    if diag.get('resume_head_neutral'):
-        return 'Return your head to its resting center to resume pointer movement after dictation.'
     brake=diag.get('mouth_brake')
     if brake and not brake['known']:
         return 'Pointer paused: mouth opening is unknown.'

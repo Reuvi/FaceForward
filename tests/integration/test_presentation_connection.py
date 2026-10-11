@@ -174,6 +174,30 @@ class PresentationConnectionTests(unittest.TestCase):
         self.assertEqual(self.lab.state()['output']['event_counts'].get(12),count)
         self.assertEqual(self.lab.state()['output']['event_counts'].get(9,0),0)
 
+    def test_completed_dictation_resumes_off_center_head_and_eye_controls(self):
+        # Real sessions can finish speaking away from the tiny pointer dead zone.
+        # Never feed a centered pose after the finish gesture in this regression.
+        self.start_speech()
+        pose=dict(head_x=.7,head_y=.6)
+        self.hold(30,left='closed',right='closed',**pose)
+        self.assertEqual(self.speech.finishes,1)
+        self.speech.emit('final','done')
+        states=self.hold(30,**pose)
+        for state in states:
+            self.assertTrue(state['snapshot']['enabled'])
+            if state['snapshot']['dictation']['state'] in ('sending','submitting'):
+                self.assertEqual(state['message']['pointer']['x'],.5)
+                self.assertEqual(state['message']['pointer']['y'],.5)
+        state=states[-1]
+        self.assertEqual(state['snapshot']['dictation']['state'],'idle')
+        self.assertEqual(state['output']['event_counts'].get(9,0),1)
+        self.assertGreater(state['message']['pointer']['x'],.5)
+        self.assertGreater(state['message']['pointer']['y'],.5)
+        self.assertTrue(self.feed(left='closed',**pose)['message']['presentation']['drag_left'])
+        self.assertFalse(self.feed(**pose)['message']['presentation']['drag_left'])
+        self.hold(10,right='closed',**pose)
+        self.assertEqual(self.feed(**pose)['output']['event_counts'].get(4),1)
+
     def test_last_character_waits_for_fresh_tick_and_submits_even_with_eyes_still_closed(self):
         self.start_speech();state=self.finish_speech('X')
         self.assertEqual(state['output']['event_counts'].get(12),1)

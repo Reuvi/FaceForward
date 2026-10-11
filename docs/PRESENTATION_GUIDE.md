@@ -70,8 +70,9 @@ starting point, not a claim of measured improvement from mouth braking.
 5. Hold both eyes closed again and reopen to finish. The **falling two-note sound**
    means recording stopped. The finalized text is sent
    through the driver one printable Unicode character every 35 ms, followed by
-   **one Return** to submit the search/field. Return your head to center before
-   moving again. The right eye now opens context menus with a right-click.
+   **one Return** to submit the search/field. Head control resumes from zero speed
+   after submission; no exact return-to-center pose is needed. The right eye
+   opens context menus with a right-click.
 
 An uncertain frame while closing does not erase the previous both-open baseline.
 The hold still requires 450 ms of fully known both-closed input; an unknown frame

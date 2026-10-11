@@ -106,3 +106,9 @@ text delivery. Pointer and solo gestures remain frozen through the submission ti
 unknown eyes do not veto explicit finalized dictation while the session itself is
 fresh and enabled. Listening/stopped sounds retain their meaning: stopped means
 recording ended, while typing/submission may still be in progress.
+
+Completing dictation releases its temporary pause in the existing enabled session.
+Head movement resumes from zero velocity through the normal response curve; it
+does not require hitting the precise center dead zone again. Mouth braking and
+invalid-input gates still apply. Stop, loss and staleness remain disarming events
+and completion must never auto-arm them.

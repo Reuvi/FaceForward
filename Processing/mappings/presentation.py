@@ -164,7 +164,6 @@ class PresentationProcessor(HeadMouseProcessor):
                                              'left_presses', 'left_releases'), 0)
         self.dictating = False
         self.dictation_toggle = 0
-        self.resume_neutral = False
         super().__init__(mapping or presentation_mapping(), subject_id)
         self.pointer = BrakedHeadFilter(self.config.pointer, self.mapping.head_motion,
                                        gain=self.mapping.pointer_gain, down_gain=self.mapping.pointer_down_gain,
@@ -173,12 +172,12 @@ class PresentationProcessor(HeadMouseProcessor):
     def arm(self, *, center=False):
         super().arm(center=center)
         self.gestures.reset()
-        self.dictating = self.resume_neutral = False
+        self.dictating = False
 
     def disarm(self, reason='Preview stopped'):
         super().disarm(reason)
         self.gestures.reset()
-        self.dictating = self.resume_neutral = False
+        self.dictating = False
 
     def decode_sample(self, frame):
         raw = decode(frame, self.config, self.subject_id, raw_eyes=True)
@@ -216,14 +215,12 @@ class PresentationProcessor(HeadMouseProcessor):
                 self.gesture_counts['dictation_toggles'] += 1
                 self.dictating = not self.dictating
                 self.dictation_toggle += 1
-                self.resume_neutral = not self.dictating
                 self.pointer.reset_motion()
         return result
 
     def cancel_dictation(self):
         self.dictating = False
         self.gestures.reset()
-        self.resume_neutral = True
         self.pointer.reset_motion()
 
     def tick(self, now_ms):
@@ -248,12 +245,13 @@ class PresentationProcessor(HeadMouseProcessor):
                                     left_known=left_known, right_known=known)
         snap['dictation_request'] = dict(active=bool(snap['enabled'] and self.dictating),
                                         toggle=self.dictation_toggle)
-        if self.resume_neutral and self.pointer.valid and self.pointer.neutral():
-            self.resume_neutral = False
-        if self.dictating or self.resume_neutral or openness is None:
+        # Dictation pauses an already enabled session. App keeps output frozen
+        # through finalization, typing and Return, then releases that pause.
+        # Resume from zero velocity without requiring another exact center pose;
+        # the normal freshness/disarm gates and mouth brake still apply.
+        if self.dictating or openness is None:
             snap['pointer_x'] = snap['pointer_y'] = .5
             self.pointer.reset_motion()
-        snap['diagnostics']['resume_head_neutral'] = self.resume_neutral
         snap['diagnostics']['mouth_brake'] = dict(openness=openness, resistance=self.pointer.brake,
                                                   known=openness is not None)
         snap['diagnostics']['button_actions']['left_eye'].update(

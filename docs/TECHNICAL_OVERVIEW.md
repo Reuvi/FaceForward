@@ -176,7 +176,9 @@ idle → starting → listening → finalizing → sending → submitting → id
    newline. The focused application's normal behavior determines the result.
 
 Pointer and individual eye actions stay paused throughout speech and sending.
-Head control resumes only after returning to center. The helper does not activate
+Head control resumes from zero velocity after submission, using the current fresh
+head input and normal response curve without an additional center gate. This does
+not re-arm output stopped by loss, staleness or an explicit Stop. The helper does not activate
 another window; the user focuses the destination before dictating.
 
 Recording is limited to 55 seconds. Recognition can finish early and enter a

@@ -85,7 +85,7 @@ for the tested model checksum, output modes, and platform boundaries.
    comfortable resting pose with both eyes open and click **Center head & start**.
 4. Move between targets, use mouth braking for precise placement, click a text
    field, and toggle dictation with both eyes. Speak after the rising cue. Toggle
-   again to type and submit; return your head to center before moving again.
+   again to type and submit; head control resumes smoothly after typing finishes.
 5. Use **Stop** to release output and cancel dictation. Tracking loss or stale
    input also stops control; resuming requires an explicit Start.
 

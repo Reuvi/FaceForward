@@ -216,15 +216,19 @@ class PresentationTests(unittest.TestCase):
         self.assertEqual(self.feed(head_x=.7,openness=None)['pointer_x'],.5)
         self.assertGreaterEqual(self.feed(head_x=.7)['pointer_x'],.5)
 
-    def test_dictation_freezes_motion_and_waits_for_head_neutral_afterward(self):
+    def test_dictation_freezes_motion_then_resumes_without_exact_head_neutral(self):
         self.hold(30,left='closed',right='closed',head_x=.7)
         snap=self.feed(head_x=.7,openness=1)
         self.assertTrue(snap['dictation_request']['active'])
         self.assertEqual(snap['pointer_x'],.5)
         self.hold(30,left='closed',right='closed',head_x=.7)
-        self.assertEqual(self.feed(head_x=.7)['pointer_x'],.5)
-        self.feed()
-        self.assertGreater(self.hold(30,head_x=.7)[-1]['pointer_x'],.5)
+        snap=self.hold(30,head_x=.7)[-1]
+        self.assertTrue(snap['enabled'])
+        self.assertGreater(snap['pointer_x'],.5)
+        self.assertEqual(self.feed(head_x=.7,openness=1)['pointer_x'],.5)
+        self.assertEqual(self.feed(head_x=.7,openness=None)['pointer_x'],.5)
+        self.core.disarm()
+        self.assertFalse(self.feed(head_x=.7)['enabled'])
 
     def test_rejected_capture_cannot_change_anatomical_eye_state(self):
         self.hold(10,left='closed')
