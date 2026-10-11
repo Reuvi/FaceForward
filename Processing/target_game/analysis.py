@@ -19,12 +19,15 @@ def usable(report):
     valid=[t for t in trials if t['valid']]
     successes=[t for t in valid if t['success']]
     return (report.get('mode')=='live-head' and report.get('complete') is True
+            and not any(c.get('during_round') for c in report.get('setup_changes',[]))
             and len({t['target']['id'] for t in valid})==16 and len(successes)>=12
             and sum(t['target']['size']=='small' for t in successes)>=3
             and sum(t['roughness'] is not None for t in successes)>=12)
 
 
 def propose(report):
+    if any(c.get('during_round') for c in report.get('setup_changes',[])):
+        return dict(changes={},reason='Setup changed within this round. Its movement data is saved; collect a stable baseline for an automatic comparison.')
     if not usable(report):
         return dict(changes={},reason='Need a complete live-head round with at least 12 successful targets, including 3 small ones. Practice and interrupted attempts cannot tune.')
     current=report['profile'];config,mapping,_=validate_profile(current)
@@ -81,6 +84,10 @@ def compare(baseline,candidate):
         return dict(better=False,reason='Camera/calibration context changed; comparison is not matched.')
     if baseline['geometry']!=candidate['geometry']:
         return dict(better=False,reason='Game position/size changed; comparison is not matched.')
+    a_center=baseline['profile']['mapping']['response']['pointer']
+    b_center=candidate['profile']['mapping']['response']['pointer']
+    if any(a_center[k]!=b_center[k] for k in ('center_x','center_y')):
+        return dict(better=False,reason='Resting head center changed; both rounds are saved, but this pair is not matched.')
     a={t['target']['id']:t for t in baseline['trials'] if t['valid']}
     b={t['target']['id']:t for t in candidate['trials'] if t['valid']}
     keys=[k for k in a.keys()&b.keys() if a[k]['success'] and b[k]['success']]
@@ -110,6 +117,8 @@ def compare(baseline,candidate):
 
 
 def decision(reports):
+    if len(reports)==4 and all(r['kind']=='A' for r in reports):
+        return dict(complete=False,winner=None,reason='Baseline rounds saved for analysis. No new adjustment was tested; defaults unchanged.')
     if len(reports)!=4 or [r['kind'] for r in reports]!=['A','B','B','A']:
         return dict(complete=False,winner=None,reason='Complete the A → B → B → A comparison before changing defaults.')
     first,second=compare(reports[0],reports[1]),compare(reports[3],reports[2])
@@ -117,7 +126,8 @@ def decision(reports):
     same_a=fingerprint(reports[0]['profile'])==fingerprint(reports[3]['profile'])
     same_b=fingerprint(reports[1]['profile'])==fingerprint(reports[2]['profile'])
     geometry=all(r['geometry']==reports[0]['geometry'] and r.get('source_context')==reports[0].get('source_context') for r in reports)
-    if not (eligible and same_a and same_b and geometry):
+    paired=all('matched' in result for result in (first,second))
+    if not (eligible and same_a and same_b and geometry and paired):
         return dict(complete=False,winner=None,comparisons=[first,second],reason='Rounds were not sufficiently complete or matched. Defaults unchanged.')
     winner='B' if first['better'] and second['better'] else 'A'
     original={t['target']['id']:t['acquisition_s'] for t in reports[0]['trials'] if t['valid'] and t['success']}

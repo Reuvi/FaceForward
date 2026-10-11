@@ -10,6 +10,13 @@ from .storage import DEFAULT_PATH, ROOT, Recorder, atomic_json, save_default, hi
 KINDS=('A','B','B','A')
 
 
+def with_center(data, current):
+    result=deepcopy(data)
+    for key in ('center_x','center_y'):
+        result['mapping']['response']['pointer'][key]=current['mapping']['response']['pointer'][key]
+    return result
+
+
 def telemetry(state,source):
     snap=state['snapshot'];diag=snap['diagnostics']
     return dict(source=source.get('mode'),source_error=source.get('error'),
@@ -45,12 +52,40 @@ class Experiment:
         self.geometry=None;self.expected=None;self.capture_session=None;self.source_context=None;self.round_profile=None
         self.started=None;self.cursor=0;self.closed=False;self.finished=False
         self.message='Move to each target and hold for 0.6 s. No clicking needed.'
-        self.result=None;self.rejected_candidates=[]
+        self.result=None;self.rejected_candidates=[];self.expected_profile=None;self.setup_changes=[]
+
+    def record_event(self,event,**values):
+        if self.recorder and not self.recorder.closed:
+            self.recorder.write(dict(event=event,time_ms=self.lab.clock(),round=len(self.reports),**values))
+
+    def accept_center(self,current):
+        """An explicit Start/Resume may adopt a new rest pose, never other edits.
+
+        Preserve original round profiles for honest matching. A recentered round
+        remains useful movement data even when it cannot select an A/B winner.
+        """
+        if not self.expected or fingerprint(current)==self.expected:return
+        reference=self.expected_profile
+        if (not reference or not current.get('mapping') or
+                fingerprint(with_center(reference,current))!=fingerprint(current)):
+            raise ValueError('Response settings changed outside the game. Saved rounds are retained; choose New session.')
+        change=dict(kind='resting_center',round=len(self.reports),during_round=self.round is not None,
+                    before={k:reference['mapping']['response']['pointer'][k] for k in ('center_x','center_y')},
+                    after={k:current['mapping']['response']['pointer'][k] for k in ('center_x','center_y')})
+        self.setup_changes.append(change);self.record_event('setup_change',change=change,profile=current)
+        if self.baseline:self.baseline=with_center(self.baseline,current)
+        if self.candidate:self.candidate=with_center(self.candidate,current)
+        self.expected_profile=deepcopy(current);self.expected=fingerprint(current)
 
     def state(self):
         state=self.lab.state(self.cursor)
         if state['trace']:self.cursor=state['trace'][-1]['id']
         return state
+
+    @property
+    def kind(self):
+        if self.suggestion is not None and not self.suggestion['changes']:return 'A'
+        return KINDS[min(len(self.reports),3)]
 
     def begin(self, geometry, *, practice=False, center=False):
         if self.closed or self.finished:raise ValueError('Start a new session for another comparison.')
@@ -61,7 +96,6 @@ class Experiment:
         if not self.reports:
             self.mode='practice' if practice else 'live-head'
             self.geometry=deepcopy(geometry)
-        elif geometry!=self.geometry:raise ValueError('Keep the same window size and position for every comparison round.')
         if self.mode=='practice' and self.reports:raise ValueError('Practice complete; start a new session to play again.')
         context={key:source.get(key) for key in ('mode','source_generation','calibration_generation')}
         context['capture_session']=state['snapshot']['session_id']
@@ -74,28 +108,43 @@ class Experiment:
             if not mapping or mapping['input_mode']!='head-mouse':raise ValueError('Select Mouse test for measured tuning.')
             if source.get('error') or state['output'].get('error'):raise ValueError('Resolve the camera/driver error before testing.')
             if self.reports:
-                if not self.suggestion or not self.suggestion['changes']:raise ValueError('No supported candidate. Keep baseline or start a new session.')
-                if fingerprint(profile(state,'Current'))!=self.expected:
-                    raise ValueError('Settings changed outside the game. Start a new baseline.')
-                selected=self.candidate if KINDS[len(self.reports)]=='B' else self.baseline
+                self.accept_center(profile(state,'Current'))
+                selected=self.candidate if self.kind=='B' else self.baseline
                 self.lab.apply_tuning_profile(selected)
-            if center and not self.reports:self.lab.action({'action':'center_head_start'})
+            if center:self.lab.action({'action':'center_head_start'})
             elif self.reports or not state['snapshot']['enabled']:self.lab.action({'action':'arm'})
         else:self.lab.action({'action':'stop'})
-        self.expected=None if not self.reports else fingerprint(profile(self.state(),'Current'))
+        if geometry!=self.geometry:
+            change=dict(kind='layout',round=len(self.reports),during_round=False,
+                        before=self.geometry,after=deepcopy(geometry))
+            self.setup_changes.append(change);self.record_event('setup_change',change=change)
+            self.geometry=deepcopy(geometry)
+        self.expected_profile=profile(self.state(),'Current') if self.reports else None
+        self.expected=fingerprint(self.expected_profile) if self.expected_profile else None
         self.waiting=True
         self.message=('Waiting for fresh live control. Keep your head at the same resting pose; open eye actions.'
                       if self.mode=='live-head' else 'Practice with the physical mouse. This data cannot change defaults.')
 
-    def resume(self):
+    def resume(self,*,center=False):
         if self.closed or self.finished:raise ValueError('This session has ended. Start a new session.')
         if not self.round or self.round.phase!='paused':return
         state=self.state()
         if self.mode=='live-head':
-            if fingerprint(profile(state,'Current'))!=self.expected:raise ValueError('Settings changed; start a new baseline instead of resuming.')
+            self.accept_center(profile(state,'Current'))
             if state['output']['mode']!='native' or self.source().get('mode')!='camera':raise ValueError('Restore Camera and Live output before resuming.')
-            self.lab.action({'action':'arm'})
+            self.lab.action({'action':'center_head_start' if center else 'arm'})
         self.waiting=True;self.message='Resuming from home after fresh input. Return to the same head rest position.'
+
+    def recenter(self,geometry):
+        if self.closed or self.finished:raise ValueError('Start a new session first.')
+        if self.round:
+            if self.round.phase!='paused':raise ValueError('Pause before recentering.')
+            self.resume(center=True)
+        elif self.waiting:
+            if self.source().get('mode')!='camera' or self.state()['output']['mode']!='native':
+                raise ValueError('Restore Camera and Live output before recentering.')
+            self.lab.action({'action':'center_head_start'})
+        else:self.begin(geometry,center=True)
 
     def poll(self,timestamp,x,y,geometry):
         if self.closed or self.finished or (not self.round and not self.waiting):return
@@ -112,9 +161,10 @@ class Experiment:
                     self.waiting=False
                     if self.round:self.round.pause(timestamp,problem)
                 return
-            current=profile(state,'Target game baseline' if not self.reports else 'Target game '+KINDS[len(self.reports)])
-            if self.expected and fingerprint(current)!=self.expected:
-                self.waiting=False;self.message='Settings changed; start a new baseline.'
+            current=profile(state,'Target game baseline' if not self.reports else 'Target game '+self.kind)
+            try:self.accept_center(current)
+            except ValueError as exc:
+                self.waiting=False;self.message=str(exc);self.record_event('blocked',reason=self.message)
                 self.lab.action({'action':'stop'});return
             if self.round:
                 self.round.resume()
@@ -124,13 +174,13 @@ class Experiment:
                     self.baseline=deepcopy(current)
                     self.rejected_candidates=[r['candidate'] for r in history(self.root)
                         if r['baseline']==fingerprint(current) and r['winner']=='A']
-                self.round_profile=current;self.expected=fingerprint(current)
+                self.round_profile=current;self.expected=fingerprint(current);self.expected_profile=deepcopy(current)
                 self.round=Round(geometry['width'],geometry['height']);self.started=timestamp
                 self.capture_session=state['snapshot']['session_id']
                 if self.source_context is None:
                     self.source_context={key:source.get(key) for key in ('mode','source_generation','calibration_generation')}
                     self.source_context['capture_session']=self.capture_session
-                self.recorder.write(dict(event='round_start',index=len(self.reports),kind=KINDS[len(self.reports)],
+                self.recorder.write(dict(event='round_start',index=len(self.reports),kind=self.kind,
                                          mode=self.mode,geometry=geometry,source_context=self.source_context,profile=current,profile_hash=self.expected))
             self.waiting=False
         if self.round.phase=='paused':return
@@ -153,11 +203,12 @@ class Experiment:
         if self.round.done:self.finish_round(timestamp)
 
     def report(self, timestamp, complete):
-        return dict(format='pointer_game_round_v1',kind=KINDS[len(self.reports)],mode=self.mode,
+        return dict(format='pointer_game_round_v1',kind=self.kind,mode=self.mode,
                     complete=complete,geometry=self.geometry,source_context=self.source_context,profile=self.round_profile,
                     profile_hash=fingerprint(self.round_profile),created_utc=datetime.now(timezone.utc).isoformat(),
                     started_ms=self.started,ended_ms=timestamp,trials=deepcopy(self.round.trials),
-                    summary=summarize(self.round.trials),rejected_candidates=self.rejected_candidates)
+                    summary=summarize(self.round.trials),rejected_candidates=self.rejected_candidates,
+                    setup_changes=deepcopy([c for c in self.setup_changes if c['round']==len(self.reports)]))
 
     def finish_round(self,timestamp):
         self.lab.action({'action':'stop'})
@@ -169,7 +220,10 @@ class Experiment:
         elif len(self.reports)==1:
             self.suggestion=propose(report);self.candidate=self.suggestion.get('profile')
             self.message=self.suggestion['reason']
-        elif len(self.reports)==4:
+            if not self.suggestion['changes']:self.message+=' Continue to record another baseline with the same response.'
+        if self.setup_changes and len(self.reports)<4:
+            self.message+=' Setup changed; rounds are retained, but unmatched results cannot select a winner.'
+        if self.mode=='live-head' and len(self.reports)==4:
             self.result=decision(self.reports)
             if self.result['complete']:
                 selected=self.candidate if self.result['winner']=='B' else self.baseline
@@ -184,14 +238,13 @@ class Experiment:
         selected=deepcopy(selected);selected['name']='Personal measured head control'
         save_default(selected,self.default_path)
         self.lab.apply_tuning_profile(selected)
-        self.expected=fingerprint(profile(self.state(),'Current'))
+        self.expected_profile=profile(self.state(),'Current');self.expected=fingerprint(self.expected_profile)
         atomic_json(self.recorder.path/'selected-profile.json',selected)
 
     def keep_baseline(self):
         if self.round or self.waiting or len(self.reports)!=1 or not usable(self.reports[0]):
             raise ValueError('Finish a usable live baseline first.')
-        if fingerprint(profile(self.state(),'Current'))!=self.expected:
-            raise ValueError('Settings changed; start a new baseline.')
+        self.accept_center(profile(self.state(),'Current'))
         self.promote(self.baseline)
         self.finished=True;self.message='Measured baseline saved as your personal default. No improvement is claimed.'
         atomic_json(self.recorder.path/'decision.json',dict(winner='A',reason=self.message,comparison_complete=False))

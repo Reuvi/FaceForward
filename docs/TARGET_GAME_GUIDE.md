@@ -26,6 +26,13 @@ Vision/.venv/bin/python -m App --source camera --output native --mapping mouse-t
    data, one proposed adjustment. Rest between rounds, then press Enter to continue.
    Output stops between rounds; return to the same resting pose for each Start.
 
+If Start waits for a resting position you cannot comfortably reproduce, hold a
+comfortable pose and press **Recenter & continue** in the game. You can also use
+**Center head & start** on Signals, then return and start the next round. Completed
+rounds remain saved. A changed center or window layout means those rounds cannot
+be treated as an unchanged A/B comparison; they still provide useful movement data.
+Other response edits or changed camera/calibration require a new session.
+
 The four rounds are **A baseline → B adjustment → B repeat → A repeat**. Each
 repeats the same targets: left/right/up/down at three sizes, plus four diagonals.
 Small targets require precise short movements; other targets test longer travel.
@@ -93,6 +100,8 @@ Vision/.venv/bin/python -m App --source demo --mapping mouse-test --factory-defa
 ```
 
 If no clear adjustment is supported, keep the settings and review the paths.
+Start remains available to collect additional baseline rounds with the same
+response; these are labeled A, and no untested adjustment is promoted.
 **Keep baseline as default** can save a completed usable first round without
 claiming improvement. Ordinary **Save as… / Load…** tuning profiles remain
 available. Face calibration is saved separately.
@@ -102,8 +111,12 @@ available. Face calibration is saved separately.
 Missing/stale head input, camera/driver failures, disabled output, focus loss or
 recording gaps pause the attempt and stop output. **Resume target** explicitly
 starts again from home after fresh input. It never resumes automatically.
-Changing calibration, source, settings or display geometry requires restoring the
-original state or starting a new session. **Stop / Escape / closing the game**
+Changing calibration, source or response settings requires a new session. Moving
+the game during a target pauses it; restore its position before resuming. Between
+rounds, a changed layout can continue collecting data but is not a matched comparison.
+Recentering during a paused round keeps the completed trials and retries the current
+target, while excluding that mixed-center round from automatic tuning.
+**Stop / Escape / closing the game**
 saves partial results and restores A while the game still owns the current settings.
 An unfinished B is never promoted; unrelated edits are preserved.
 
@@ -115,6 +128,9 @@ Sessions are private local files under `.local/target-game/<session-id>/`:
 - `round-1.csv` …: convenient per-target tables.
 - `decision.json` and `selected-profile.json`: final comparison and chosen settings.
 - `partial-round.json`: interrupted work, when present.
+
+Traces also record blocked UI actions and setup changes, so continuation failures
+can be diagnosed later. Original round profiles are never rewritten after recentering.
 
 `personal-default.json` and bounded `history.json` live in `.local/target-game/`.
 No images or face calibration models are recorded, and this directory is ignored
@@ -131,3 +147,6 @@ After your first live comparison, share the session ID or say the rounds are
 finished in the integration task. The saved paths and synchronized head signals
 can guide the next iteration. Software tests use synthetic trajectories; your
 real trials are needed to establish whether any setting actually helps you.
+You can explicitly request a provisional trial profile from existing baseline
+data; its saved review identifies it as unverified and includes the prior profile
+for rollback. That choice does not count as a successful A/B comparison.

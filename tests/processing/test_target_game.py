@@ -169,6 +169,78 @@ class ExperimentTests(unittest.TestCase):
         self.assertNotIn('exponent',next_suggestion['changes'])
         self.assertNotIn('gain',next_suggestion['changes'])
 
+    def test_recenter_after_baseline_continues_without_rewriting_old_results(self):
+        baseline=deepcopy(self.baseline())
+        self.lab.action({'action':'center_head_start'});self.tick(head_x=.42,head_y=.55)
+        self.e.begin(GEOMETRY);self.tick(head_x=.42,head_y=.55)
+        self.assertIsNotNone(self.e.round)
+        self.assertEqual(self.e.reports[0],baseline)
+        self.assertEqual(self.lab.processor.config.pointer.center_x,.42)
+        self.assertEqual(self.lab.processor.config.pointer.exponent,1.95)
+        traverse(self.e.round,self.tick)
+        self.assertIn('center changed',compare(baseline,self.e.reports[1])['reason'])
+        for _ in range(2):
+            self.e.begin(GEOMETRY);self.tick(head_x=.42,head_y=.55)
+            traverse(self.e.round,self.tick)
+        self.assertTrue(self.e.finished);self.assertFalse(self.e.result['complete'])
+        self.assertFalse(self.default.exists())
+        self.assertFalse((Path(self.e.root)/'history.json').exists())
+        self.assertEqual(self.lab.processor.config.pointer.center_y,.55)
+        self.assertEqual(len(self.e.reports),4)
+
+    def test_recenter_button_recovers_waiting_start_on_next_fresh_sample(self):
+        self.baseline();self.e.begin(GEOMETRY);self.tick(head_x=.42,head_y=.55)
+        self.assertTrue(self.e.waiting);self.assertIsNone(self.e.round)
+        self.e.recenter(GEOMETRY)
+        self.assertTrue(self.e.waiting);self.assertIsNone(self.e.round)
+        self.tick(head_x=.42,head_y=.55)
+        self.assertIsNotNone(self.e.round);self.assertTrue(self.lab.processor.enabled)
+        self.assertEqual(self.lab.processor.config.pointer.exponent,1.95)
+        self.assertEqual(self.e.setup_changes[-1]['kind'],'resting_center')
+        rows=[json.loads(line) for line in (self.e.recorder.path/'cursor.jsonl').read_text().splitlines()]
+        self.assertTrue(any(r['event']=='setup_change' for r in rows))
+
+    def test_between_round_layout_change_keeps_collection_but_not_matched_promotion(self):
+        baseline=self.baseline();changed=dict(GEOMETRY,width=1100,origin_x=15)
+        self.e.begin(changed)
+        self.now+=50;self.seq+=1;self.lab.ingest(frame(self.seq,self.now))
+        self.e.poll(self.now,500,300,changed)
+        self.assertIsNotNone(self.e.round)
+        self.assertEqual(self.e.geometry,changed)
+        self.assertEqual(baseline['geometry'],GEOMETRY)
+        self.assertEqual(self.e.setup_changes[-1]['kind'],'layout')
+
+    def test_center_exception_does_not_accept_other_response_changes(self):
+        self.baseline();state=self.lab.state()
+        self.lab.tune_response('pointer',{'gain':2.5},mapping_id=state['mapping_id'],generation=state['generation'])
+        self.lab.action({'action':'center_head_start'});self.tick(head_x=.42,head_y=.55)
+        with self.assertRaisesRegex(ValueError,'Response settings changed'):self.e.begin(GEOMETRY)
+        self.assertEqual(len(self.e.reports),1)
+        self.e.cancel()
+        self.assertEqual(self.lab.state()['mapping']['pointer_gain'],2.5)
+
+    def test_no_supported_candidate_can_still_collect_more_baseline_data(self):
+        traverse(self.begin(),self.tick)
+        self.assertFalse(self.e.suggestion['changes'])
+        for _ in range(3):traverse(self.begin(),self.tick)
+        self.assertEqual([r['kind'] for r in self.e.reports],['A']*4)
+        self.assertTrue(self.e.finished);self.assertFalse(self.default.exists())
+        self.assertIn('Baseline rounds saved',self.e.result['reason'])
+
+    def test_paused_round_recenter_keeps_trials_but_marks_comparison_unusable(self):
+        model=self.begin()
+        for _ in range(8):self.tick()
+        self.tick(head_y=None)
+        self.assertEqual(model.phase,'paused')
+        self.e.recenter(GEOMETRY);self.tick(head_x=.42,head_y=.55)
+        self.assertEqual(model.phase,'home')
+        traverse(model,self.tick)
+        self.assertEqual(self.e.reports[0]['summary']['completed'],16)
+        self.assertFalse(usable(self.e.reports[0]))
+        self.assertTrue(self.e.reports[0]['setup_changes'][0]['during_round'])
+        self.e.begin(GEOMETRY);self.tick(head_x=.42,head_y=.55)
+        self.assertIsNotNone(self.e.round)
+
     def test_candidate_must_win_both_comparisons(self):
         a=self.baseline();b=deepcopy(a);b['kind']='B';b['profile']=self.e.candidate
         for t in b['trials']:

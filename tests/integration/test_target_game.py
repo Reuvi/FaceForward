@@ -59,6 +59,25 @@ class TargetGameWindowTests(unittest.TestCase):
         self.assertFalse(self.game.experiment.waiting)
         self.assertFalse(self.lab.processor.armed)
 
+    def test_recenter_recovery_button_is_connected_and_does_not_run_in_practice(self):
+        with patch.object(self.game.experiment,'recenter') as recenter:
+            self.game.recenter_button.invoke()
+            recenter.assert_called_once_with(self.game.geometry())
+        self.game.start(practice=True);self.game.draw()
+        self.assertEqual(str(self.game.recenter_button['state']),'disabled')
+
+    def test_failed_continue_is_logged_and_saved_data_is_preserved(self):
+        import json
+        self.game.start(practice=True);geometry=self.game.geometry()
+        self.now+=50;self.game.experiment.poll(self.now,0,0,geometry)
+        path=self.game.experiment.recorder.path/'cursor.jsonl'
+        def fail():raise ValueError('Synthetic blocked continuation')
+        self.game.guarded(fail)
+        rows=[json.loads(line) for line in path.read_text().splitlines()]
+        self.assertEqual(rows[-1]['event'],'ui_error')
+        self.assertIn('blocked continuation',rows[-1]['reason'])
+        self.assertFalse(self.lab.processor.armed)
+
     def test_status_and_saved_footer_do_not_resize_active_course(self):
         initial=self.game.geometry()
         self.game.status.set('A long measured recommendation with evidence. '*30)
@@ -68,6 +87,8 @@ class TargetGameWindowTests(unittest.TestCase):
         self.assertGreaterEqual(initial['width'],640);self.assertGreaterEqual(initial['height'],400)
         self.assertLess(self.game.canvas.winfo_rooty()+self.game.canvas.winfo_height(),
                         self.game.window.winfo_rooty()+self.game.window.winfo_height())
+        self.game.window.geometry('900x650');self.root.update()
+        self.assertGreaterEqual(self.game.geometry()['height'],400)
 
     def test_new_session_and_close_cancel_pending_start_and_callbacks(self):
         self.game.practice_button.invoke();self.game.new_session()

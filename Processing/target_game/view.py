@@ -2,7 +2,7 @@
 import tkinter as tk
 from tkinter import ttk
 
-from .experiment import Experiment, KINDS
+from .experiment import Experiment
 from .storage import ROOT, DEFAULT_PATH
 
 BG='#0b1220';TEXT='#e5edf8';MUTED='#91a4bf';BLUE='#60a5fa';GREEN='#4adea5';GOLD='#fbbf24'
@@ -39,6 +39,10 @@ class TargetGame:
         self.keep_button=ttk.Button(bar,text='Keep baseline as default',command=lambda:self.guarded(self.keep))
         self.keep_button.pack(side='left',padx=6)
         ttk.Button(bar,text='New session',command=lambda:self.guarded(self.new_session)).pack(side='right')
+        recovery=ttk.Frame(outer);recovery.pack(fill='x',pady=(0,8))
+        self.recenter_button=ttk.Button(recovery,text='Recenter & continue',command=lambda:self.guarded(self.recenter))
+        self.recenter_button.pack(side='left')
+        ttk.Label(recovery,text='Use if Start is waiting for your resting pose. Existing rounds stay saved.').pack(side='left',padx=8)
         self.canvas=tk.Canvas(outer,background=BG,highlightthickness=0,cursor='crosshair')
         self.canvas.pack(fill='both',expand=True)
         self.footer=tk.StringVar(value='16 targets per round · 600 ms hold · A baseline → B adjustment → B repeat → A repeat')
@@ -58,6 +62,8 @@ class TargetGame:
         except (ValueError,OSError,TypeError,KeyError) as exc:
             self.error=str(exc);self.status.set(self.error)
             self.lab.action({'action':'stop'})
+            try:self.experiment.record_event('ui_error',reason=self.error)
+            except OSError:pass
         self.draw()
 
     def start(self,practice=False):
@@ -73,6 +79,10 @@ class TargetGame:
         return 'break'
 
     def resume(self):self.experiment.resume()
+
+    def recenter(self):
+        if self.experiment.closed or self.experiment.finished:self.new_session()
+        self.experiment.recenter(self.geometry())
 
     def keep(self):self.experiment.keep_baseline()
 
@@ -137,13 +147,14 @@ class TargetGame:
         e=self.experiment;r=e.round
         self.start_button.configure(state='disabled' if r or e.waiting else 'normal',
                                     text='New baseline · Enter' if e.finished or e.closed else
-                                    f'Start {KINDS[len(e.reports)]} round {len(e.reports)+1} · Enter' if e.reports else 'Start baseline · Enter')
+                                    f'Start {e.kind} round {len(e.reports)+1} · Enter' if e.reports else 'Start baseline · Enter')
         self.resume_button.configure(state='normal' if r and r.phase=='paused' and not e.waiting else 'disabled')
+        self.recenter_button.configure(state='disabled' if e.mode=='practice' or r and r.phase!='paused' else 'normal')
         self.practice_button.configure(state='disabled' if r or e.waiting or e.reports else 'normal')
         self.keep_button.configure(state='normal' if len(e.reports)==1 and not r and not e.waiting and e.mode=='live-head' and not e.closed and not e.finished else 'disabled')
         if r and r.phase in ('home','target') and not e.waiting:
             target=r.targets[r.index]
-            kind='PRACTICE · no tuning' if e.mode=='practice' else 'BASELINE A' if KINDS[len(e.reports)]=='A' else 'ADJUSTMENT B'
+            kind='PRACTICE · no tuning' if e.mode=='practice' else 'BASELINE A' if e.kind=='A' else 'ADJUSTMENT B'
             label=f'{kind}   ·   {r.index+1} / 16'
             c.create_text(24,26,text=label,anchor='w',fill=MUTED,font=('TkDefaultFont',12,'bold'))
             if r.phase=='home':
@@ -165,7 +176,7 @@ class TargetGame:
                 c.create_text(w-24,26,text=f'{elapsed:.1f} s   ·   exits {r.trial.exits}',anchor='e',fill=MUTED)
             return
         if e.waiting:
-            self.center_text('Preparing live control',e.message+'\nReturn your head to the saved resting pose.\nUse Stop / Esc to cancel.')
+            self.center_text('Preparing live control',e.message+'\nReturn your head to the saved resting pose, or use Recenter & continue.\nUse Stop / Esc to cancel.')
         elif r and r.phase=='paused':self.center_text('Paused — this attempt does not count',r.reason+'\nPress Resume target after the issue is resolved.')
         elif e.reports:
             report=e.reports[-1];s=report['summary']

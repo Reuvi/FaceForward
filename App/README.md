@@ -19,6 +19,10 @@ small-target exits/re-entries, accuracy and roughness. A → B → B → A round
 one supported adjustment and save the winner as a local personal default. Native
 output still requires explicit Start. A physical-mouse Practice mode cannot tune.
 [Game instructions and recorded data](../docs/TARGET_GAME_GUIDE.md).
+If a round cannot start from the previous resting pose, use **Recenter & continue**
+inside the game. Saved rounds remain available; changed setups are labeled and
+excluded from unmatched automatic comparisons. No suggested adjustment still
+allows more baseline data collection.
 
 Normal startup and `--mapping mouse-test` use a valid saved personal default;
 explicit other mappings override it. `--factory-defaults` ignores it for this run.

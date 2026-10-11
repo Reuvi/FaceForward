@@ -1,5 +1,48 @@
 # Main chat and agent coordination hub
 
+## Target-game continuation and existing-data review handoff
+
+- Task / lane / branch / worktree: Reuvi integration continuation on
+  `codex/integration/target-game-tuning`, existing isolated worktree. Base `6ed660f`;
+  recovery contract commit `c58df6e` precedes the implementation commit.
+- Changed paths: `Processing/target_game/{analysis,experiment,view}.py`, target-game
+  Processing/Tk tests, `Contracts/TARGET_GAME.md`, App README, game guide, this handoff.
+- Before → after: a post-round **Center head & start** changed the saved profile
+  fingerprint and blocked every subsequent round. Explicit Start/Resume now accepts
+  only a changed resting center, preserves original reports, and records setup
+  changes. **Recenter & continue** can recover a pending/paused game using a fresh
+  capture. Other response edits remain rejected. Changed layouts between rounds
+  may continue collecting observations; changes during a trial still pause it.
+  Mismatched centers/layouts or within-round recentering cannot promote a winner
+  or populate failed-candidate history. No candidate now permits more A rounds
+  rather than blocking Start. Game UI errors are recorded in the session trace.
+- Existing user recordings were reviewed in place. At the user's request, a
+  provisional data-guided profile, evidence and rollback profile were saved under
+  ignored `.local/target-game/`; the personal default identifies the trial as
+  unverified and preserves the latest logged resting center. No original recording
+  was edited and no human measurements/profile values are committed to Git.
+- Run: restart App from main; normal startup or `--mapping mouse-test` loads the
+  local personal default without arming. Use **Signals → Target game… → Recenter
+  & continue** when waiting for the old resting pose. The existing recordings are
+  already usable for review; they need not be recollected for this trial profile.
+- Verification: `python3 -m unittest discover -s tests/processing -q` passed
+  **193 tests**. With Vision Python and `RUN_TK_TESTS=1`, target-game UI passed
+  **7 tests**, and `test_simple_signals.py` passed **17 tests**. Compiled driver
+  dry-run integration passed **21 tests** with `FID_LIBRARY` set; gaming mock
+  pipeline passed **5 tests**. Target-game Processing tests were rerun after final
+  comparison changes: **24 passed**. Recenter-before-B, pending-start recovery,
+  paused-round recovery, retained original reports, unmatched comparison exclusion,
+  no-candidate continuation, rejected unrelated edits, UI error logging and minimum
+  window geometry are covered. The real private trial profile was validated and
+  loaded into an isolated stopped Lab; no camera or native OS events were used.
+- Contract impact: additive setup-change entries and error events in private game
+  records. Existing shared interfaces, profile versions and Drivers are unchanged.
+  Automatic matched A/B selection stays separate from explicitly requested
+  provisional defaults. Freshness/loss/stop release and explicit arming remain.
+- Remaining evidence: the proposed trial has not been tested against baseline;
+  human improvement remains unverified. Private rollback/evidence files stay local.
+  All other worktrees, face profiles and recordings were preserved.
+
 ## Measured target-game tuning handoff
 
 - Task / lane / branch / worktree: Reuvi integration,
