@@ -1,3 +1,5 @@
+**Current measured pointer tuning:** read [Contracts/TARGET_GAME.md](Contracts/TARGET_GAME.md). Native target trials collect actual cursor/head data; repeated baseline/candidate comparisons choose local personal defaults. Practice/invalid data cannot tune.
+
 **Latest eye mode / head recovery:** read [Contracts/EYE_MODE_CONTROL_RECOVERY.md](Contracts/EYE_MODE_CONTROL_RECOVERY.md). Mapping v7 adds a persisted require_wink flag; explicit plain closure bypasses wink intent with immediate independent eye gates. Center head & start uses a fresh head sample. These supersede older wink-only restrictions only when selected.
 
 # Agent working agreement
