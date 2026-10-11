@@ -12,7 +12,7 @@ MATRIX_SIZE = 11
 
 
 def normalize(xy):
-    """Legacy fixed map for developer comparisons; the workbench uses pupil_calibration."""
+    """Fixed scale for direct iris direction; no personal fit or head-pose gate."""
     if xy is None or len(xy) != 2 or not all(finite_number(v) for v in xy):
         return None
     x, y = xy

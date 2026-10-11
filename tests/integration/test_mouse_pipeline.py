@@ -143,7 +143,7 @@ class PipelineTests(unittest.TestCase):
             self.lab.settings({"runtime": {"source": "mock"}})
 
     @unittest.skipUnless(all(importlib.util.find_spec(n) for n in ("cv2", "numpy")), "Install Vision requirements for camera adapter")
-    def test_camera_adapter_exposes_raw_ratios_before_pupil_calibration(self):
+    def test_camera_adapter_exposes_pupil_motion_without_calibration(self):
         clock = self.clock
         from Vision.demo_detection import demo_image
         image, observations = demo_image()
@@ -164,7 +164,10 @@ class PipelineTests(unittest.TestCase):
         state = self.session.state()
         self.assertEqual(state["observations"]["single-user"]["eyes"]["left"]["openness"], 0.24)
         values = state["frame"]["faces"][0]["signals"]
-        self.assertTrue(all(not item["valid"] for item in values.values()))
+        self.assertTrue(values["gaze_x"]["valid"])
+        self.assertTrue(values["gaze_y"]["valid"])
+        self.assertFalse(values["head_y"]["valid"])
+        self.assertFalse(values["left_eye_open"]["valid"])
         self.assertIsNotNone(self.session.detector_runtime.workbench.trace[-1]["pupil_raw_x"])
         self.assertIsNone(self.session.detector_runtime.workbench.pupil_model)
 

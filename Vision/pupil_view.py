@@ -1,10 +1,9 @@
-"""Personal pupil calibration, a temporary native guide and square matrix."""
+"""Live raw pupil direction and square matrix; no calibration guide."""
 
 import tkinter as tk
 from tkinter import ttk
 
 from .pupil import MATRIX_SIZE, matrix_cell
-from .eye_view import CalibrationSounds, FullscreenEyeGuide
 from LabUI.traces import darker
 
 
@@ -76,86 +75,19 @@ def draw_matrix(canvas, state):
 
 class PupilPanel:
     def __init__(self, parent, root, call):
-        self.root, self.call = root, call
-        self.sounds = CalibrationSounds(root)
-        self.event = self.fullscreen = self.pending_present = None
         self.frame = ttk.Frame(parent)
         self.frame.pack(fill="x", pady=8)
-        self.message = tk.StringVar(
-            value="Calibrate comfortable eye directions with head compensation"
-        )
-        ttk.Label(self.frame, textvariable=self.message, wraplength=420).pack(
-            anchor="w"
-        )
-        ttk.Label(
-            self.frame,
-            text="One highlighted cell marks the direction. The small dot shows the precise X/Y value. Dark cells hold the last visible position only; unknown input stays unavailable.",
-            wraplength=420,
-        ).pack(anchor="w", pady=5)
-        self.start = ttk.Button(self.frame, text="Start / restart pupil guide", command=lambda: call("start_pupil_guide"))
-        self.start.pack(fill="x", pady=3)
-        self.retry = ttk.Button(self.frame, text="Retry failed step", command=lambda: call("retry_pupil_step"))
-        self.retry.pack(fill="x", pady=3)
-        self.reset = ttk.Button(self.frame, text="Reset pupils only", command=lambda: self.reset_pupils())
-        self.reset.pack(fill="x", pady=3)
-        self.canvas = tk.Canvas(
-            self.frame, height=310, bg="#14202c", highlightthickness=0
-        )
+        self.message = tk.StringVar(value="Raw pupil direction · no calibration needed")
+        ttk.Label(self.frame, textvariable=self.message, wraplength=420).pack(anchor="w")
+        ttk.Label(self.frame, text="Look left/right/up/down to move the pointer. Keep both pupils visible. Pointer gain, dead zone and smoothing are in Signals → Mapping settings.",
+                  wraplength=420).pack(anchor="w", pady=5)
+        ttk.Label(self.frame, text="The cell and dot show fixed-scale raw direction, not screen gaze. Dark cells hold only the display; unknown input stops movement.",
+                  wraplength=420).pack(anchor="w", pady=5)
+        self.canvas = tk.Canvas(self.frame, height=310, bg="#14202c", highlightthickness=0)
         self.canvas.pack(fill="x", pady=5)
 
     def update(self, state):
         draw_matrix(self.canvas, state)
-        guide = state.get("pupil_guide")
-        active = bool(guide and guide["active"])
-        self.start.configure(state="normal" if not state["calibrating"] or active else "disabled")
-        self.reset.configure(state="normal" if not state["calibrating"] or active else "disabled")
-        self.retry.configure(state="normal" if guide and not guide["active"] and not guide["passed"] and not state["calibrating"] else "disabled")
-        if not active:
-            self.dismiss_fullscreen()
-            self.message.set(guide["report"] if guide else ("Personal pupil calibration loaded" if state.get("pupil_model") else "Start the guide to define directions. Raw iris data is available before calibration."))
-            if guide and self.event and self.event[2]:
-                self.sounds.play("success" if guide["passed"] else "retry")
-            self.event = None
-            return
-        event = (state["generation"], guide["index"], guide["active"], guide["phase"])
-        self.message.set(guide["instruction"])
-        if self.fullscreen is None:
-            self.fullscreen = FullscreenEyeGuide(self.root, self.cancel)
-            self.fullscreen.window.title("Pupil calibration — Escape to cancel")
-        progress = f"{guide['phase'].upper()} · {guide['remaining_ms']/1000:.1f}s · {guide['samples']} clear / {guide['rejected']} rejected"
-        self.fullscreen.update(guide, f"Pupils · step {guide['index']+1}/{guide['total']}", guide["instruction"], progress)
-        if event != self.event:
-            self.sounds.play({"rest":"rest", "prepare":"resume", "capture":"capture"}[guide["phase"]])
-            self.event = event
-        if guide["waiting"] and self.pending_present is None:
-            self.pending_present = self.root.after_idle(lambda e=event: self.present(e))
-
-    def present(self, event):
-        self.pending_present = None
-        if event != self.event or self.fullscreen is None:
-            return
-        if not self.fullscreen.ready:
-            self.pending_present = self.root.after(30, lambda: self.present(event))
-        elif self.fullscreen.canvas.find_all():
-            self.call("present_pupil_step", event[1], event[3], event[0])
-
-    def dismiss_fullscreen(self):
-        if self.pending_present is not None:
-            self.root.after_cancel(self.pending_present)
-            self.pending_present = None
-        if self.fullscreen is not None:
-            self.fullscreen.close()
-            self.fullscreen = None
-
-    def cancel(self):
-        self.dismiss_fullscreen()
-        self.call("cancel")
-        self.sounds.play("cancel")
-
-    def reset_pupils(self):
-        self.dismiss_fullscreen()
-        self.call("reset_pupils")
 
     def close(self):
-        self.dismiss_fullscreen()
-        self.sounds.close()
+        pass

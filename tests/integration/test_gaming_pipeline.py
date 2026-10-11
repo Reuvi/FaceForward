@@ -92,7 +92,7 @@ class CalibratedGamingPipeline(GamingHarness):
         self.capture()
         for _ in range(16):frame = self.capture(head=.65,head_x=.35,pupil_x=.723,pupil_y=.5)
         values = frame["faces"][0]["signals"]
-        self.assertEqual(frame["gaze_measurement"],"head_compensated_iris_direction_v1")
+        self.assertEqual(frame["gaze_measurement"],"mediapipe_iris_direction_v3")
         self.assertAlmostEqual(self.lab.processor.sample.pointer[0],values["gaze_x"]["value"])
         self.assertNotEqual(self.lab.processor.sample.pointer[0],frame["pupil_matrix"]["column"]/10)
         command = self.lab.state()["message"]
@@ -116,7 +116,7 @@ class CalibratedGamingPipeline(GamingHarness):
             self.session.load_profile(path)
             self.assertEqual(self.lab.mapping_id,GAMING_ID)
             self.assertFalse(self.lab.processor.armed)
-            self.assertEqual(self.core.export_calibration()["version"],12)
+            self.assertEqual(self.core.export_calibration()["version"],13)
             self.assertIsNotNone(self.core.pupil_model)
 
     @unittest.skipUnless(os.environ.get("RUN_TK_TESTS")=="1","native Tk check")

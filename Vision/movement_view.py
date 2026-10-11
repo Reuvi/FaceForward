@@ -282,13 +282,13 @@ def draw_position(canvas, state, kind):
         for index, (keys, title, color) in enumerate(
             (
                 (
-                    ("pupil_compensated_x", "pupil_compensated_y"),
-                    "Compensated pupils · eye widths",
+                    ("pupil_raw_x", "pupil_raw_y"),
+                    "Raw pupils · eye widths",
                     "#75e3a8",
                 ),
                 (
                     ("gaze_x", "gaze_y"),
-                    "Calibrated pupils · center (.5, .5)",
+                    "Fixed-scale pupils · center (.5, .5)",
                     "#6ed7fe",
                 ),
             )
@@ -331,20 +331,6 @@ def draw_position(canvas, state, kind):
             )
             def plot_value(value):
                 return max(0, min(1, value+.5)) if index==0 else value
-            bounds = None
-            if kind == "pupil":
-                model = state.get("pupil_model")
-                if model:
-                    bounds = {axis:dict(low=model["low"][i], high=model["high"][i]) for i,axis in enumerate(("x","y"))}
-            if index == 0 and bounds:
-                canvas.create_rectangle(
-                    x0 + plot_value(bounds["x"]["low"]) * (x1 - x0),
-                    y0 + plot_value(bounds["y"]["low"]) * (y1 - y0),
-                    x0 + plot_value(bounds["x"]["high"]) * (x1 - x0),
-                    y0 + plot_value(bounds["y"]["high"]) * (y1 - y0),
-                    outline="#b18bff",
-                    dash=(4, 3),
-                )
             point, known = display_point(state, keys)
             if point:
                 x = x0 + plot_value(point[0]) * (x1 - x0)
@@ -545,11 +531,10 @@ def draw_pupil_scope(canvas, state):
     canvas.delete("all")
     w,h=max(360,canvas.winfo_width()),max(160,canvas.winfo_height())
     rows=state["trace"];start=(rows[-1]["timestamp_ms"] if rows else 0)-8000
-    canvas.create_text(8,5,text="Pupils · raw vs head-compensated · eye widths",fill="white",anchor="nw")
-    specs=(("pupil_raw_x","Raw X","#55cfff"),("pupil_raw_y","Raw Y","#c39aff"),
-           ("pupil_compensated_x","Corrected X","#ffa663"),("pupil_compensated_y","Corrected Y","#75e3a8"))
+    canvas.create_text(8,5,text="Pupils · raw direction · eye widths",fill="white",anchor="nw")
+    specs=(("pupil_raw_x","Raw X","#55cfff"),("pupil_raw_y","Raw Y","#c39aff"))
     for index,(key,label,color) in enumerate(specs):
-        canvas.create_text(8+index*w/4,28,text=label,fill=color,anchor="nw")
+        canvas.create_text(8+index*w/len(specs),28,text=label,fill=color,anchor="nw")
         for unknown,segment in trace_runs(scope_samples(rows,key,state["scope_subject"],state["generation"]),
                                           max_gap=state["config"]["stale_ms"],start=start):
             points=[]

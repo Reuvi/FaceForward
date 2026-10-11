@@ -36,7 +36,7 @@ def pointer_status(source, lab):
             quality = min(p.get("confidence", 0) for p in pupils)
             if quality < config["min_confidence"]:
                 return f"Pointer unavailable: pupil confidence {quality:.2f} is below {config['min_confidence']:.2f}."
-        reason = detector.get("reasons", {}).get("pupil", "Both calibrated pupil inputs must be usable.")
+        reason = detector.get("reasons", {}).get("pupil", "Both pupils must be visible and usable; no pupil calibration is needed.")
         eyes = (detector.get("pupil") or {}).get("eyes", {})
         details = [f"{side.title()}: {eye['reason']}" for side, eye in eyes.items()
                    if not eye.get("valid") and eye.get("reason")]

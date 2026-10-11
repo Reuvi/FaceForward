@@ -1,5 +1,12 @@
 # Agent working agreement
 
+**Current raw pupil decision:** follow `Contracts/RAW_PUPIL_CONTROL.md` (repository root).
+Pupils use fixed-scale raw iris X/Y with no pupil guide, learned endpoints or
+head-pose compensation gate. Prior calibrated-pupil requirements below are
+superseded. Keep adaptive Processing, visibility checks, independent eye/head
+calibration and head-only Mouse test. Presets v13 preserve validated old fits
+as inactive data; combined profiles stay v3.
+
 **Current pupil / Mouse test update:** read `Contracts/PUPIL_QUALITY_MOUSE_TEST.md`.
 Gaming retains calibrated pupils, with personal open-eye evidence and adaptive
 velocity smoothing. The built-in Mouse test mapping uses calibrated head X/Y only,

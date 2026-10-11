@@ -122,9 +122,6 @@ class LabRuntime:
                     controls["head"]={"neutral":.5,"up":.2,"down":.8}[state["name"]]
                 elif movement.kind=="head_x":
                     controls["head_x"]={"neutral":.5,"left":.2,"right":.8}[state["name"]]
-            pupil = self.workbench.pupil_guide
-            if pupil and pupil.active:
-                controls.update(pupil.demo_controls())
             controls["tongue"] = False  # Retired input is absent from synthetic images too.
             return controls
 

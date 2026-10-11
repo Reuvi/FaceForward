@@ -1,8 +1,9 @@
 # Pupil quality update and Mouse test
 
-The current changes retain the local MediaPipe model and personal pupil endpoints
-with head-angle compensation. They improve availability and motion filtering;
-they do not claim measured screen-gaze accuracy or replace the camera model.
+The current code retains the local MediaPipe model and uses fixed-scale raw
+eye-relative iris direction, without pupil calibration or head compensation.
+The quality and filtering changes improve availability and pointer response;
+they do not establish measured screen-gaze accuracy or replace the camera model.
 
 ## What changed
 
@@ -13,9 +14,10 @@ they do not claim measured screen-gaze accuracy or replace the camera model.
   iris shape, geometry and binocular agreement checks. These are heuristic
   safeguards, not calibrated probabilities. The generic path remains available
   without an eye fit; legacy non-guided fits do not override aperture checks.
-- Raw iris coordinates, binocular averaging, pupil/head calibration identity,
-  matrix, capture time, and invalid/null data remain unchanged. Saved v12 profiles
-  still load. Neither eye can provide the other's open evidence. Actual closure
+- Raw iris coordinates, binocular averaging, matrix, capture time, and invalid/null
+  data remain unchanged. Saved v12 profiles still load into v13; their pupil fits
+  are retained as inactive data. No head-pose estimate is needed for pupil output.
+  Neither eye can provide the other's open evidence. Actual closure
   and uncertain narrow eyes remain unavailable. Wink classification is unchanged.
 - Gaming and Mouse test now use a **1€ adaptive filter** on the two-dimensional
   pointer velocity target before acceleration limiting. A shared smoothed speed
@@ -35,7 +37,9 @@ they do not claim measured screen-gaze accuracy or replace the camera model.
 [Google's MediaPipe Iris description](https://research.google/blog/mediapipe-iris-real-time-iris-tracking-depth-estimation/)
 explains the iris/eye-contour pipeline and distinguishes iris localization from
 estimating a screen gaze point. More smoothing cannot remove a biased calibration.
-The existing personal endpoints and same-frame head correction therefore remain.
+The user chose raw directional control for simpler operation. Fixed-scale raw
+values can be biased by resting gaze or head movement; filtering does not remove
+that bias. Old learned correction and head-angle restrictions are no longer used.
 [EyeTrax](https://github.com/ck-zhang/EyeTrax) similarly combines webcam features,
 personal calibration and filtering; it is not evidence that substituting the
 same landmark detector alone would improve this app.
@@ -69,8 +73,9 @@ symmetry, output bounds, missing input, true-neutral startup and resets.
 
 Restart App. Load a compatible saved profile. If pupil rejection persists for
 naturally narrow open eyes, redo **Eye open/closed** while following all open-eye
-targets, then redo the dependent wink-action guide. Keep the existing pupil fit
-unless its center/endpoints are inaccurate; in that case rerun **4 Pupils**.
+targets, then redo the dependent wink-action guide. There is no pupil guide.
+**4 Pupils** displays the raw measurements and direction matrix. Old pupil fits
+are ignored.
 Compare steady fixation and deliberate directions with adaptive smoothing on/off,
 using the same lighting, camera distance and profile. Inspect pupil reasons and
 per-eye aperture source in local diagnostics; invalid samples are never filtered

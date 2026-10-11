@@ -1113,3 +1113,48 @@ Validation on the final implementation:
 Remaining dependency: the user's next live camera trial with the visible per-eye
 pupil rejection reason. No claim that synthetic driver success validates real
 pupil/wink recognition, all launchers' permissions, or game behavior.
+
+## Raw pupils without calibration — user-requested integration
+
+Lane / task / branch: Reuvi integration / raw-pupil-default /
+`codex/integration/raw-pupil-default`, based on `8691e7a`.
+Writable paths: Vision pupil/workbench/preset/UI wiring, App profile messaging and
+command boundary, integration tests and relevant shared/component documentation.
+Contract-first commit: `6d1ccf7`, [RAW_PUPIL_CONTROL.md](../Contracts/RAW_PUPIL_CONTROL.md).
+
+Gaming now uses current raw eye-relative iris X/Y through the existing fixed
+normalization, without a pupil fit, head-pose estimate, trained pose range or
+pupil guide. The live pupil view contains readings, plots and the matrix, with
+no calibration controls. Both-eye visibility and iris quality checks still apply;
+Processing gain, dead zone, adaptive smoothing and invalid/stale-input stops are
+unchanged. Eye clicks, head keys and head-only Mouse test remain independent.
+
+Detector presets are v13 (`raw-pupil-control-v13`). Old v1–v12 files fully validate
+before migration; compatible eye/head fits survive and validated v12 pupil fits
+remain inactive archival data. Combined profiles stay v3 and mappings v2. Current
+gaze identity is `mediapipe_iris_direction_v3`; compensated trace columns stay null.
+No driver ABI or Processing algorithm changes, dependencies or runtime downloads.
+
+Verification on the final code:
+- Vision venv, `VISION_MODEL_PATH=<main>/Vision/.local/face_landmarker.task`,
+  `-m unittest discover -s tests/vision -q`: **158 run, 156 passed, 2 optional skips**.
+- `python3 -m unittest discover -s tests/processing -q`: **109 passed**.
+- `RUN_TK_TESTS=1 FID_LIBRARY=<main>/Drivers/build/libface_input_driver.dylib`
+  with the Vision venv, `-m unittest discover -s tests/integration -p <module> -q`
+  for every `test_*.py` in a fresh process: **139 passed**, no skips or cleanup
+  warnings. A preceding all-in-one run aborted in Tk garbage collection on a
+  background thread (`Tcl_AsyncDelete`); module isolation avoided accumulated
+  destroyed windows. No application behavior was changed to mask that test issue.
+- New checks cover no-fit/no-pose pupil → Processing → compiled dry-run driver,
+  diagonal motion, closure release, missing/stale capture disarm, inert archived
+  fits including out-of-range head angles, atomic migration and guide-free UI.
+- 490-frame App gaming dry run: **490 accepted**, 850 movement events, 3 clicks
+  per side, 4 key downs/ups, no errors, final disabled and held-key mask 0.
+- All four existing local profiles loaded read-only while paused and disarmed;
+  v5, v10 and v12 migrated in memory to v13. No personal files were rewritten.
+- Ruff F, module compilation, `git diff --check` and integration scope check passed.
+
+Remaining: restart App for the next human camera trial. Raw direction is a
+joystick input; resting gaze/head movement may bias its center. Software checks
+do not establish human tracking accuracy. No camera or native OS input was used
+for this follow-up, and other active checkouts were preserved.

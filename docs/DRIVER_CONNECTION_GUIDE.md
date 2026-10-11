@@ -3,7 +3,7 @@
 The App now connects the current Vision → Processing pipeline to the driver's
 native macOS/Linux mouse and keyboard backend. It uses the driver merged from
 `driverTest` (`2e3e734`) with an additive synchronous submission API. Preview is
-still the default; choose live output explicitly after calibrating.
+still the default; choose live output explicitly. Pupils need no calibration; eye/head actions do.
 
 ## Build once after pulling
 
@@ -47,8 +47,9 @@ input through App.
 Vision/.venv/bin/python -m App --source camera --model Vision/.local/face_landmarker.task
 ```
 
-1. Load your saved camera profile or complete the independent eye action, head
-   X/Y and pupil guides. Inspect the valid raw/normalized values first.
+1. Pupils work immediately without calibration. Load your saved profile or complete
+   the eye action and Head X/Y guides if you also want clicks and keys. Inspect
+   the valid raw/normalized values first.
 2. On **Signals**, choose **Output → Live mouse + keyboard**
    and press **Connect output**. This connects while stopped.
 3. Center your head and pupil direction, open your eyes, then press **Start live

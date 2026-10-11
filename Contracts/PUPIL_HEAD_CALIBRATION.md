@@ -1,5 +1,7 @@
 # Head-compensated pupil calibration (detector preset v12)
 
+> Current behavior: [raw pupil control](RAW_PUPIL_CONTROL.md) supersedes pupil fitting/head compensation below. No pupil guide is required or exposed; old fits are retained as inactive data.
+
 > [Pupil quality update](PUPIL_QUALITY_MOUSE_TEST.md) adds optional same-eye guided open geometry as aperture evidence. No eye fit is required, and pupil coordinate/calibration identities remain unchanged.
 
 The user's latest decision supersedes fixed/no-calibration pupil requirements in

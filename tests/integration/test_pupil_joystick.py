@@ -45,7 +45,7 @@ class JoystickIntegration(unittest.TestCase):
             self.assertAlmostEqual(sample.pointer[0],x)
             self.assertAlmostEqual(sample.pointer[1],expected_y)
             self.assertEqual(self.runtime.snapshot()['trace'][-1]['gaze_x'],values['gaze_x']['value'])
-            self.assertEqual(frame['gaze_measurement'],'head_compensated_iris_direction_v1')
+            self.assertEqual(frame['gaze_measurement'],'mediapipe_iris_direction_v3')
         for kwargs in ({'left_closed':True},{'right_closed':True}):
             values=self.feed(**kwargs)['faces'][0]['signals']
             self.assertFalse(values['gaze_x']['valid'])
@@ -107,7 +107,7 @@ class JoystickIntegration(unittest.TestCase):
         self.assertIsNone(self.runtime.snapshot()['frame']['pupil_matrix']['values'])
 
     def test_completed_profile_roundtrip_and_atomic_validation(self):
-        data=self.core.export_calibration();self.assertEqual(data['version'],12)
+        data=self.core.export_calibration();self.assertEqual(data['version'],13)
         self.assertEqual(data['eyes'],{});self.assertIsNone(data['head'])
         self.core.disconnect();self.core.load_calibration(data)
         values=self.feed(pupil_x=.75,pupil_y=1)['faces'][0]['signals']
@@ -129,8 +129,8 @@ class JoystickIntegration(unittest.TestCase):
             self.core.load_calibration(old)
             self.assertIn('old pupil settings discarded',self.core.notice)
             values=self.feed()['faces'][0]['signals']
-            self.assertIsNone(values['gaze_x']['value'])
-            self.assertIsNone(values['gaze_y']['value'])
+            self.assertTrue(values['gaze_x']['valid'])
+            self.assertTrue(values['gaze_y']['valid'])
             self.assertIsNotNone(self.core.pupil.xy)
             self.assertEqual(self.core.head.center,0)
             saved=self.core.export_calibration()
@@ -138,7 +138,7 @@ class JoystickIntegration(unittest.TestCase):
             with self.assertRaises(ValueError):self.core.load_calibration(bad)
             self.assertEqual(self.core.export_calibration(),saved)
 
-    def test_no_eye_fit_dependency_but_head_pose_is_required(self):
+    def test_no_eye_fit_or_head_pose_dependency(self):
         from Vision.calibration import EyeCalibration
         # A poor eye-closure fit must not turn a visible iris into a pupil failure.
         self.core.eyes['left']=EyeCalibration(.24,.5,.7)
@@ -148,12 +148,11 @@ class JoystickIntegration(unittest.TestCase):
         b,o=demo_image(pupil_x=.75);o[0].rotation=None
         self.now+=25;self.sequence+=1
         frame=self.session.deliver_detection(CapturedImage(Envelope('pupils',self.sequence,self.now),b),o,preview=False)
-        self.assertIsNone(frame['faces'][0]['signals']['gaze_x']['value'])
-        self.assertIn('Head pose unavailable',self.core.reasons['pupil'])
+        self.assertAlmostEqual(frame['faces'][0]['signals']['gaze_x']['value'],.75)
+        self.assertIn('Raw pupil direction',self.core.reasons['pupil'])
         self.core.disconnect()
         self.assertTrue(self.feed()['faces'][0]['signals']['gaze_x']['valid'])
-        self.session.detector_command('start_pupil_guide')
-        self.assertIsNotNone(self.core.pupil_guide)
+        with self.assertRaises(ValueError):self.session.detector_command('start_pupil_guide')
         self.assertFalse(self.session.lab.processor.armed)
 
     def test_guided_personal_eye_geometry_improves_narrow_pupil_availability(self):
@@ -179,8 +178,8 @@ class JoystickIntegration(unittest.TestCase):
             old['pupil']=dict(measurement='mediapipe_iris_direction_v2',x_sensitivity=4,y_sensitivity=.25)
             self.core.load_calibration(old)
             values=self.feed(pupil_x=.75,pupil_y=.825)['faces'][0]['signals']
-            self.assertIsNone(values['gaze_x']['value'])
-            self.assertIsNone(values['gaze_y']['value'])
+            self.assertTrue(values['gaze_x']['valid'])
+            self.assertTrue(values['gaze_y']['valid'])
             self.assertEqual(self.core.head.low,-12);self.assertEqual(self.core.head_x.high,20)
             self.assertIn('old pupil settings discarded',self.core.notice)
             self.assertIsNone(self.core.export_calibration()['pupil']['calibration'])
@@ -227,14 +226,14 @@ class JoystickIntegration(unittest.TestCase):
         callback_errors=[]
         root.report_callback_exception=lambda *error:callback_errors.append(error)
         root.geometry('1230x910')
-        with patch('Vision.movement_view.CalibrationSounds'), patch('Vision.pupil_view.CalibrationSounds'):
+        with patch('Vision.movement_view.CalibrationSounds'):
             container=tk.Frame(root);container.pack(fill="both",expand=True)
             ui=DetectionLab(root,SimpleNamespace(demo=True),runtime=CalibrationBridge(self.session),container=container)
             self.addCleanup(ui.close_panels)
             ui.calibration_tabs.select(ui.pupil_tab);root.update();ui.tick()
-            self.assertTrue(hasattr(ui.pupil_panel,'start'))
+            self.assertFalse(hasattr(ui.pupil_panel,'start'))
             self.assertFalse(hasattr(ui.pupil_panel,'window'))
-            self.assertIn('Personal pupil calibration',ui.pupil_panel.message.get())
+            self.assertIn('no calibration needed',ui.pupil_panel.message.get())
             self.assertIsNone(self.core.movement_guide)
             self.feed(pupil_x=.75);ui.tick();root.update()
             self.assertIn('Normalized X/Y: (0.750, 0.500)',ui.pupil_details.get())

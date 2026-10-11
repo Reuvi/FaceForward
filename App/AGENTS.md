@@ -1,5 +1,12 @@
 # Application integration
 
+**Current raw pupil decision:** follow `Contracts/RAW_PUPIL_CONTROL.md` (repository root).
+Pupils use fixed-scale raw iris X/Y with no pupil guide, learned endpoints or
+head-pose compensation gate. Prior calibrated-pupil requirements below are
+superseded. Keep adaptive Processing, visibility checks, independent eye/head
+calibration and head-only Mouse test. Presets v13 preserve validated old fits
+as inactive data; combined profiles stay v3.
+
 **Current App UI:** two main tabs, Signals and Calibration. Signals combines source,
 profile and output controls with the mapping table and shared graphs. Mapping
 tuning opens a dialog; standalone Processing keeps its developer tabs. Source

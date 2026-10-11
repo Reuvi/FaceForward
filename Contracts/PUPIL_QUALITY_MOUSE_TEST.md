@@ -1,5 +1,7 @@
 # Pupil quality and Mouse test
 
+> Current behavior: [raw pupil control](RAW_PUPIL_CONTROL.md) supersedes pupil fitting/head compensation below. No pupil guide is required or exposed; old fits are retained as inactive data.
+
 User-requested integration update, 2026-10-11. Extends the pupil/head calibration
 and driver contracts; source signals and device_control_v1 do not change.
 

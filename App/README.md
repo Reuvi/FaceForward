@@ -61,13 +61,11 @@ default is a labeled synthetic demo; choose **Camera** to open your camera.
    to 0/.5/1. **Retry this pose** keeps successful prior captures and a previous
    completed fit. Gaming maps left/right to Shift/S independently of pitch.
    [Head X testing](../docs/HEAD_HORIZONTAL_TESTING.md).
-5. **4 Pupils**: press **Start / restart pupil guide**. Keep looking at center
-   while turning/nodding your head, then center your head and follow the eye targets.
-   Your chosen limits map to 0/.5/1 after learned head compensation. Fresh checks
-   must pass before the new fit replaces an existing one. **Retry failed step**
-   or **Reset pupils only** leave eyes and head fits intact. An **11×11 square
-   matrix** highlights the cell; a white dot shows continuous position.
-   [Full guide and engineering details](../docs/PUPIL_HEAD_CALIBRATION_GUIDE.md).
+5. **4 Pupils** shows live raw iris X/Y and the **11×11 matrix**. No pupil
+   calibration is needed: a fixed scale maps eye-relative direction to 0–1.
+   There is no trained head-angle restriction or head compensation. A white dot
+   shows the continuous value. Keep both pupils visible; adjust mouse gain,
+   dead zone and smoothing in **Signals → Mapping settings…**.
 6. Open **Signals**, center your head/pupil direction, open both eyes,
    and press **Start**. Inspect raw → filtered → instruction for each
    input. **Mapping settings…** opens Head X/Y activation/release thresholds,
@@ -87,7 +85,7 @@ default is a labeled synthetic demo; choose **Camera** to open your camera.
 
 **Mouse test setup:** choose **Signals → Active mapping → Mouse test**, load a profile with both head fits (or complete **Calibration → 2 Head Y** and **3 Head X**), center your head and press **Start live control**. Eye and pupil calibration are unnecessary for this mapping. Both calibrated head inputs must be valid; raw yaw alone is insufficient. Changing mappings stops output.
 
-Pupils now use completed guided eye geometry as additional evidence for naturally narrow open eyes. Without it, generic checks still work. Raw coordinates and saved pupil/head fits are unchanged; closure, ambiguous iris evidence and missing input still stop motion. See [quality changes and measured software comparison](../docs/PUPIL_QUALITY_GUIDE.md).
+Pupils use raw direction without a guide or personal pupil fit. They can use completed guided eye geometry as additional evidence for naturally narrow open eyes. Without it, generic checks still work. Raw coordinates and saved pupil/head fits are unchanged; closure, ambiguous iris evidence and missing input still stop motion. See [quality changes and measured software comparison](../docs/PUPIL_QUALITY_GUIDE.md).
 
 Unknown plots hold the last displayed position in a darker color. Actual unknown
 observations remain invalid. Unknown eye Processing samples hold the previous
@@ -111,19 +109,15 @@ The default model and profile folder resolve from the checkout, even when launch
 from another directory. Startup errors remain visible beside the preview. If the
 camera cannot open, check camera permissions for the launching app and close other
 camera apps. Dependencies must be installed in the Python environment running App.
-A pupil-only profile can save without any fitted eye/head detector. Pupil calibration
-uses raw same-frame head angles; Head X/Y calibration is not a prerequisite.
-Raw pupils remain visible before calibration, but normalized pointer values are invalid.
+Pupil movement works without any eye/head calibration or profile. Eye clicks
+and head keys still require their own independent guides or compatible saved fits.
 
-New combined files remain `face_mouse_profile_v3`; their detector section is
-**v12**, `head-compensated-pupils-v12`. It stores independent eye geometry, wink
-models, head pitch/yaw fits, settings, pupil endpoints and learned head compensation.
-No tongue data/settings, images, trace history, tracking IDs or armed state are
-saved. Profiles from detector v1–v11 are validated fully, then retired tongue
-state and old pupil calibration/settings are discarded. Both historical v10
-pupil measurement identities (v2 and v3) are accepted before discarding that old
-pupil setting. Compatible eyes/winks
-and head fits survive; run the new pupil guide before using the pointer. A legacy image-position head fit needs the pitch guide;
+New combined files remain `face_mouse_profile_v3`; detector presets are now
+**v13**, `raw-pupil-control-v13`. Old detector v1–v12 files are validated fully.
+Compatible eyes, wink models and head fits survive; validated v12 pupil fits are
+stored as inactive legacy data and never alter raw control. Older tongue and
+obsolete pupil settings remain retired. No images, trace history, tracking IDs or
+armed state are saved. A legacy image-position head fit needs the pitch guide;
 old geometry-only eye files need Wink action training for clicks.
 
 Old `pointer_source: tongue` settings migrate to `gaze`, including imported
@@ -133,7 +127,7 @@ Save the migrated profile to preserve the new format. Existing files are not
 rewritten automatically.
 
 Gaming names, head thresholds, key bindings and pointer gain use separate
-`input_mapping_v1` files exported from **Signals → Mapping settings…**. Face profiles continue
+`input_mapping_v2` files (v1 readable) exported from **Signals → Mapping settings…**. Face profiles continue
 to contain detector fits and the existing mouse response settings. Loading a face
 profile applies its response to the selected mapping and stops output; it keeps
 that mapping's name, head settings and bindings. Export mapping settings separately
@@ -164,8 +158,8 @@ SignalFrame v1 keeps required `tongue_x/y` slots null/invalid for compatibility.
 Current producers emit no `tongue_sample` or tongue coordinate metadata. App uses
 continuous `gaze_x/y`; the additive `pupil_matrix_v1` is available for inspection,
 without quantizing mouse movement. `gaze_measurement` is now
-`head_compensated_iris_direction_v1`; raw iris measurements remain
-`mediapipe_iris_direction_v3`. Independent `eye_intent_v1` samples remain on
+`mediapipe_iris_direction_v3`, identifying fixed-scale raw iris direction.
+Legacy compensated trace columns stay null, never fabricated. Independent `eye_intent_v1` samples remain on
 every capture. Gaming emits `device_control_v1` with held keys/buttons, velocity,
 validity and original capture provenance. Mouse mode preserves `mouse_preview_v0`.
 See [the command boundary](../Contracts/GAMING_MAPPING.md) and

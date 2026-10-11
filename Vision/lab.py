@@ -208,11 +208,7 @@ class DetectionLab:
             self.eye_panel.cancel()
             state=self.runtime.snapshot()
             self.eye_panel.update(state)
-        if state.get("pupil_guide") and state["pupil_guide"]["active"] and (hidden or self.calibration_tabs.select()!=str(self.pupil_tab)):
-            self.pupil_panel.cancel()
-            state=self.runtime.snapshot()
         if hidden:
-            self.pupil_panel.dismiss_fullscreen()
             if state.get("movement_guide") and state["movement_guide"]["active"]:
                 self.call("cancel")
             self.after_id=self.root.after(200,self.tick)
@@ -268,16 +264,10 @@ class DetectionLab:
         pupil=state.get("pupil",{})
         def pair_text(values):
             return "("+", ".join(self.fmt(v) for v in values)+")" if values else "unavailable"
-        self.pupil_details.set("Raw position (eye widths): "+pair_text(pupil.get("xy"))+"\nHead yaw/pitch/roll (°): "+pair_text(pupil.get("pose"))+"\nCompensated (eye widths): "+pair_text(state.get("pupil_corrected"))+"\nNormalized X/Y: "+
+        self.pupil_details.set("Raw position (eye widths): "+pair_text(pupil.get("xy"))+"\nHead yaw/pitch/roll (°): "+pair_text(pupil.get("pose"))+"\nNormalized X/Y: "+
             pair_text(tuple(signals.get(k,{}).get("value") for k in ("gaze_x","gaze_y")))+"\n"+
             state["reasons"].get("pupil",pupil.get("reason","Waiting"))+"\n"+
             "\n".join(f"{side.title()}: {pair_text(v.get('xy'))} · {v.get('reason')}\n  Lid gap {self.fmt(v.get('lid_gap'))} · blink {self.fmt(v.get('blink'))} · look down {self.fmt(v.get('look_down'))}" for side,v in pupil.get("eyes",{}).items()))
-        model=state.get("pupil_model")
-        if model:
-            self.pupil_details.set(self.pupil_details.get()+"\n\nPersonal references (compensated eye widths):"+
-                f"\nX: left {model['low'][0]:.3f} → 0 · center {model['center'][0]:.3f} → .5 · right {model['high'][0]:.3f} → 1"+
-                f"\nY: up {model['low'][1]:.3f} → 0 · center {model['center'][1]:.3f} → .5 · down {model['high'][1]:.3f} → 1"+
-                f"\nTrained yaw {model['pose_bounds'][0][0]:.1f}° to {model['pose_bounds'][0][1]:.1f}°; pitch {model['pose_bounds'][1][0]:.1f}° to {model['pose_bounds'][1][1]:.1f}°")
         self.metrics.set("\n".join(f"{k:16} {self.fmt(signals.get(k,{}).get('value'))}   {'valid' if signals.get(k,{}).get('valid') else 'unavailable'}" for k in ("left_eye_open","right_eye_open","head_y","head_x","gaze_x","gaze_y")))
         if self.calibration_tabs.select()==str(self.eye_tab):
             draw_eye_scope(self.eye_scope,state)

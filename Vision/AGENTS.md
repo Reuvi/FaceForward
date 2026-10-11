@@ -1,5 +1,12 @@
 # Vision lane
 
+**Current raw pupil decision:** follow `Contracts/RAW_PUPIL_CONTROL.md` (repository root).
+Pupils use fixed-scale raw iris X/Y with no pupil guide, learned endpoints or
+head-pose compensation gate. Prior calibrated-pupil requirements below are
+superseded. Keep adaptive Processing, visibility checks, independent eye/head
+calibration and head-only Mouse test. Presets v13 preserve validated old fits
+as inactive data; combined profiles stay v3.
+
 **Latest pupil update:** follow `Contracts/PUPIL_HEAD_CALIBRATION.md` (relative to repository root). Personal pupil endpoints and head-angle compensation supersede fixed/no-calibration mapping below. Tongue remains retired.
 
 **Current user decision — tongue retired:** read [../Contracts/TONGUE_RETIREMENT.md](../Contracts/TONGUE_RETIREMENT.md).

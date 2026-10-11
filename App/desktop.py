@@ -220,9 +220,7 @@ class IntegratedDesktop(DesktopLab):
             def apply():
                 self.session.load_profile(path)
                 self.notebook.select(self.vision_page)
-                self.message.set("Profile loaded. Older pupil settings need the pupil guide in Calibration; compatible eye/head fits are retained."
-                                 if data["detector"]["version"] < 12 else
-                                 "Profile loaded. Center your inputs and press Start when ready.")
+                self.message.set("Profile loaded. Pupils need no calibration. Center your inputs and press Start when ready.")
             self.source_var.set(self.source_name(mode))
             if mode == self.session.mode:
                 apply()  # Loading a paused source stays paused; no face is required.

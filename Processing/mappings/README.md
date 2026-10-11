@@ -48,11 +48,12 @@ filtered value, threshold and instruction. Unknown stays unknown in the numeric
 readout; a darker plot hold is display history only. The graph picker shows raw detector, head or pointer processing traces. The standalone
 Processing lab retains its simulated pointer playground and developer tabs.
 
-For camera use, load a compatible profile or finish the independent eye action,
-head X/Y and pupil guides. Partial calibration is supported: an unavailable
-channel is released while other usable channels can work. Pupil direction needs
-the current personal endpoint/head-compensation fit. Processing uses precise
-`gaze_x/y`, never the 11×11 matrix or uncalibrated raw iris ratios.
+For camera eye/head actions, load a compatible profile or finish the independent
+eye action and head X/Y guides; pupil motion needs no guide. Partial calibration
+is supported: an unavailable channel is released while other usable channels can
+work. Pupil direction uses fixed-scale raw iris X/Y, with no pupil fit or calibrated
+head-angle gate. Processing uses precise `gaze_x/y`, never the 11×11 matrix;
+gain, dead zone, adaptive smoothing and invalid-input stops still apply.
 
 The synthetic demo cycles every 16 seconds: neutral, immediate labeled eye
 actions, pupil circle, head up+right (Space+S), head down+left (W+Shift), neutral.
@@ -110,7 +111,7 @@ private local write. Copies live in memory until exported. Importing an existing
 ID replaces that mapping; use Copy as… first to preserve another variant.
 
 The separate face profile format remains `face_mouse_profile_v3` with detector
-v12. Its existing mouse response settings apply to the active mapping on load;
+v13. Its existing mouse response settings apply to the active mapping on load;
 head settings and bindings stay with the mapping. The Mouse and scroll mode
 keeps its own independent response settings.
 
@@ -168,4 +169,4 @@ pointer and scroll; keys remain false. Both end disabled and fully released.
 The CLI reports evidence; it exits nonzero on source error, not on a missing
 observed flag. Tests assert the expected actions, threshold boundaries, capture
 timing, partial invalidity, stale/restart behavior, persistence and current
-calibrated pupil/head input. Synthetic checks do not establish live accuracy.
+raw pupil and calibrated head input. Synthetic checks do not establish live accuracy.

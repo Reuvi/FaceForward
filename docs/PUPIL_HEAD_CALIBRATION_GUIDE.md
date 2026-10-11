@@ -1,5 +1,7 @@
 # Pupil calibration with head-angle compensation
 
+> Current behavior: [raw pupil control](../Contracts/RAW_PUPIL_CONTROL.md) supersedes pupil fitting/head compensation below. No pupil guide is required or exposed; old fits are retained as inactive data.
+
 This replaces fixed pupil normalization. It defines **your** comfortable left,
 right, up and down limits and learns how head turns change your iris readings.
 The result is a directional joystick for the mouse, not absolute screen gaze.

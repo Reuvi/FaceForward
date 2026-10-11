@@ -7,9 +7,11 @@ clicks; head directions hold keys. [GAMING_MAPPING.md](GAMING_MAPPING.md) define
 the preset, device_control_v1 and separate mapping persistence. The existing
 mouse_preview_v0 remains supported.
 
-[PUPIL_HEAD_CALIBRATION.md](PUPIL_HEAD_CALIBRATION.md) is the latest pupil contract:
-personal endpoints plus learned head compensation, detector presets v12. It
-supersedes fixed pupil mapping below. Tongue remains retired.
+[RAW_PUPIL_CONTROL.md](RAW_PUPIL_CONTROL.md) is the latest pupil contract:
+fixed-scale raw iris direction with no pupil calibration or head-pose gate,
+detector presets v13. It supersedes the personal endpoints and head compensation
+in [PUPIL_HEAD_CALIBRATION.md](PUPIL_HEAD_CALIBRATION.md). Eye/head calibration,
+visibility checks, adaptive Processing and head-only Mouse test remain independent.
 
 [TONGUE_RETIREMENT.md](TONGUE_RETIREMENT.md) is current: no active tongue
 path, pupil-only App pointer and detector presets v11. Earlier tongue requirements

@@ -119,9 +119,9 @@ class HeadYRetryTests(unittest.TestCase):
         self.session.detector_command('present_movement_step',0,'prepare',generation)
         self.assertIsNone(self.core.movement_guide.start_ms)
         self.session.detector_command('cancel')
-        for command,args in (('start_movement_guide',('head_x',)),('start_eye_guide',()),('start_pupil_guide',())):
+        for command,args in (('start_movement_guide',('head_x',)),('start_eye_guide',())):
             self.session.detector_command(command,*args)
-            guide=self.core.movement_guide or self.core.eye_guide or self.core.pupil_guide
+            guide=self.core.movement_guide or self.core.eye_guide
             with self.assertRaises(ValueError):self.session.detector_command('redo_head_y_step','train','up')
             self.assertTrue(guide.active)
             self.session.detector_command('cancel')
@@ -134,7 +134,7 @@ class HeadYRetryTests(unittest.TestCase):
         from App.desktop import CalibrationBridge
         root=tk.Tk();self.addCleanup(root.destroy);root.geometry('1230x910')
         errors=[];root.report_callback_exception=lambda *error:errors.append(error)
-        with patch('Vision.movement_view.CalibrationSounds'),patch('Vision.eye_view.CalibrationSounds'),patch('Vision.pupil_view.CalibrationSounds'):
+        with patch('Vision.movement_view.CalibrationSounds'),patch('Vision.eye_view.CalibrationSounds'):
             container=tk.Frame(root);container.pack(fill='both',expand=True)
             ui=DetectionLab(root,SimpleNamespace(demo=True),runtime=CalibrationBridge(self.session),container=container)
             self.addCleanup(ui.close_panels)

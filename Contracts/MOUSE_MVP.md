@@ -1,5 +1,10 @@
 # Mouse lab integration, October 2026
 
+[RAW_PUPIL_CONTROL.md](RAW_PUPIL_CONTROL.md) defines current pupil behavior:
+fixed-scale raw direction without pupil calibration, detector presets v13.
+[DRIVER_CONNECTION.md](DRIVER_CONNECTION.md) defines the implemented native output.
+The simulated-only status and older detector versions below describe past stages.
+
 [TONGUE_RETIREMENT.md](TONGUE_RETIREMENT.md) is current: no active tongue
 path, pupil-only App pointer and detector presets v11. Earlier tongue requirements
 below are historical; keep the two invalid v1 schema slots for compatibility.
