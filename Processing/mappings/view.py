@@ -122,6 +122,9 @@ class MappingPanel(ttk.Frame):
             var = tk.StringVar()
             self.motion_fields[key] = var
             ttk.Entry(self.motion_group, textvariable=var, width=8).grid(row=1, column=col*2+1, padx=5)
+        self.wink_clicks = tk.BooleanVar()
+        ttk.Checkbutton(self.motion_group, text="Calibrated winks: left eye → left click, right eye → right click",
+                        variable=self.wink_clicks).grid(row=2, column=0, columnspan=4, sticky="w", pady=4)
         self.pointer_group = None
         if compact:
             pointer = ttk.LabelFrame(settings_parent, text="Pointer response", padding=8)
@@ -233,6 +236,7 @@ class MappingPanel(ttk.Frame):
         data["pointer_down_gain"] = float(self.down_gain.get())
         data["head_motion"] = dict(enabled=self.motion_enabled.get(),
                                    **{key:float(var.get()) for key,var in self.motion_fields.items()})
+        data["head_wink_clicks"] = self.wink_clicks.get()
         data.update({key:float(var.get()) for key,var in self.target_fields.items()})
         data["revision"] += 1
         for (axis, key), var in self.fields.items():
@@ -292,6 +296,7 @@ class MappingPanel(ttk.Frame):
                 self.motion_group.pack_forget()
             motion = mapping["head_motion"] if mapping else dict(enabled=False,speed_gain=.75,return_brake=.65)
             self.motion_enabled.set(motion["enabled"])
+            self.wink_clicks.set(mapping["head_wink_clicks"] if mapping else False)
             for key, var in self.motion_fields.items():
                 var.set(motion[key])
             for group in (*self.head_groups, self.binding_group):
@@ -305,7 +310,10 @@ class MappingPanel(ttk.Frame):
                 var.set(mapping[key] if mapping else 0)
             self.mode_widget.configure(state="disabled" if head_only or not mapping else "readonly")
             self.pointer_controls()
-            self.help_text.set(("Head X + Head Y move the pointer together. Both head axes need calibration. Eyes and pupils are ignored; no clicks, keys or scroll."
+            head_help = ("Head X + Head Y move the pointer together; both axes need calibration. Small movements give precise slow speed; larger, faster turns travel quickly. "
+                         + ("Left/right calibrated Wink actions click the matching mouse button. Load a wink-trained profile or finish Eye open/closed and Wink action calibration. Pupils, keys and scroll are ignored."
+                            if mapping and mapping["head_wink_clicks"] else "Eyes and pupils are ignored; no clicks, keys or scroll."))
+            self.help_text.set((head_help
                                if head_only else "Head thresholds use the fraction of your calibrated range from neutral. Eyes use calibrated actions without a dwell timer.")
                                + (" Screen destination moves to a point and stops; without screen calibration its alignment is approximate. Fixation dead band 0.002 means 0.2% of the screen. Position smoothing/delay belong to this mapping. Velocity keeps moving while off-center."
                                   if not head_only else "")

@@ -1,6 +1,6 @@
 # Face-controlled accessibility interface
 
-Current update: Gaming uses raw pupils to choose an approximate **screen destination**; the cursor arrives and stops. **Mouse test** remains head X/Y velocity only. See [screen pointer setup and limits](docs/SCREEN_POINTER_GUIDE.md) and [run instructions](App/README.md).
+Current update: Gaming uses raw pupils to choose an approximate **screen destination**; the cursor arrives and stops. **Mouse test** uses precise head X/Y velocity with faster large/quick turns and matching left/right calibrated wink clicks. See [head movement and clicks](docs/HEAD_POINTER_GUIDE.md), [screen pointer setup and limits](docs/SCREEN_POINTER_GUIDE.md) and [run instructions](App/README.md).
 
 Current MVP: **eyes/winks, Head Y, Head X and pupils**. Tongue detection has been
 removed from the live app, calibration and graphs. Pupils control the pointer with

@@ -10,12 +10,15 @@ from gaming_fixtures import frame
 
 
 class MouseTestMappingTests(unittest.TestCase):
+    """Explicit clicks-off mode retains the independent pointer-only behavior."""
     def setUp(self):
         self.now = 1000.
         self.sequence = 0
         self.lab = Lab(clock=lambda:self.now)
         self.addCleanup(self.lab.close)
         self.lab.select_mapping(MOUSE_TEST_ID)
+        mapping=self.lab.state()['mapping'];mapping['head_wink_clicks']=False
+        self.lab.update_mapping(mapping)
         self.lab.settings({'runtime':{'source':'external','subject_id':'person'}})
 
     def feed(self, **values):
@@ -62,7 +65,7 @@ class MouseTestMappingTests(unittest.TestCase):
 
     def test_tiny_nudges_stale_stop_and_no_automatic_rearming(self):
         self.lab.action({'action':'arm'});self.feed()
-        for _ in range(25):snap=self.feed(head_x=.51,head_y=.51)
+        for _ in range(25):snap=self.feed(head_x=.503,head_y=.503)
         self.assertEqual((snap['pointer_x'],snap['pointer_y']),(.5,.5))
         self.now += 300;self.lab.step(self.now)
         self.assertFalse(self.lab.processor.armed)
@@ -94,9 +97,9 @@ class MouseTestMappingTests(unittest.TestCase):
         self.assertTrue(self.feed(x=None,y=None,left='unknown',right='unknown')['enabled'])
 
     def test_mapping_versions_and_invalid_head_keyboard_bindings(self):
-        current=Mapping().to_dict();self.assertEqual(current['format'],'input_mapping_v5')
+        current=Mapping().to_dict();self.assertEqual(current['format'],'input_mapping_v6')
         legacy=deepcopy(current);legacy['format']='input_mapping_v1'
-        for key in ('pointer_down_gain','target_smoothing_ms','target_interpolation_ms','head_motion'):del legacy[key]
+        for key in ('pointer_down_gain','target_smoothing_ms','target_interpolation_ms','head_motion','head_wink_clicks'):del legacy[key]
         del legacy['input_mode'];del legacy['adaptive_pointer']
         del legacy['pointer_mode'];del legacy['target_jitter']
         self.assertEqual(Mapping.from_dict(legacy),Mapping(pointer_mode='velocity',pointer_down_gain=1,

@@ -23,15 +23,23 @@ repeat clicks or drag. The raw command button fields remain activation levels.
 
 ## Mouse test
 
-Select **Mouse test** on Signals, or pass `--mapping mouse-test`. Calibrated head X/Y form one pointer vector: turn left/right and nod up/down; both can move together diagonally. All eyes, pupils, buttons, keyboard actions and scroll are ignored. Both head axes must be valid. Center your head and explicitly Start; either missing axis stops the pointer immediately. Face loss/staleness and Stop require another Start.
+Select **Mouse test** on Signals, or pass `--mapping mouse-test`. Calibrated head X/Y form one pointer vector: turn left/right and nod up/down; both can move together diagonally. Calibrated left/right Wink actions activate the matching mouse button. Pupils, keyboard actions and scroll are ignored. Both head axes must be valid. Center your head, release eye actions and explicitly Start; either missing axis stops the pointer immediately. Face loss/staleness and Stop require another Start.
 
 Mouse test now enables **Speed-aware acceleration and return braking**. Quick
 outward turns add a bounded speed boost; returning toward neutral reduces cursor
-speed. Holding still keeps the existing position-driven speed. The 20 ms adaptive
-smoothing, dead zone, downward gain and calibration are unchanged. The off switch
-restores the earlier response exactly. See [head pointer tuning](../../docs/HEAD_POINTER_GUIDE.md).
+speed. Holding still keeps position-driven speed. A gentler response curve gives
+small movements very slow precision speed while larger turns reach full speed.
+The 20 ms adaptive smoothing, 3× downward gain and calibration remain. The speed
+response off switch disables the transient boost/braking; the precision curve remains. See [head pointer tuning](../../docs/HEAD_POINTER_GUIDE.md).
 
-Copies retain this head-only mode. Pointer settings and gain apply; keyboard bindings and key thresholds are hidden. The driver connection and permissions are identical to gaming mode.
+The **Calibrated winks** checkbox in Head movement response enables the clicks.
+Use a wink-trained face profile or complete Eye open/closed and Wink action
+calibration. Untrained/unknown eyes still allow head movement. Each unknown eye
+releases its click and needs actual reopening before another activation; head loss
+stops only the pointer while valid wink channels remain usable after startup.
+Uncheck the option for the previous pointer-only behavior.
+
+Copies retain this head movement mode and the wink setting. Pointer settings and gain apply; keyboard bindings and key thresholds are hidden. The driver connection and permissions are identical to gaming mode.
 
 ## Try it
 
@@ -93,7 +101,7 @@ values provide approximate positioning, not calibrated gaze; see
 release at .16 with default settings. **Signals → Mapping settings…** exposes the response
 curve, smoothing and acceleration limits; standalone **Transfer settings** also
 exposes interpolation (50 ms by default) and other developer settings.
-Velocity mappings default to adaptive **1€** velocity smoothing, followed by acceleration/deceleration limits. Screen destination uses an independent position smoothing/delay setting, without velocity curves/acceleration. Uncheck **Adaptive pointer smoothing (1€)** for fixed smoothing. Mouse test stays velocity: downward boost 3, gain 1, smoothing 20 ms, zero interpolation delay, dead zone .10 / activation margin .02, exponent 1.2, acceleration 10/s and deceleration 14/s. Loading face profiles preserves target filtering and the Mouse test pointer response. See [method, benchmark and limitations](../../docs/PUPIL_QUALITY_GUIDE.md).
+Velocity mappings default to adaptive **1€** velocity smoothing, followed by acceleration/deceleration limits. Screen destination uses an independent position smoothing/delay setting, without velocity curves/acceleration. Uncheck **Adaptive pointer smoothing (1€)** for fixed smoothing. Mouse test stays velocity: downward boost 3, gain 1.4, smoothing 20 ms, zero interpolation delay, dead zone .03 / activation margin .005, exponent 1.8, acceleration 10/s and deceleration 14/s. Loading face profiles preserves target filtering and the Mouse test pointer response. See [method, benchmark and limitations](../../docs/PUPIL_QUALITY_GUIDE.md).
 
 In velocity mode, **Mapping settings… → Pointer gain** scales only the motion beyond the dead zone
 (.1–4×, capped at full velocity). A gain increase cannot amplify neutral jitter
@@ -120,7 +128,7 @@ combined as a held state. Pointer and independent mouse-button bindings remain
 fixed within each mapping family. Mouse test always has all key bindings set to none. Apply increments the mapping revision and
 requires a new Start preview.
 
-**Export mapping / Import mapping** writes strict `input_mapping_v5` JSON (v1/v2 read as velocity; v3/v4 retain their saved response), including pointer mode, downward boost, position smoothing/delay, fixation dead band, input mode and adaptive-filter selection alongside
+**Export mapping / Import mapping** writes strict `input_mapping_v6` JSON (v1/v2 read as velocity; v3–v5 retain their saved response; all older files import with head wink clicks off), including pointer mode, downward boost, position smoothing/delay, fixation dead band, input mode and adaptive-filter selection alongside
 name, stable ID, revision, response settings, pointer gain, head thresholds,
 bindings and head movement response. v1–v4 import with the new head response
 disabled; opt in with its checkbox and re-export to save. Import validates the whole file before replacing/selecting it. Files
@@ -130,7 +138,7 @@ ID replaces that mapping; use Copy as… first to preserve another variant.
 
 The separate face profile format remains `face_mouse_profile_v3` with detector
 v13. Its existing mouse response settings apply to the active mapping on load;
-head settings, bindings, gains, pointer mode, target filtering and head movement response stay with the mapping. Mouse test also preserves its complete pointer response and interpolation delay on face-profile loading. The Mouse and scroll mode
+head settings, bindings, gains, pointer mode, target filtering and head movement response and wink-click option stay with the mapping. Mouse test also preserves its complete pointer response and interpolation delay on face-profile loading. The Mouse and scroll mode
 keeps its own independent response settings.
 
 ## Python boundary

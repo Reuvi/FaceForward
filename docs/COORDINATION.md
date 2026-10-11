@@ -1318,3 +1318,58 @@ Start live control. Mapping settings → Head movement response exposes the togg
 Movement boost and Return braking. Export custom mapping settings for persistence.
 See [head pointer tuning](HEAD_POINTER_GUIDE.md). Synthetic checks establish the
 software path; no real-camera comfort study or native OS injection was performed.
+
+## Precise head movement and wink clicks — user-requested integration
+
+Lane / task / branch: Reuvi integration / precise-head-wink-clicks /
+`codex/integration/precise-head-wink-clicks`, based on `f1d49fe`.
+Changed paths: Processing mapping defaults/persistence, head eye routing/settings,
+App diagnostics, component/integration tests, agent notes, contracts and runbooks.
+Contract-first commit: `0e09a6b`; contract [HEAD_MOUSE_CLICKS](../Contracts/HEAD_MOUSE_CLICKS.md).
+
+Mouse test now starts very slowly just outside neutral and reaches high speed with
+larger/quicker turns: dead zone .03, activation margin .005, exponent 1.8 and gain
+1.4. Existing capture-speed boost, return braking, 20 ms adaptive smoothing, zero
+interpolation delay, 3× downward gain and head calibration remain. At a 900 px/s
+maximum, a steady horizontal 5% personal half-range turn requests about 1 px/s;
+60% requests about 484 px/s before any outward speed boost.
+
+Independent calibrated left/right Wink actions now click the matching button.
+No raw closure fallback, dwell, opposite-eye gate, repeats or dragging. Unknown
+releases that eye and requires actual reopening; head movement remains available
+with unknown/untrained eyes. Startup requires neutral head and released known eye
+actions. After enable, missing head stops pointer motion while valid winks still
+work independently. The existing driver supplies one complete click per activation.
+
+Mapping files v6 add validated head_wink_clicks; v1–v5 retain saved tuning and
+migrate with clicks off. The built-in head mapping enables it. Checkbox and eye
+rows are integrated into the existing Signals/settings UI; copies, export/import
+and face-profile loading preserve the option. Applying settings stops output.
+No Vision code, driver ABI, detector-preset or face-profile schema changes.
+
+Checks:
+- `python3 -m unittest discover -s tests/processing -q`: **139 passed**, including
+  precision speed, bounded monotonic steady response, independent winks, unknown
+  and actual reopening, untrained eyes, missing head, startup, raw closure rejection,
+  malformed input, stale/Stop, migration, copies and persistence.
+- `RUN_TK_TESTS=1 FID_LIBRARY=<main compiled library>` with Vision's venv, each
+  `tests/integration/test_*.py` in a separate process: **150 passed**, no skips.
+  Includes actual compiled driver: fractional speed accumulates into single-pixel
+  moves; held simultaneous winks click once each; unknown cannot re-click before
+  reopening; no keys/scroll, valid pointer motion with no pupils, clean stop.
+  Native Tk checks verify the checkbox and five action rows, and three rows with
+  clicks disabled. Profile loads and diagnostics preserve/report the option.
+- Full App demo: `Vision/.venv/bin/python -m App --source demo --mapping mouse-test
+  --headless --frames 490 --output dry-run --driver-library <main library>`:
+  **490 accepted**, no errors, **651 movement events**, **3 clicks per side**,
+  no keyboard/scroll; final disabled, neutral pointer and zero held keys.
+- Ruff F, `git diff --check` and integration scope against `f1d49fe` passed.
+
+Handoff: restart App, choose Mouse test, load the existing head/wink-trained face
+profile, center/release eyes, then Start live control. If wink training is absent,
+finish Eye open/closed and Wink action calibration; head motion still works without
+it. Older mapping imports keep clicks off until the checkbox is enabled. Export
+custom mappings to persist settings. See [tuning guide](HEAD_POINTER_GUIDE.md).
+Checks use synthetic inputs and compiled dry-run output; real-camera comfort and
+wink-classifier accuracy still need the user's live test. No native OS input was
+injected and no local profiles were changed.

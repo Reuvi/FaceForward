@@ -68,6 +68,7 @@ class Mapping:
     target_smoothing_ms: float = 20
     target_interpolation_ms: float = 0
     head_motion: HeadMotionConfig = field(default_factory=HeadMotionConfig)
+    head_wink_clicks: bool = False
 
     def __post_init__(self):
         if not isinstance(self.id, str) or not re.fullmatch(r"[a-z][a-z0-9-]{0,63}", self.id) or self.id == "mouse":
@@ -103,9 +104,13 @@ class Mapping:
             raise ValueError("Head motion needs independent settings")
         if self.head_motion.enabled and self.input_mode != "head-mouse":
             raise ValueError("Head motion response applies only to head mouse mappings")
+        if type(self.head_wink_clicks) is not bool:
+            raise ValueError("Head wink clicks must be boolean")
+        if self.head_wink_clicks and self.input_mode != "head-mouse":
+            raise ValueError("Head wink click setting applies only to head mouse mappings")
 
     def to_dict(self):
-        return {"format": "input_mapping_v5", "id": self.id, "name": self.name,
+        return {"format": "input_mapping_v6", "id": self.id, "name": self.name,
                 "revision": self.revision, "response": self.response.to_dict(),
                 "pointer_gain": self.pointer_gain, "head_x": asdict(self.head_x),
                 "head_y": asdict(self.head_y), "bindings": dict(zip(DIRECTIONS, self.bindings)),
@@ -114,25 +119,27 @@ class Mapping:
                 "pointer_down_gain": self.pointer_down_gain,
                 "target_smoothing_ms": self.target_smoothing_ms,
                 "target_interpolation_ms": self.target_interpolation_ms,
-                "head_motion": asdict(self.head_motion)}
+                "head_motion": asdict(self.head_motion), "head_wink_clicks": self.head_wink_clicks}
 
     @classmethod
     def from_dict(cls, data):
         fields = {"format", "id", "name", "revision", "response", "pointer_gain", "head_x", "head_y", "bindings"}
         if not isinstance(data, dict):
-            raise ValueError("Expected an input_mapping_v1/v2/v3/v4/v5 file")
+            raise ValueError("Expected an input_mapping_v1/v2/v3/v4/v5/v6 file")
         version = data.get("format")
-        if version in ("input_mapping_v2", "input_mapping_v3", "input_mapping_v4", "input_mapping_v5"):
+        if version in ("input_mapping_v2", "input_mapping_v3", "input_mapping_v4", "input_mapping_v5", "input_mapping_v6"):
             fields |= {"input_mode", "adaptive_pointer"}
-        if version in ("input_mapping_v3", "input_mapping_v4", "input_mapping_v5"):
+        if version in ("input_mapping_v3", "input_mapping_v4", "input_mapping_v5", "input_mapping_v6"):
             fields |= {"pointer_mode", "target_jitter"}
-        if version in ("input_mapping_v4", "input_mapping_v5"):
+        if version in ("input_mapping_v4", "input_mapping_v5", "input_mapping_v6"):
             fields |= {"pointer_down_gain", "target_smoothing_ms", "target_interpolation_ms"}
-        if version == "input_mapping_v5":
+        if version in ("input_mapping_v5", "input_mapping_v6"):
             fields.add("head_motion")
-        if set(data) != fields or version not in ("input_mapping_v1", "input_mapping_v2", "input_mapping_v3", "input_mapping_v4", "input_mapping_v5"):
-            raise ValueError("Expected an input_mapping_v1/v2/v3/v4/v5 file")
-        if version == "input_mapping_v5" and (not isinstance(data["head_motion"], dict) or
+        if version == "input_mapping_v6":
+            fields.add("head_wink_clicks")
+        if set(data) != fields or version not in ("input_mapping_v1", "input_mapping_v2", "input_mapping_v3", "input_mapping_v4", "input_mapping_v5", "input_mapping_v6"):
+            raise ValueError("Expected an input_mapping_v1/v2/v3/v4/v5/v6 file")
+        if version in ("input_mapping_v5", "input_mapping_v6") and (not isinstance(data["head_motion"], dict) or
                 set(data["head_motion"]) != {"enabled", "speed_gain", "return_brake"}):
             raise ValueError("Malformed head motion settings")
         if not isinstance(data["bindings"], dict) or set(data["bindings"]) != set(DIRECTIONS):
@@ -147,7 +154,7 @@ class Mapping:
                        data.get("pointer_down_gain", 1),
                        data.get("target_smoothing_ms", response.pointer.smoothing_ms),
                        data.get("target_interpolation_ms", response.interpolation_ms),
-                       HeadMotionConfig(**data.get("head_motion", {})))
+                       HeadMotionConfig(**data.get("head_motion", {})), data.get("head_wink_clicks", False))
         except TypeError as exc:
             raise ValueError("Malformed mapping settings") from exc
 
@@ -155,11 +162,11 @@ class Mapping:
 def mouse_test_mapping():
     response = gaming_response()
     response = replace(response, interpolation_ms=0, pointer=replace(response.pointer,
-                       deadzone=.10, hysteresis=.02, smoothing_ms=20,
-                       exponent=1.2, acceleration=10, deceleration=14))
+                       deadzone=.03, hysteresis=.005, smoothing_ms=20,
+                       exponent=1.8, acceleration=10, deceleration=14))
     return Mapping(id=MOUSE_TEST_ID, name="Mouse test", input_mode="head-mouse", pointer_mode="velocity",
-                   bindings=("none",) * 4, pointer_gain=1, pointer_down_gain=3, response=response,
-                   head_motion=HeadMotionConfig(enabled=True))
+                   bindings=("none",) * 4, pointer_gain=1.4, pointer_down_gain=3, response=response,
+                   head_motion=HeadMotionConfig(enabled=True), head_wink_clicks=True)
 
 
 def read_mapping(path):

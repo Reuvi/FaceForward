@@ -1,5 +1,9 @@
 # Head movement speed response
 
+Latest follow-up: [HEAD_MOUSE_CLICKS.md](HEAD_MOUSE_CLICKS.md) adjusts the built-in
+base curve for small-motion precision, adds wink clicks and mapping v6. The motion
+estimator and braking rules below remain in effect.
+
 The user prefers calibrated head X/Y pointer control and requested acceleration
 and deceleration based on head movement speed, while retaining the existing smooth
 Mouse test behavior. This change applies only to the head-mouse mapping family.

@@ -1,5 +1,12 @@
 # Application integration
 
+**Latest head precision / wink clicks:** read [../Contracts/HEAD_MOUSE_CLICKS.md](../Contracts/HEAD_MOUSE_CLICKS.md).
+Mouse test now uses a gentle small-motion speed curve and independent calibrated
+left/right wink clicks. This supersedes its prior no-click/ignore-eyes rule and
+base curve defaults. Mapping v6 adds head_wink_clicks; v1–v5 retain their tuning
+and migrate with clicks off. Unknown eyes cannot block valid head movement or
+click; actual reopening re-arms that eye. Preserve head response and downward gain.
+
 **Current head pointer response:** follow `Contracts/HEAD_POINTER_RESPONSE.md`.
 Mouse test has a speed-aware response toggle and strengths in Mapping settings;
 face-profile loads keep this mapping configuration. Mapping files are now v5, with

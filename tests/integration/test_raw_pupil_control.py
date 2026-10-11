@@ -199,6 +199,7 @@ class RawPupilControlTests(unittest.TestCase):
                 self.assertEqual(pointer.config.smoothing_ms,12 if identity.startswith('gaming') else 17)
                 self.assertEqual(pointer.down_gain,5)
                 self.assertEqual(self.session.lab.state()['mapping']['head_motion'],selected['head_motion'])
+                self.assertEqual(self.session.lab.state()['mapping']['head_wink_clicks'],selected['head_wink_clicks'])
                 state=self.session.lab.state()
                 self.assertEqual(state['snapshot']['diagnostics']['pointer_interpolation_ms'],0)
                 self.assertFalse(state['snapshot']['armed'])

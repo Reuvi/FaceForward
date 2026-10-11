@@ -53,7 +53,8 @@ def pointer_status(source, lab):
             if not diag.get(key, {}).get("neutral", True):
                 pending.append(name)
         return ("Waiting to start: center " + ", ".join(pending) + "." if pending else
-                "Waiting to start: release eye actions and center head inputs." if target else
+                "Waiting to start: center head inputs." if head_only and not (lab.get("mapping") or {}).get("head_wink_clicks") else
+                "Waiting to start: release eye actions and center head inputs." if target or head_only else
                 "Waiting to start: release eye actions and center inputs.")
     if target:
         location = f"X {snap['pointer_x']:.1%}, Y {snap['pointer_y']:.1%}"
@@ -155,6 +156,7 @@ class DiagnosticLog:
                      "pointer_interpolation_ms":diag.get("pointer_interpolation_ms", lab["config"]["interpolation_ms"]),
                      "pointer_down_gain":diag.get("pointer_down_gain", 1),
                      "head_motion":diag.get("head_motion"),
+                     "head_wink_clicks":(lab.get("mapping") or {}).get("head_wink_clicks", False),
                      "target_jitter":diag.get("target_jitter"), "min_confidence":lab["config"]["min_confidence"],
                      "pointer_gain":(lab.get("mapping") or {}).get("pointer_gain",1),
                      "adaptive_pointer":(lab.get("mapping") or {}).get("adaptive_pointer", False),

@@ -198,7 +198,7 @@ class GamingProcessor(MouseProcessor):
                 continue
             signed = 2*snap["pointer_"+axis]-1
             direction = ("right" if signed > 0 else "left") if axis == "x" else ("down" if signed > 0 else "up")
-            instruction = "unknown; stopped" if point is None else "stopped" if abs(signed) < .0001 else f"{direction} {abs(signed):.0%}"
+            instruction = "unknown; stopped" if point is None else "stopped" if abs(signed) < .0001 else f"{direction} {abs(signed):.1%}"
             rows.append({"id": "pupil_"+axis, "input": "Pupils "+axis.upper(),
                          "raw": point[index] if point is not None else None,
                          "filtered": filtered[index] if filtered is not None else None,
@@ -208,7 +208,7 @@ class GamingProcessor(MouseProcessor):
 
 
 class HeadMouseProcessor(GamingProcessor):
-    """Head X/Y form one pointer vector; no eye, pupil, key or scroll actions."""
+    """Head X/Y pointer with optional calibrated wink clicks; no keys/scroll."""
 
     def __init__(self, mapping=None, subject_id="mock-person"):
         mapping = mapping or mouse_test_mapping()
@@ -221,24 +221,32 @@ class HeadMouseProcessor(GamingProcessor):
                                              adaptive=mapping.adaptive_pointer)
 
     def decode_sample(self, frame):
-        sample = decode(frame, self.config, self.subject_id, ignore_eyes=True)
+        sample = decode(frame, self.config, self.subject_id, ignore_eyes=not self.mapping.head_wink_clicks)
+        if not self.mapping.head_wink_clicks or not sample.appearance_intent:
+            # Even legacy raw closures cannot substitute for trained winks.
+            sample = replace(sample, left_closed=False, right_closed=False,
+                             left_known=False, right_known=False)
         point = ((sample.head_x, sample.scroll)
                  if sample.head_x is not None and sample.scroll is not None else None)
         return replace(sample, pointer=point, pointer_async=False,
-                       pointer_timestamp_ms=None, pointer_sequence=None,
-                       left_closed=False, right_closed=False,
-                       left_known=False, right_known=False)
+                       pointer_timestamp_ms=None, pointer_sequence=None)
 
     def can_enable(self):
-        return self.pointer.valid and self.pointer.neutral()
+        eyes_released = (self.sample is not None and
+                         not (self.sample.left_known and self.sample.left_closed) and
+                         not (self.sample.right_known and self.sample.right_closed))
+        return (self.pointer.valid and self.pointer.neutral() and eyes_released
+                and not self.left.down and not self.right.down)
 
     def instructions(self, snap):
-        rows = super().instructions(snap)[-2:]
+        all_rows = super().instructions(snap)
+        rows = all_rows[-2:]
         motion = snap["diagnostics"]["head_motion"]
         for row, axis in zip(rows, ("X", "Y")):
             row.update(id="head_pointer_"+axis.lower(), input="Head "+axis)
             if motion and snap["enabled"] and snap["known"]["pointer"]:
                 row["instruction"] += " · "+motion["phase"]
         rows.append(dict(id="ignored", input="Other inputs", raw=None, filtered=None,
-                         threshold="Ignored", instruction="No clicks, keys or scroll"))
-        return rows
+                         threshold="Ignored", instruction="No pupil movement, keys or scroll" if self.mapping.head_wink_clicks
+                         else "No clicks, keys or scroll"))
+        return (all_rows[:2] if self.mapping.head_wink_clicks else []) + rows

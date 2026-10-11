@@ -35,7 +35,7 @@ class HeadPointerResponseTests(unittest.TestCase):
     def test_stationary_head_keeps_original_steady_speed(self):
         f=self.make_filter();self.capture(f,0)
         self.capture(f,20,x=.7);self.assertGreater(f.motion_state['multiplier'],1)
-        old=AxisFilter(f.config,2,gain=1,down_gain=3,adaptive=True)
+        old=AxisFilter(f.config,2,gain=f.gain,down_gain=3,adaptive=True)
         for i in range(2,80):
             self.capture(f,i*20,x=.7)
             self.capture(old,i*20,x=.7)
@@ -44,7 +44,7 @@ class HeadPointerResponseTests(unittest.TestCase):
         self.assertAlmostEqual(f.velocity[0],old.velocity[0],places=5)
 
     def test_return_never_gets_outward_boost_and_stops_without_reversal(self):
-        f=self.make_filter();old=AxisFilter(f.config,2,gain=1,down_gain=3,adaptive=True)
+        f=self.make_filter();old=AxisFilter(f.config,2,gain=f.gain,down_gain=3,adaptive=True)
         for i in range(20):
             for filt in (f,old):self.capture(filt,i*20,x=.8)
         response=[];baseline=[]
@@ -138,12 +138,12 @@ class HeadPointerResponseTests(unittest.TestCase):
 
     def test_off_switch_matches_previous_filter_and_v4_import_keeps_it_off(self):
         mapping=mouse_test_mapping()
-        legacy=mapping.to_dict();legacy['format']='input_mapping_v4';del legacy['head_motion']
+        legacy=mapping.to_dict();legacy['format']='input_mapping_v4';del legacy['head_motion'];del legacy['head_wink_clicks']
         loaded=Mapping.from_dict(legacy)
         self.assertFalse(loaded.head_motion.enabled)
         core=HeadMouseProcessor(loaded,subject_id='person')
         self.assertIs(type(core.pointer),AxisFilter)
-        reference=AxisFilter(loaded.response.pointer,2,gain=1,down_gain=3,adaptive=True)
+        reference=AxisFilter(loaded.response.pointer,2,gain=loaded.pointer_gain,down_gain=3,adaptive=True)
         for i in range(40):
             x=.5+.25*math.sin(i*.2);y=.5+.1*math.cos(i*.2)
             self.assertEqual(self.capture(core.pointer,i*20,x,y),self.capture(reference,i*20,x,y))

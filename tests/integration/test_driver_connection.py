@@ -38,9 +38,12 @@ class DriverConnectionTests(unittest.TestCase):
         for key,value in values.items():
             frame["faces"][0]["signals"][key].update(value=value,valid=value is not None,
                                                     confidence=1 if value is not None else 0)
-        if "left_eye_open" in values:
-            closed = values["left_eye_open"] == 0
-            frame["eye_intent"]["left"].update(value=int(closed),state="wink" if closed else "open")
+        for side in ('left','right'):
+            if side+'_eye_open' in values:
+                value=values[side+'_eye_open']
+                closed=value == 0
+                frame['eye_intent'][side].update(value=None if value is None else int(closed),
+                    known=value is not None,state='unknown' if value is None else 'wink' if closed else 'open')
         self.session.deliver(frame)
         return self.lab.state()["output"]
 
@@ -54,6 +57,8 @@ class DriverConnectionTests(unittest.TestCase):
 
     def test_head_mouse_reaches_driver_without_any_eye_key_or_scroll_event(self):
         self.lab.select_mapping("mouse-test")
+        mapping=self.lab.state()['mapping'];mapping['head_wink_clicks']=False
+        self.lab.update_mapping(mapping)
         self.lab.action({"action":"arm"})
         output = self.deliver(gaze_x=1,gaze_y=0,left_eye_open=0)
         self.assertTrue(output["enabled"])
@@ -98,6 +103,42 @@ class DriverConnectionTests(unittest.TestCase):
         self.deliver(head_y=None)
         self.assertEqual(self.lab.state()['message']['pointer'],dict(mode='velocity',x=.5,y=.5))
 
+    def test_head_winks_emit_one_compiled_click_per_activation_and_require_reopen_after_unknown(self):
+        self.lab.select_mapping('mouse-test');self.lab.action({'action':'arm'})
+        output=self.deliver(left_eye_open=0)
+        self.assertFalse(output['enabled']);self.assertIsNone(output['error'])
+        self.assertTrue(self.deliver(gaze_x=None,gaze_y=None)['enabled'])
+        for _ in range(12):
+            time.sleep(.01)
+            output=self.deliver(head_x=.7,left_eye_open=0,right_eye_open=0,gaze_x=None,gaze_y=None)
+        self.assertEqual(output['event_counts'].get(3),1)
+        self.assertEqual(output['event_counts'].get(4),1)
+        self.assertGreater(output['event_counts'].get(1,0),0)
+        self.deliver(left_eye_open=None,right_eye_open=0)
+        output=self.deliver(left_eye_open=0,right_eye_open=0)
+        self.assertEqual(output['event_counts'].get(3),1)
+        self.assertEqual(output['event_counts'].get(4),1)
+        self.deliver(left_eye_open=1,right_eye_open=0)
+        output=self.deliver(left_eye_open=0,right_eye_open=0,head_y=None)
+        self.assertEqual(output['event_counts'].get(3),2)
+        self.assertEqual(output['event_counts'].get(4),1)
+        self.assertTrue(all(event['type'] in (1,3,4) for event in self.lab.output.events))
+        self.assertEqual(output['held_keys'],0);self.assertIsNone(output['error'])
+        self.session.stop()
+        self.assertFalse(self.lab.state()['output']['enabled'])
+
+    def test_precise_subpixel_head_speed_accumulates_into_small_driver_moves(self):
+        self.lab.select_mapping('mouse-test');self.lab.action({'action':'arm'});self.deliver()
+        start=len(self.lab.output.events)
+        for _ in range(140):
+            time.sleep(.01);self.deliver(head_x=.525)
+        self.lab.output.collect()
+        events=list(self.lab.output.events)[start:]
+        self.assertTrue(events, 'Fractional velocity must eventually produce movement')
+        self.assertTrue(all(e['type']==1 and e['x']==1 and e['y']==0 for e in events))
+        self.assertLessEqual(sum(e['x'] for e in events),5)
+        self.assertIsNone(self.lab.state()['output']['error'])
+
     def test_centering_after_start_discards_pre_enable_interpolation(self):
         settings=self.lab.state()['mapping'];settings['pointer_mode']='velocity'
         self.lab.update_mapping(settings)
@@ -122,7 +163,7 @@ class DriverConnectionTests(unittest.TestCase):
         self.lab.action({'action':'arm'});self.deliver()
         phases=[]
         for i in range(1,9):
-            time.sleep(.01);self.deliver(head_x=.5+i*.025,left_eye_open=0,gaze_x=None,gaze_y=None)
+            time.sleep(.01);self.deliver(head_x=.5+i*.025,left_eye_open=1,gaze_x=None,gaze_y=None)
             snap=self.lab.state()['snapshot']
             phases.append(snap['diagnostics']['head_motion']['phase'])
             self.assertTrue(.5 <= snap['pointer_x'] <= 1)

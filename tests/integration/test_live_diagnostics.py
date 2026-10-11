@@ -54,6 +54,7 @@ class LiveDiagnosticsTests(unittest.TestCase):
             self.assertEqual(row['pointer_input'],'head')
             self.assertIsNone(row['processed_pupils'])
             self.assertIn('head_x',row['head_reasons'])
+            self.assertTrue(row['head_wink_clicks'])
             self.assertIn('phase',row['head_motion'])
             self.assertEqual(row['head_motion']['multiplier'],1)
 

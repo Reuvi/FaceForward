@@ -1,5 +1,10 @@
 # Shared contracts — initial v1
 
+[HEAD_MOUSE_CLICKS.md](HEAD_MOUSE_CLICKS.md) is the latest Mouse test contract:
+precise slow small-motion response, faster large/quick turns and independent
+calibrated wink clicks. Mapping v6 migrates v1–v5 with clicks off and saved tuning
+intact. This supersedes earlier head-only/no-click wording below.
+
 [HEAD_POINTER_RESPONSE.md](HEAD_POINTER_RESPONSE.md) adds optional head-speed
 acceleration/return braking to Mouse test and mapping v5 persistence. Existing
 v1–v4 mappings retain the prior response until explicitly enabled.
