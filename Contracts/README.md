@@ -1,5 +1,9 @@
 # Shared contracts — initial v1
 
+[LIVE_CURVE_EDITOR.md](LIVE_CURVE_EDITOR.md) adds connected live response sliders,
+curve/timing previews and signal_tuning_profile_v1 files. Only response hot edits
+keep output running; mapping/profile/source changes still stop.
+
 [HEAD_MOUSE_CLICKS.md](HEAD_MOUSE_CLICKS.md) is the latest Mouse test contract:
 precise slow small-motion response, faster large/quick turns and independent
 calibrated wink clicks. Mapping v6 migrates v1–v5 with clicks off and saved tuning

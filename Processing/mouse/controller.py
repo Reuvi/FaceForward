@@ -12,6 +12,7 @@ from .engine import MouseProcessor
 from .mocks import SCENARIOS, raw_frame, scenario
 from .output import control_message
 from Processing.eye_samples import trace_fields
+from Processing.tuning.model import edited, validate_profile
 from Processing.mappings.config import GAMING_ID, MOUSE_TEST_ID, Mapping, mouse_test_mapping, read_mapping, write_mapping
 from Processing.mappings.engine import GamingProcessor, HeadMouseProcessor
 
@@ -49,6 +50,7 @@ class Lab:
         self.trace = deque(maxlen=2000)
         self.trace_id = 0
         self.generation = 0
+        self.tuning_revision = 0
         self.pulses = {"left": 0.0, "right": 0.0}
         self.streaming = True
         self.stop_event = threading.Event()
@@ -189,7 +191,7 @@ class Lab:
                     "trace": [row for row in self.trace if row["id"] > after],
                     "raw": self.last_raw, "runtime": self.runtime.copy(), "manual": self.manual.copy(),
                     "config": self.processor.config.to_dict(), "scenario": self.scenario_name,
-                    "streaming": self.streaming, "generation": self.generation,
+                    "streaming": self.streaming, "generation": self.generation, "tuning_revision": self.tuning_revision,
                     "input_status": self.last_ingest}
 
     def control(self, values):
@@ -269,6 +271,65 @@ class Lab:
         with self.lock:
             self.mappings[mapping.id] = mapping
             self.select_mapping(mapping.id)
+
+    def tune_response(self, channel, changes, *, mapping_id, generation):
+        """Hot-update only transfer parameters; never restart or arm the source."""
+        with self.lock:
+            if mapping_id != self.mapping_id or generation != self.generation:
+                raise ValueError("Mapping/settings changed; refresh the curve editor")
+            current = dict(config=self.processor.config.to_dict(), raw=self.last_raw, runtime=self.runtime,
+                           mapping=self.mappings[self.mapping_id].to_dict() if self.mapping_id != "mouse" else None)
+            config, mapping = edited(current, channel, changes)
+            core = self.processor
+            if mapping:
+                # Driver routing revision stays stable during response-only edits.
+                core.mapping = mapping
+                self.mappings[self.mapping_id] = mapping
+                for axis in ("head_x", "head_y"):
+                    gate = getattr(core, axis)
+                    new = getattr(mapping, axis)
+                    if new != gate.config:
+                        gate.config = new
+                        gate.reset()  # Release changed key gates; require fresh neutral.
+            else:self.mouse_config = config
+            for side in ("left", "right"):
+                gate = getattr(core, side)
+                new = getattr(config, side+"_eye")
+                if new != gate.config:
+                    gate.config = new
+                    gate.reset()
+            core.config = config
+            pointer_config = (replace(config.pointer, smoothing_ms=mapping.target_smoothing_ms)
+                              if mapping and mapping.pointer_mode == "target" else config.pointer)
+            core.pointer.retune(pointer_config, gain=mapping.pointer_gain if mapping else 1,
+                                down_gain=mapping.pointer_down_gain if mapping else 1)
+            if mapping and mapping.pointer_mode == "target":
+                core.pointer.jitter = mapping.target_jitter
+                core.pointer.delay_ms = mapping.target_interpolation_ms
+            if mapping and mapping.input_mode == "head-mouse" and mapping.head_motion.enabled:
+                core.pointer.motion = mapping.head_motion
+            core.scroll.retune(config.scroll)
+            self.generation += 1
+            self.tuning_revision += 1
+            if core.armed and not core.enabled:
+                # A larger dead zone must not start output from a cached sample.
+                # Keep the explicit Start request, but require a new capture.
+                core.received_ms = None
+            self.take_snapshot(self.clock())
+            return self.generation
+
+    def apply_tuning_profile(self, data):
+        config, mapping, speeds = validate_profile(data)
+        with self.lock:
+            if self.locked_pointer_source is not None:
+                config = replace(config, pointer_source=self.locked_pointer_source)
+                if mapping:mapping = replace(mapping, response=config)
+            self.processor.disarm("Tuning profile loaded; press Start again")
+            self.take_snapshot(self.clock())
+            self.mapping_id = mapping.id if mapping else "mouse"
+            if mapping:self.mappings[mapping.id] = mapping
+            self.settings({"config":config.to_dict(), "runtime":speeds})
+            self.tuning_revision += 1
 
     def copy_mapping(self, name):
         with self.lock:

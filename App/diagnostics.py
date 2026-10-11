@@ -157,6 +157,7 @@ class DiagnosticLog:
                      "pointer_down_gain":diag.get("pointer_down_gain", 1),
                      "head_motion":diag.get("head_motion"),
                      "head_wink_clicks":(lab.get("mapping") or {}).get("head_wink_clicks", False),
+                     "tuning_revision":lab.get("tuning_revision", 0),
                      "target_jitter":diag.get("target_jitter"), "min_confidence":lab["config"]["min_confidence"],
                      "pointer_gain":(lab.get("mapping") or {}).get("pointer_gain",1),
                      "adaptive_pointer":(lab.get("mapping") or {}).get("adaptive_pointer", False),

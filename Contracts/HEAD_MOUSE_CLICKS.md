@@ -1,5 +1,9 @@
 # Precise head movement and independent wink clicks
 
+Follow-up: [LIVE_CURVE_EDITOR.md](LIVE_CURVE_EDITOR.md) permits validated live
+response-only slider edits without disarming. Regular settings and full profile
+loads still stop; all wink validity and independence rules below remain.
+
 The user requested very slow, precise cursor speed for small head movements,
 fast travel for larger/quicker turns, and left/right clicks from the matching eye
 in wink mode. This supersedes Mouse test's earlier eye/click exclusion. It keeps

@@ -1,5 +1,7 @@
 # Face-controlled accessibility interface
 
+Current editor: **Signals → Live curves…** adjusts response curves and timing with connected sliders. Save/load named tuning profiles or restore the tuned defaults. [Live curve editor guide](docs/LIVE_CURVE_EDITOR_GUIDE.md).
+
 Current update: Gaming uses raw pupils to choose an approximate **screen destination**; the cursor arrives and stops. **Mouse test** uses precise head X/Y velocity with faster large/quick turns and matching left/right calibrated wink clicks. See [head movement and clicks](docs/HEAD_POINTER_GUIDE.md), [screen pointer setup and limits](docs/SCREEN_POINTER_GUIDE.md) and [run instructions](App/README.md).
 
 Current MVP: **eyes/winks, Head Y, Head X and pupils**. Tongue detection has been

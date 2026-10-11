@@ -11,6 +11,16 @@ left/right mouse, head down/up/left/right → W/Space/Shift/S, pupils → an app
 screen destination where the cursor stops. **Mouse test** combines calibrated head X/Y into precise pointer velocity and uses left/right calibrated winks for matching clicks; pupils, keys and scroll are ignored. The previous **Mouse and scroll** mode remains selectable. See
 [the Processing runbook](../Processing/mappings/README.md) for tuning and saved mappings.
 
+## Live curve editor
+
+Open **Signals → Live curves…** to adjust the active mapping with connected sliders.
+See actual response curves/live markers and a synthetic ramp/settling preview.
+Pointer velocity/target, head-key gates and scroll expose the controls they use;
+calibrated winks show independent binary click states. Live response edits preserve
+running control. **Save as…**, **Load…** and **Default profile** manage named local
+tuning files; loading/defaults stop output. Face calibration stays separate.
+[Editor, timing and profile guide](../docs/LIVE_CURVE_EDITOR_GUIDE.md).
+
 ## Open and test
 
 Run from the repository root:

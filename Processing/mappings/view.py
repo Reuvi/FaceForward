@@ -14,6 +14,7 @@ class MappingPanel(ttk.Frame):
         self.desktop, self.lab = desktop, desktop.lab
         self.compact = compact
         self.settings_window = None
+        self.curve_editor = None
         self.generation = -1
         self.mapping_choices = []
         toolbar = ttk.Frame(self)
@@ -24,6 +25,7 @@ class MappingPanel(ttk.Frame):
         self.selector.bind("<<ComboboxSelected>>", lambda event: desktop.guarded(self.select))
         if compact:
             desktop.button(toolbar, "Mapping settings…", self.show_settings).pack(side="left", padx=(8,0))
+        desktop.button(toolbar, "Live curves…", self.show_curves).pack(side="left", padx=(8,0))
         self.notice = tk.StringVar()
         if not compact:
             label(self, textvariable=self.notice, foreground=GREEN, wraplength=1250).pack(anchor="w", pady=7)
@@ -203,6 +205,12 @@ class MappingPanel(ttk.Frame):
             for offset, widget in enumerate(widgets):
                 widget.grid(row=row, column=col*2+offset)
 
+    def show_curves(self):
+        from Processing.tuning.view import CurveEditor
+        if self.curve_editor is None:
+            self.curve_editor = CurveEditor(self.desktop.root, self.lab)
+        else:self.curve_editor.show()
+
     def apply(self):
         try:
             self._apply()
@@ -282,6 +290,7 @@ class MappingPanel(ttk.Frame):
         return rows
 
     def refresh(self, state, history):
+        if self.curve_editor is not None:self.curve_editor.refresh(state)
         if state["mappings"] != self.mapping_choices:
             self.mapping_choices = state["mappings"]
             self.selector.configure(values=[m["name"] if self.compact else f"{m['name']} [{m['id']}]" for m in self.mapping_choices])

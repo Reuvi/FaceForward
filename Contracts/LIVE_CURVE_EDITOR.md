@@ -8,7 +8,9 @@ Expose only controls used by the active mapping: velocity pointer shaping,
 head-speed boost/braking, target gain/downward amplification/fixation smoothing,
 gaming head-key thresholds/smoothing/confirmation, and legacy scroll response.
 Show independent calibrated wink ON/OFF and live validity; binary wink actions have
-no amplitude curve or added dwell/release timer. Detector calibration is unchanged.
+no amplitude curve or added dwell/release timer. Legacy raw-eye developer inputs
+may tune their existing independent confirmation/reopen timers; editing releases
+that eye and requires reopening. Detector calibration is unchanged.
 Show the actual transfer curve, live raw/output markers and a labeled synthetic
 movement/settling preview from the same Processing filters. Missing inputs stay
 unknown; plotted or simulated values never enter the live pipeline.

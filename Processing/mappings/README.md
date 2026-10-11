@@ -41,6 +41,18 @@ Uncheck the option for the previous pointer-only behavior.
 
 Copies retain this head movement mode and the wink setting. Pointer settings and gain apply; keyboard bindings and key thresholds are hidden. The driver connection and permissions are identical to gaming mode.
 
+## Live response curves
+
+**Live curves…** opens one connected editor for every active mapped input. Sliders
+hot-update validated response settings under the Processing lock without replacing
+the processor or changing the driver routing revision. Local tuning_revision and
+the settings generation update for diagnostics/UI. Head-key gate changes release
+only that axis and require neutral again; eye activations are never replayed.
+Curves share the actual transfer calculation; timing previews use separate filter
+instances and never enter control. Calibrated wink channels remain binary and
+instantaneous. Profile/default loading uses the usual disarmed lifecycle.
+See [sliders and tuning files](../../docs/LIVE_CURVE_EDITOR_GUIDE.md).
+
 ## Try it
 
 From the checkout containing this change:

@@ -18,6 +18,17 @@ def centered(value, center):
     return (value - center) / (center if value < center else 1 - center)
 
 
+def axis_target(signed, config, *, gain=1, boost=0, active=False):
+    """Shared steady curve for live filtering and the display-only editor."""
+    magnitude = length(signed)
+    active = magnitude > config.deadzone + (0 if active else config.hysteresis)
+    strength = 0.0
+    if active:
+        strength = ((min(1.0, magnitude)-config.deadzone)/(1-config.deadzone)) ** config.exponent
+        strength = min(1.0, strength*gain*(1+boost))
+    return active, tuple(v/magnitude*strength if magnitude else 0.0 for v in signed)
+
+
 class EyeGate:
     """One independent eye: open baseline → dwell → held → debounced release."""
 
@@ -68,6 +79,7 @@ class AxisFilter:
 
     def __init__(self, config, dimensions, *, gain=1, adaptive=False, down_gain=1):
         self.config = config
+        self.adaptive_enabled = adaptive
         self.gain = gain
         self.down_gain = down_gain
         self.dimensions = dimensions
@@ -78,6 +90,20 @@ class AxisFilter:
         self.adaptive = (OneEuro(dimensions, 1000 / (4*math.pi*config.smoothing_ms))
                          if adaptive and config.smoothing_ms else None)
         self.reset_motion()
+
+    def retune(self, config, *, gain=None, down_gain=None):
+        """Change response without discarding captured input or current velocity."""
+        self.config = config
+        if gain is not None:self.gain = gain
+        if down_gain is not None:self.down_gain = down_gain
+        if self.adaptive_enabled and config.smoothing_ms:
+            cutoff = 1000/(4*math.pi*config.smoothing_ms)
+            if self.adaptive is None:
+                self.adaptive = OneEuro(self.dimensions, cutoff)
+                self.adaptive.reset(getattr(self, "filtered", None) or self.velocity)
+            else:self.adaptive.min_cutoff = cutoff
+        else:self.adaptive = None
+        self.boost = min(self.boost, config.boost_max) if config.boost_gain else 0.0
 
     def reset_motion(self):
         self.velocity = (0.0,) * self.dimensions
@@ -156,20 +182,12 @@ class AxisFilter:
             return self.velocity
         config = self.config
         signed = self.normalize(self.position)
-        magnitude = length(signed)
-        if self.active:
-            self.active = magnitude > config.deadzone
-        else:
-            self.active = magnitude > config.deadzone + config.hysteresis
         self.boost *= math.exp(-dt * 1000.0 / config.boost_decay_ms)
-        strength = 0.0
-        if self.active:
-            strength = ((min(1.0, magnitude) - config.deadzone) / (1 - config.deadzone)) ** config.exponent
-            strength = min(1.0, strength * self.gain * (1 + self.boost))
-        self.target = tuple(v / magnitude * strength if magnitude else 0.0 for v in signed)
+        self.active, self.target = axis_target(signed, config, gain=self.gain,
+                                              boost=self.boost, active=self.active)
         self.target, acceleration, deceleration = self.motion_response(self.target, now)
         alpha = 1.0 if config.smoothing_ms == 0 else -math.expm1(-dt * 1000.0 / config.smoothing_ms)
-        desired = (self.adaptive.step(self.target, dt) if self.adaptive else
+        desired = (self.adaptive.step(self.target, dt) if self.adaptive and config.smoothing_ms else
                    tuple(v + alpha * (t - v) for v, t in zip(self.velocity, self.target)))
         delta = tuple(d - v for d, v in zip(desired, self.velocity))
         rate = deceleration if length(desired) < length(self.velocity) else acceleration

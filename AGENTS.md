@@ -1,5 +1,12 @@
 # Agent working agreement
 
+**Latest live curve editor:** read [Contracts/LIVE_CURVE_EDITOR.md](Contracts/LIVE_CURVE_EDITOR.md).
+Signals has one connected native curve/timing editor with response-only live
+sliders and local tuning profiles. Hot edits preserve filter/input/driver state,
+never arm or change routing, and keep driver mapping revision stable; local
+tuning_revision tracks changes. Profile/default loads still disarm. Calibrated
+winks remain instantaneous binary actions; legacy raw-eye timers stay separate.
+
 **Latest head precision / wink clicks:** read [Contracts/HEAD_MOUSE_CLICKS.md](Contracts/HEAD_MOUSE_CLICKS.md).
 Mouse test now uses a gentle small-motion speed curve and independent calibrated
 left/right wink clicks. This supersedes its prior no-click/ignore-eyes rule and

@@ -49,7 +49,7 @@ class TargetFilter(AxisFilter):
             self.filtered = self.target
             if self.adaptive:
                 self.adaptive.reset(self.target)
-        elif self.adaptive:
+        elif self.adaptive and self.config.smoothing_ms:
             self.filtered = self.adaptive.step(self.target, dt)
         else:
             alpha = 1 if not self.config.smoothing_ms else -math.expm1(-dt*1000/self.config.smoothing_ms)

@@ -184,6 +184,54 @@ class SimpleSignalsWindowTests(unittest.TestCase):
         self.assertTrue(panel.binding_group.winfo_ismapped())
         self.assertFalse(panel.motion_group.winfo_ismapped())
 
+    def test_live_curve_editor_sliders_profiles_and_mapping_switch(self):
+        self.session.lab.select_mapping('mouse-test')
+        self.ui.refresh();self.ui.mapping_page.show_curves();self.root.update()
+        editor=self.ui.mapping_page.curve_editor
+        self.assertEqual(set(dict(editor.channel_choices)),{'pointer','left','right'})
+        self.assertIn('speed_gain',editor.widgets)
+        self.assertTrue(editor.curve_canvas.find_all())
+        self.assertTrue(editor.time_canvas.find_all())
+        editor.widgets['gain'][2].set(2.2)
+        self.assertTrue(editor.flush())
+        self.assertAlmostEqual(self.session.lab.state()['mapping']['pointer_gain'],2.2)
+        self.assertIn('updated',editor.notice.get())
+        self.assertFalse(self.session.lab.processor.armed)
+        editor.selector.current(1);editor.select_channel();self.root.update()
+        self.assertEqual(editor.channel,'left')
+        self.assertEqual(editor.widgets,{})
+        self.assertIn('ON/OFF',editor.explanation.get())
+        path=Path(self.directory.name)/'response.json'
+        editor.name.set('My precise head')
+        with patch('Processing.tuning.view.filedialog.asksaveasfilename',return_value=str(path)):
+            editor.save()
+        self.assertTrue(path.is_file())
+        editor.defaults()
+        self.assertEqual(self.session.lab.state()['mapping']['pointer_gain'],1.4)
+        with patch('Processing.tuning.view.filedialog.askopenfilename',return_value=str(path)):
+            editor.load()
+        self.assertEqual(editor.name.get(),'My precise head')
+        self.assertAlmostEqual(self.session.lab.state()['mapping']['pointer_gain'],2.2)
+        self.assertFalse(self.session.lab.processor.armed)
+        editor.selector.current(0);editor.select_channel()
+        editor.widgets['gain'][2].set(3)
+        self.session.lab.select_mapping('gaming-keyboard-mouse-1')
+        editor.refresh(self.session.lab.state())
+        self.assertIsNone(editor.pending)
+        self.assertEqual(self.session.lab.state()['mapping']['pointer_gain'],2)
+        self.assertIn('head_x',dict(editor.channel_choices))
+        self.assertIn('jitter',editor.widgets)
+        self.assertNotIn('acceleration',editor.widgets)
+        self.root.update()
+        # Graphs, stop button and profile controls remain within the editor.
+        self.assertLess(editor.time_canvas.winfo_rooty()+editor.time_canvas.winfo_height(),
+                        editor.window.winfo_rooty()+editor.window.winfo_height())
+        editor.hide();self.root.update()
+        self.assertFalse(editor.window.winfo_viewable())
+        editor.show();self.root.update()
+        editor.stop()
+        self.assertFalse(self.session.lab.processor.armed)
+
     def test_screen_destination_settings_show_only_relevant_response_controls(self):
         self.ui.refresh();self.root.update()
         panel=self.ui.mapping_page

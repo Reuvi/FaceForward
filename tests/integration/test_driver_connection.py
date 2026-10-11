@@ -139,6 +139,42 @@ class DriverConnectionTests(unittest.TestCase):
         self.assertLessEqual(sum(e['x'] for e in events),5)
         self.assertIsNone(self.lab.state()['output']['error'])
 
+    def test_head_live_curve_edits_keep_driver_running_without_duplicate_winks(self):
+        self.lab.select_mapping('mouse-test');self.lab.action({'action':'arm'});self.deliver()
+        for _ in range(10):self.deliver(head_x=.7,left_eye_open=0)
+        core=self.lab.processor
+        old=self.lab.state()['message']['output_session_id']
+        for i in range(1,12):
+            time.sleep(.01)
+            state=self.lab.state()
+            self.lab.tune_response('pointer',{'gain':1+i*.1,'smoothing_ms':i*5,'exponent':1+i*.05},
+                                   mapping_id=state['mapping_id'],generation=state['generation'])
+            output=self.deliver(head_x=.7,left_eye_open=0)
+            self.assertTrue(output['enabled']);self.assertIsNone(output['error'])
+            self.assertEqual(output['event_counts'].get(3),1)
+        self.assertIs(self.lab.processor,core)
+        self.assertEqual(self.lab.state()['message']['output_session_id'],old)
+        self.assertGreater(output['event_counts'].get(1,0),0)
+        self.assertFalse(any(e['type'] not in (1,3) for e in self.lab.output.events))
+        self.session.stop()
+        state=self.lab.state()
+        self.lab.tune_response('pointer',{'gain':2},mapping_id=state['mapping_id'],generation=state['generation'])
+        self.assertFalse(self.lab.state()['output']['enabled'])
+
+    def test_target_live_curve_and_profile_load_use_existing_driver(self):
+        from Processing.tuning.model import profile
+        for _ in range(10):self.deliver(gaze_x=.6)
+        state=self.lab.state();data=profile(state,'Destination response')
+        self.lab.tune_response('pointer',{'gain':1,'smoothing_ms':10,'jitter':.001},
+                               mapping_id=state['mapping_id'],generation=state['generation'])
+        for _ in range(12):output=self.deliver(gaze_x=.6)
+        self.assertTrue(output['enabled']);self.assertIsNone(output['error'])
+        self.assertAlmostEqual(self.lab.state()['message']['pointer']['x'],.6,delta=.001)  # Fixation dead band.
+        self.lab.apply_tuning_profile(data)
+        self.assertFalse(self.lab.state()['output']['enabled'])
+        self.assertEqual(self.lab.state()['mapping']['pointer_gain'],2)
+        self.assertFalse(self.deliver()['enabled'])
+
     def test_centering_after_start_discards_pre_enable_interpolation(self):
         settings=self.lab.state()['mapping'];settings['pointer_mode']='velocity'
         self.lab.update_mapping(settings)

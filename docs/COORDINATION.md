@@ -1373,3 +1373,67 @@ custom mappings to persist settings. See [tuning guide](HEAD_POINTER_GUIDE.md).
 Checks use synthetic inputs and compiled dry-run output; real-camera comfort and
 wink-classifier accuracy still need the user's live test. No native OS input was
 injected and no local profiles were changed.
+
+## Connected live curves and tuning profiles — user-requested integration
+
+Lane / task / branch: Reuvi integration / live-curve-editor /
+`codex/integration/live-curve-editor`, based on `5435fd8`.
+Changed paths: Processing response hot-update API/shared transfer math, native
+editor and profile/preview modules; App diagnostic revision; component/integration
+tests; contracts, agent notes and runbooks. Contract-first commit: `aea6f31`.
+
+Signals → Live curves… opens a single window with an active-input selector,
+connected sliders, response curves/live markers and a separate synthetic timing
+preview. Mouse/head velocity, pupil destination, gaming head-key gates and legacy
+scroll expose only effective settings. Calibrated winks show binary ON/OFF without
+extra timing gates; raw legacy eye timers are adjustable only where used. The
+editor has Stop/Escape, Save as…, Load… and a tuned Default profile.
+
+Response edits validate an allowlist under Lab.lock, preserve the processor,
+filter velocity/history and output session, and never reprocess cached eyes.
+Adaptive smoothing can cross zero while preserving velocity. Edited head gates
+and legacy eye timers release only their own channel and require fresh neutral /
+reopening. No setting can start stopped output; a pending Start requires another
+capture after tuning. Driver mapping revision stays stable for response-only edits;
+a local tuning_revision records edits. The UI rejects/discards stale queued edits
+when mapping/source/settings generations change. Structural settings still disarm.
+
+signal_tuning_profile_v1 stores a readable name, active mapping v6 (or complete
+legacy mouse response) and existing driver speed settings. Bounded validation
+precedes mutation; writes are atomic. Save keeps live-tuned values; loading and
+restoring defaults disarm. Defaults preserve mapping identity/routing/pointer mode
+and wink choice. Face calibration remains separate. No Vision or Drivers code,
+ABI, face-profile or detector-preset schema changes.
+
+Checks:
+- `python3 -m unittest discover -s tests/processing -q`: **155 passed**, including
+  16 live-tuning/profile/preview cases: continuity, wink independence, unknown/
+  stopped/stale input, cached-start prevention, bad/stale edits, key rearming,
+  zero smoothing, target/scroll behavior, profile validation/defaults, shared curve
+  parity, synthetic timing and legacy eye timers.
+- All `tests/integration/test_*.py` modules run separately with Vision's venv,
+  `RUN_TK_TESTS=1` and the existing compiled library: **153 passed**, no skips.
+  The new target assertion was corrected to respect its configured .001 fixation
+  band; driver module rerun **19 passed**. Final native UI module **15 passed**.
+  Compiled driver tests keep pointer output enabled during live gain/curve/smoothing
+  edits, preserve the session, avoid duplicate wink clicks and stop on profile load.
+  Tk tests exercise actual sliders, graphs, binary channels, save/load/defaults,
+  stale queued changes, target-mode controls, geometry and Stop. A separate synthetic
+  UI process also opened and closed without a callback error; the user's running
+  camera/native controller was not altered or restarted.
+- Full App Mouse test demo with compiled dry-run output, 490 frames: **490 accepted**,
+  no source/driver errors, **650 moves**, **3 clicks per side**, no keys/scroll;
+  final disabled with both buttons zero and neutral pointer. Command:
+  `Vision/.venv/bin/python -m App --source demo --mapping mouse-test --headless
+  --frames 490 --output dry-run --driver-library <main compiled library>`.
+- Display-only curve + timing recompute (50 iterations): mean **6.55 ms**, p95
+  **6.90 ms**. Coalesced slider updates are capped at 25 Hz; live marker drawing is
+  10 Hz. Simulations use separate filters, never the controller, camera or driver.
+- Ruff F, `git diff --check` and integration scope checks against `5435fd8` passed.
+
+Handoff: save any current face calibration and restart App to load this code.
+Select the mapping and open Signals → Live curves…. Start preview/live control
+as usual; sliders then apply without another Start. Save named tuning files for
+reuse. Full profile/default loads stop output and require Start again. See
+[editor and tuning guide](LIVE_CURVE_EDITOR_GUIDE.md). Real-camera comfort remains
+user testing; these are synthetic/software checks, not detector accuracy claims.
