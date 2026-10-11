@@ -56,3 +56,11 @@ discard incompatible tongue ranges. New v9 files restore their explicit backend;
 tongue ranges still need fresh checks. Calibrated head_x now saturates past trained
 limits when the raw observation remains usable.
 Combined profile v3 and mouse mappings/Drivers remain unchanged.
+
+The user clarifies that raw yaw/face tracking also disappears. Use experimental
+presence/tracking confidence floors of .35 in the calibrated live Lab (initial
+face-detection confidence remains .5); expose these values in diagnostics/docs.
+Generic detector defaults remain .5. Never replace genuinely absent landmarks
+with a held or invented head observation. Encourage small comfortable Head X
+turns (roughly 10–20 degrees), and allow a failed horizontal guide pose to retry
+without repeating good captures. Human-camera validation is still required.
