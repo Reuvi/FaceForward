@@ -1,4 +1,4 @@
-**Presentation mode:** head pointer with continuous mouth brake, click/drag/Return eye gestures and both-eye dictation requests. Mapping v9 preserves all older assignments. [Controls and tests](../docs/PRESENTATION_GUIDE.md).
+**Presentation mode:** head pointer with continuous mouth brake, left click/drag and right-click eye gestures, plus both-eye dictation that submits with Return after typing. Mapping v9 preserves all older assignments. [Controls and tests](../docs/PRESENTATION_GUIDE.md).
 
 # Signal processing and mappings
 

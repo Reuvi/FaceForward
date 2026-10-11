@@ -48,20 +48,25 @@ class PresentationConnectionTests(unittest.TestCase):
         return [self.feed(**values) for _ in range(count)]
 
     def start_speech(self):
+        starts=self.speech.starts
+        counts=self.lab.state()['output']['event_counts']
         states=self.hold(left='closed',right='closed')
-        self.assertEqual(self.speech.starts,1)
-        self.assertFalse(any(s['output']['event_counts'].get(3,0) or s['output']['event_counts'].get(9,0) for s in states))
+        self.assertEqual(self.speech.starts,starts+1)
+        for state in states:
+            for kind in (3,4,9):
+                self.assertEqual(state['output']['event_counts'].get(kind,0),counts.get(kind,0))
         self.feed()
         self.speech.emit('listening')
         self.feed()
 
     def finish_speech(self, text):
+        finishes=self.speech.finishes
         self.hold(left='closed',right='closed')
-        self.assertEqual(self.speech.finishes,1)
+        self.assertEqual(self.speech.finishes,finishes+1)
         self.speech.emit('final',text)
         return self.feed()
 
-    def test_compiled_left_down_hold_up_enter_and_relative_movement(self):
+    def test_compiled_left_down_hold_up_right_click_and_relative_movement(self):
         state=self.feed(left='closed')
         self.assertEqual(state['output']['event_counts'].get(10),1)
         self.assertEqual(state['output']['event_counts'].get(11,0),0)
@@ -69,7 +74,10 @@ class PresentationConnectionTests(unittest.TestCase):
         self.assertEqual(state['output']['event_counts'].get(11),1)
         self.assertEqual(state['output']['event_counts'].get(3,0),0)
         self.hold(10,right='closed');state=self.feed()
-        self.assertEqual(state['output']['event_counts'].get(9),1)
+        self.assertEqual(state['output']['event_counts'].get(4),1)
+        self.assertEqual(state['output']['event_counts'].get(9,0),0)
+        self.assertTrue(state['message']['known']['right_click'])
+        self.assertFalse(state['message']['presentation']['enter'])
         state=self.feed(left='closed')
         self.assertEqual(state['output']['event_counts'].get(10),2)
         for _ in range(8):
@@ -127,9 +135,13 @@ class PresentationConnectionTests(unittest.TestCase):
         self.assertEqual(state['output']['event_counts'].get(10),1)
         self.assertEqual(state['output']['event_counts'].get(3,0),0)
 
-    def test_dictation_types_one_character_at_a_time_and_enter_is_separate(self):
+    def test_dictation_types_one_character_at_a_time_then_returns_once(self):
         from unittest.mock import Mock
+        order=Mock()
         typed=Mock(wraps=self.lab.output.type_character)
+        returned=Mock(wraps=self.lab.output.press_return)
+        order.attach_mock(typed,'character');order.attach_mock(returned,'submit')
+        self.lab.output.press_return=returned
         self.lab.output.type_character=typed
         self.start_speech()
         self.speech.emit('partial','Hello')
@@ -143,11 +155,14 @@ class PresentationConnectionTests(unittest.TestCase):
         state=states[-1]
         self.assertEqual(state['output']['event_counts'].get(12),len('Hi é🙂 there'))
         self.assertEqual(''.join(call.args[0] for call in typed.call_args_list),'Hi é🙂 there')
-        self.assertEqual(state['output']['event_counts'].get(9,0),0)
+        self.assertEqual(state['output']['event_counts'].get(9,0),1)
         self.assertEqual(state['snapshot']['dictation']['state'],'idle')
+        self.assertEqual([call[0] for call in order.mock_calls], ['character']*len('Hi é🙂 there')+['submit'])
+        self.hold(20)
+        returned.assert_called_once_with()
         self.assertFalse(any(e['x'] is not None for e in state['output']['events'] if e['type']==12))
         self.hold(10,right='closed');state=self.feed()
-        self.assertEqual(state['output']['event_counts'].get(9),1)
+        self.assertEqual(state['output']['event_counts'].get(4),1)
 
     def test_stop_during_send_discards_remaining_text_and_never_resumes(self):
         self.start_speech();self.finish_speech('abcdef')
@@ -157,6 +172,68 @@ class PresentationConnectionTests(unittest.TestCase):
         self.assertFalse(self.session.dictation.pending)
         self.lab.action({'action':'arm'});self.hold(30)
         self.assertEqual(self.lab.state()['output']['event_counts'].get(12),count)
+        self.assertEqual(self.lab.state()['output']['event_counts'].get(9,0),0)
+
+    def test_last_character_waits_for_fresh_tick_and_submits_even_with_eyes_still_closed(self):
+        self.start_speech();state=self.finish_speech('X')
+        self.assertEqual(state['output']['event_counts'].get(12),1)
+        self.assertEqual(state['output']['event_counts'].get(9,0),0)
+        self.assertEqual(self.session.dictation.state,'submitting')
+        self.feed(left='unknown',right='unknown',head_x=.7)
+        state=self.feed(left='unknown',right='unknown',head_x=.7)
+        self.assertEqual(state['output']['event_counts'].get(9),1)
+        self.assertEqual(state['message']['pointer']['x'],.5)
+        self.assertEqual(state['output']['event_counts'].get(4,0),0)
+        self.assertEqual(self.session.dictation.state,'idle')
+
+    def test_cancel_after_last_character_discards_pending_return(self):
+        from unittest.mock import Mock
+        for cancellation in ('stop','loss','stale','profile','output','speech_error'):
+            with self.subTest(cancellation=cancellation):
+                self.lab.action({'action':'stop'});self.lab.action({'action':'arm'});self.feed()
+                returned=Mock(wraps=self.lab.output.press_return)
+                self.lab.output.press_return=returned
+                self.start_speech();self.finish_speech('X')
+                self.assertEqual(self.session.dictation.state,'submitting')
+                if cancellation=='stop':self.lab.action({'action':'stop'})
+                elif cancellation=='loss':
+                    self.now+=20;self.seq+=1;lost=frame(self.seq,self.now);lost['faces']=[]
+                    self.session.deliver(lost)
+                elif cancellation=='stale':self.now+=300;self.lab.step(self.now)
+                elif cancellation=='profile':
+                    from Processing.tuning.model import profile
+                    self.lab.apply_tuning_profile(profile(self.lab.state(),'Synthetic test profile'))
+                elif cancellation=='output':self.session.configure_output('dry-run')
+                else:self.speech.emit('error');self.feed()
+                self.hold(5)
+                returned.assert_not_called()
+                self.lab.action({'action':'stop'});self.lab.action({'action':'arm'});self.hold(5)
+                returned.assert_not_called()
+
+    def test_empty_speech_never_submits_and_successive_dictations_submit_once_each(self):
+        for text in ('',' \n\t ', 'First', 'Second'):
+            self.feed();self.start_speech();self.finish_speech(text);self.hold(25)
+            expected=0 if not text.strip() else 1 if text=='First' else 2
+            state=self.lab.state()
+            self.assertEqual(state['output']['event_counts'].get(9,0),expected)
+            self.assertEqual(state['output']['event_counts'].get(4,0),0)
+
+    def test_return_adapter_rejects_stale_or_stopped_output(self):
+        self.lab.action({'action':'stop'})
+        with self.assertRaises(DriverError):self.lab.output.press_return()
+        self.lab.action({'action':'arm'});self.feed();self.now+=251
+        with self.assertRaises(DriverError):self.lab.output.press_return()
+        self.assertEqual(self.lab.output.counts[9],0)
+        self.assertFalse(self.lab.output.status().enabled)
+
+    def test_wink_mode_routes_one_right_click_and_no_return(self):
+        mapping=self.lab.state()['mapping'];mapping['require_wink']=True
+        self.lab.update_mapping(mapping);self.lab.action({'action':'arm'});self.feed()
+        self.hold(10,right='closed');self.feed()
+        self.assertEqual(self.lab.output.counts[4],0)
+        self.feed(right='wink');state=self.feed()
+        self.assertEqual(state['output']['event_counts'].get(4),1)
+        self.assertEqual(state['output']['event_counts'].get(9,0),0)
 
     def test_loss_cancels_listening_and_ignores_late_final(self):
         self.start_speech();self.speech.emit('partial','private text')
@@ -257,10 +334,11 @@ class PresentationConnectionTests(unittest.TestCase):
         self.start_speech();self.finish_speech('abcdefghijklmnop')
         self.hold(35,right='closed')
         state=self.feed()
-        self.assertEqual(state['output']['event_counts'].get(9,0),0)
+        self.assertEqual(state['output']['event_counts'].get(9,0),1)
+        self.assertEqual(state['output']['event_counts'].get(4,0),0)
         self.assertEqual(state['output']['event_counts'].get(3,0),0)
         self.hold(10,right='closed');state=self.feed()
-        self.assertEqual(state['output']['event_counts'].get(9),1)
+        self.assertEqual(state['output']['event_counts'].get(4),1)
 
     def test_synthetic_source_cannot_start_a_real_speech_provider(self):
         self.session.dictation=DictationController(self.speech,allow_capture=lambda:False)

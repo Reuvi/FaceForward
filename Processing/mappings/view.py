@@ -362,7 +362,7 @@ class MappingPanel(ttk.Frame):
                 widget.grid_remove() if presentation else widget.grid()
             self.eye_enable.configure(state='disabled' if presentation else 'normal')
             if presentation:
-                self.help_text.set('Presentation: head X/Y moves; mouth opening brakes. Left eye closed = mouse down, reopened = mouse up; move while held to drag. Right eye close/reopen presses Return. Hold both eyes to start/finish dictation. Mouth brake and right/both-eye timings are in Live curves. Uncheck Require calibrated wink there to use plain open/closed eyes.')
+                self.help_text.set('Presentation: head X/Y moves; mouth opening brakes. Left eye closed = mouse down, reopened = mouse up; move while held to drag. Right eye close/reopen right-clicks. Hold both eyes to start/finish dictation; finished text is typed and submitted with Return. Mouth brake and right/both-eye timings are in Live curves. Uncheck Require calibrated wink there to use plain open/closed eyes.')
             self.apply_button.configure(state="disabled" if mapping is None and not self.compact else "normal")
             self.name.set(mapping["name"] if mapping else "Mouse and scroll")
             for key, var in self.pointer_fields.items():
@@ -411,7 +411,7 @@ class MappingPanel(ttk.Frame):
         if output["mode"] != "preview":
             counts = output.get("event_counts", {})
             if 'presentation' in snap:
-                set_var(self.events, f"Driver events: {counts.get(10,0)} left downs · {counts.get(11,0)} left ups · {counts.get(9,0)} Return · {counts.get(1,0)} mouse moves")
+                set_var(self.events, f"Driver events: {counts.get(10,0)} left downs · {counts.get(11,0)} left ups · {counts.get(4,0)} right clicks · {counts.get(9,0)} Return · {counts.get(1,0)} mouse moves")
             else:
                 set_var(self.events, f"Driver events: {counts.get(3,0)} left clicks · {counts.get(4,0)} right clicks · {counts.get(7,0)} key downs · {counts.get(8,0)} key ups · {counts.get(1,0)} mouse moves")
         if not self.compact and self.desktop.notebook.select() == str(self):

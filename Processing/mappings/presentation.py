@@ -46,7 +46,7 @@ class HeldLeftEye:
 
 
 class EyeGestures:
-    """Independent held-left input; capture-timed right Return and both-eye chord."""
+    """Independent held-left input; capture-timed right-eye click and both-eye chord."""
     def __init__(self):
         self.reset()
 
@@ -60,7 +60,7 @@ class EyeGestures:
         self.since = self.both_since = None
         self.blocked = False
         self.chord_seen = False
-        self.drag = self.click = self.enter = self.toggle = False
+        self.drag = self.click = self.right_click = self.toggle = False
         self.reason = 'Open both eyes to prepare gestures'
 
     def sample(self, left, right, timestamp, settings, eligible=(True, True), *, require_wink=False):
@@ -71,18 +71,18 @@ class EyeGestures:
             self.reason = self.left_button.reason
 
     def _sample_combined(self, left, right, timestamp, settings, eligible, require_wink):
-        self.click = self.enter = self.toggle = False
+        self.click = self.right_click = self.toggle = False
         if left is None or right is None:
             # Preserve a prior real open baseline, but discard uncertain solo
             # actions and restart the full chord timer. Unknown cannot toggle,
             # rearm a consumed chord or supply any part of its closed duration.
             self.side = self.since = self.both_since = None
-            self.reason = 'Eye open/closed unknown — Return cancelled; dictation hold reset'
+            self.reason = 'Eye open/closed unknown — right-click cancelled; dictation hold reset'
             return
         if not left and not right:
             if self.ready and not self.blocked and self.side == 'right' and self.since is not None:
-                self.enter = require_wink or timestamp-self.since >= settings.solo_ms
-            self.reason = 'Return requested' if self.enter else 'Eyes open — ready'
+                self.right_click = require_wink or timestamp-self.since >= settings.solo_ms
+            self.reason = 'right-click requested' if self.right_click else 'Eyes open — ready'
             self.ready = True
             self.side = self.since = self.both_since = None
             self.blocked = False
@@ -125,7 +125,7 @@ class EyeGestures:
             return
         if self.since is None:
             self.since = timestamp
-        self.reason = 'Right eye recognized — reopen for Return'
+        self.reason = 'Right eye recognized — reopen for right-click'
 
 
 class BrakedHeadFilter(HeadPointerFilter):
@@ -160,7 +160,7 @@ class PresentationProcessor(HeadMouseProcessor):
         self.gestures = EyeGestures()
         self.gesture_counts = dict.fromkeys(('captures', 'left_action_frames', 'right_action_frames',
                                              'left_unknown_frames', 'right_unknown_frames',
-                                             'clicks', 'enters', 'drags', 'dictation_toggles',
+                                             'clicks', 'right_clicks', 'drags', 'dictation_toggles',
                                              'left_presses', 'left_releases'), 0)
         self.dictating = False
         self.dictation_toggle = 0
@@ -208,7 +208,7 @@ class PresentationProcessor(HeadMouseProcessor):
                                  require_wink=self.mapping.require_wink)
             if self.enabled and not self.dictating:
                 self.gesture_counts['clicks'] += int(self.gestures.click)
-                self.gesture_counts['enters'] += int(self.gestures.enter)
+                self.gesture_counts['right_clicks'] += int(self.gestures.right_click)
                 self.gesture_counts['drags'] += int(self.gestures.drag and not was_dragging)
                 self.gesture_counts['left_presses'] += int(self.gestures.drag and not was_dragging)
                 self.gesture_counts['left_releases'] += int(was_dragging and not self.gestures.drag)
@@ -238,12 +238,12 @@ class PresentationProcessor(HeadMouseProcessor):
         left_known = bool(fresh and sample.anatomical_left is not None and sample.left_known)
         active = snap['enabled'] and not self.dictating
         snap['left_click'] = 0  # Held down/up uses the presentation driver API.
-        snap['right_click'] = 0
+        snap['right_click'] = int(active and known and self.gestures.right_click)
         snap['keys'] = dict.fromkeys(snap['keys'], 0)
         snap['known']['left_click'] = left_known
-        snap['known']['right_click'] = False
+        snap['known']['right_click'] = known
         snap['known']['keys'] = dict.fromkeys(snap['keys'], False)
-        snap['presentation'] = dict(enter=bool(active and known and self.gestures.enter),
+        snap['presentation'] = dict(enter=False,
                                     drag_left=bool(active and left_known and self.gestures.drag), eyes_known=known,
                                     left_known=left_known, right_known=known)
         snap['dictation_request'] = dict(active=bool(snap['enabled'] and self.dictating),
@@ -261,7 +261,7 @@ class PresentationProcessor(HeadMouseProcessor):
             ready=self.gestures.left_button.ready, output='left_button')
         snap['diagnostics']['eyes']['left'].update(
             down=snap['presentation']['drag_left'], known=left_known, ready=self.gestures.left_button.ready)
-        snap['diagnostics']['button_actions']['right_eye'].update(down=int(snap['presentation']['enter']), output='enter')
+        snap['diagnostics']['button_actions']['right_eye'].update(down=snap['right_click'], known=known, output='right_click')
         gesture_status = (snap['status'] if not snap['enabled'] else
                           'Dictation active — solo eye actions paused' if self.dictating else self.gestures.reason)
         snap['diagnostics']['eye_gesture'] = dict(
@@ -285,7 +285,7 @@ class PresentationProcessor(HeadMouseProcessor):
                      filtered=int(snap['left_click'] or snap['presentation']['drag_left']), threshold=eye_mode,
                      instruction=snap['diagnostics']['eye_gesture']['left_status']),
                 dict(id='eye_right', input='Right eye', raw=snap['diagnostics']['right_closed'],
-                     filtered=int(snap['presentation']['enter']), threshold=eye_mode, instruction=status+' · right eye: Return'),
+                     filtered=snap['right_click'], threshold=eye_mode, instruction=status+' · right eye: right-click'),
                 dict(id='mouth_brake', input='Mouth opening', raw=brake['openness'], filtered=brake['resistance'],
                      threshold='Wider = slower', instruction='Pointer paused: unknown mouth' if not brake['known'] else f"Resistance {brake['resistance']:.0%}"),
                 dict(id='both_eyes', input='Both eyes', raw=None, filtered=None,

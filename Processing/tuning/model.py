@@ -45,7 +45,7 @@ def channels(state):
     if mapping and mapping['button_bindings']['mouth'] != 'none':
         result.append(('mouth','Mouth open → '+action_label(mapping['button_bindings']['mouth'])))
     if mapping and mapping.get('presentation',{}).get('enabled'):
-        result = [(key, 'Right eye → Return' if key=='right' else label) for key,label in result]
+        result = [(key, 'Right eye → right-click' if key=='right' else label) for key,label in result]
         result += [('mouth_brake','Mouth opening → pointer resistance'), ('gestures','Eye gesture timing')]
     return result
 
@@ -64,7 +64,7 @@ def sliders(state, channel):
             add(key,label,lo,hi,step,'mapping.presentation.'+key)
         return result
     if channel == 'gestures':
-        for key,label,lo,hi in (('solo_ms','Right eye: Return minimum closure',0,400),
+        for key,label,lo,hi in (('solo_ms','Right eye: right-click minimum closure',0,400),
                               ('chord_ms','Both eyes: dictation hold',250,1500)):
             if key == 'solo_ms' and mapping['require_wink']:
                 continue  # A recognized wink has no additional solo dwell.

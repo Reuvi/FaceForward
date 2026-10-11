@@ -1,5 +1,45 @@
 # Main chat and agent coordination hub
 
+## Right-click and automatic dictation Return handoff
+
+- Behavior: Presentation right-eye close/reopen now sends one right-click through
+  the existing button channel. Wink/plain qualification and gesture timing remain.
+  A deliberate both-eye finish types finalized nonempty speech, then sends exactly
+  one main Return to submit the focused field. Left hold/drag, head response,
+  mouth brake and listening/stopped sounds are preserved.
+- Ownership: Reuvi integration in owned `codex/integration/presentation-wink-fix`,
+  base `a4f3524`. User explicitly requested both routing changes and has authorized
+  merge/push to main. Contract commit `a9a68a7` precedes dependent implementation.
+  Paths: App dictation/diagnostics, Processing presentation/config/tuning/UI,
+  Drivers Python adapter, integration/Processing tests, readmes and runbook.
+- Interfaces: no native ABI or profile/mapping format change. Right eye sets
+  `right_click`/its validity, never `presentation.enter`; App calls the additive
+  Python adapter `press_return()` after text. Existing native Return API is reused.
+- Lifecycle: a separate submitting phase waits for the next fresh output tick
+  after the last character, with pointer/solo actions still frozen. Empty or
+  whitespace-only recognition never submits. Stop, face loss, staleness, profile/
+  output changes and speech errors discard a pending Return even after all text
+  has already been entered. Unknown eyes alone do not veto a finalized, explicitly
+  finished dictation in a fresh enabled session. Success resets the Return latch
+  so successive dictations each submit once; no automatic retry after failure.
+- Verification: Processing **225 passed**; compiled-driver presentation **27
+  passed**; diagnostics **10 passed**; driver connection **22 passed / 1 optional
+  skip**; native Tk Signals/curves **19 passed**; **5/5 CTest groups passed**.
+  Tests cover both eye modes, actual right-click event 4 without eye-triggered
+  Return, Unicode ordering before exactly one Return event 9, successive runs,
+  empty speech, cancellation after the final character, paused motion, suppressed
+  gesture leakage, and stale/stopped adapter refusal. Changed-file Ruff F, diff
+  and integration scope checks pass. The 490-frame full mock pipeline accepted
+  every capture, emitted 682 moves, one left down/up pair and one right-click,
+  no eye-triggered Return, and ended disabled with held keys zero and no error.
+  Speech-order tests use injected recognition and the compiled dry-run driver;
+  this change did not repeat the prior live microphone/OS field trials.
+- Handoff: restart App from updated main. Existing saved Presentation profiles
+  keep their wink flag and tuning. Focus a search/text field, hold both eyes to
+  start speech and again to finish; the text is typed and submitted automatically.
+  Use the right eye for context menus. [Controls](PRESENTATION_GUIDE.md).
+
+
 ## Return and working audible dictation handoff
 
 - Lane/task: Reuvi integration, owned isolated `codex/integration/presentation-wink-fix`

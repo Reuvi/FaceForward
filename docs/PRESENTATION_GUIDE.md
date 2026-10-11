@@ -11,8 +11,8 @@ Eye open/closed geometry and both head axes. Mouth opening needs no calibration.
 | Open mouth wider | More resistance; wide opening stops the pointer |
 | Close left eye / reopen | Mouse button down immediately / mouse button up |
 | Keep left eye closed | Keep mouse button held; move head to drag |
-| Close/reopen right eye | One Return press (default minimum closure 120 ms) |
-| Hold both eyes closed | Toggle dictation after 450 ms; reopen between toggles |
+| Close/reopen right eye | One right-click (default minimum closure 120 ms) |
+| Hold both eyes closed | Toggle dictation after 450 ms; finishing types text then presses Return |
 
 Both-eye gestures release the mouse and suppress solo actions until both reopen.
 Short simultaneous blinks do not toggle dictation. If the left eye closes first,
@@ -28,7 +28,7 @@ closure presses instead. Open the left eye once to prepare each press. Uncertain
 closing frames before the press do not erase that baseline or fabricate a press;
 a later valid match can still press. Once pressed, unknown/nonmatching left
 evidence releases it and requires an actual reopen before another press. There
-is no left-click or drag delay. Right-eye Return still occurs on reopening.
+is no left-click or drag delay. Right-eye right-click occurs on reopening.
 
 ## Build and run
 
@@ -65,18 +65,22 @@ starting point, not a claim of measured improvement from mouth braking.
    microphone actually started. The pointer and other actions pause during dictation.
 5. Hold both eyes closed again and reopen to finish. The **falling two-note sound**
    means recording stopped. The finalized text is sent
-   through the driver one printable Unicode character every 35 ms. No Return is
-   appended. Return your head to center before moving again; use the right eye
-   to press Return when ready.
+   through the driver one printable Unicode character every 35 ms, followed by
+   **one Return** to submit the search/field. Return your head to center before
+   moving again. The right eye now opens context menus with a right-click.
 
 An uncertain frame while closing does not erase the previous both-open baseline.
 The hold still requires 450 ms of fully known both-closed input; an unknown frame
 restarts that timer. Reopen both eyes between start and finish. Wink mode applies
 only to solo actions; dictation uses anatomical closure.
 
-The Return key is macOS's main Return key, not keypad Enter. It inserts a newline
+The automatic Return after dictation uses macOS's main Return key, not keypad Enter. It inserts a newline
 in a multiline field or invokes the focused field's normal submit action. No
-additional key mapping is needed in Drivers.
+additional key mapping is needed in Drivers. The submit happens after all text is
+typed, while pointer/eye actions are still paused, not when the stopped sound first
+plays. Empty/whitespace-only speech does not submit. Stop, loss, stale input, a
+profile/output change or a speech error cancels a pending Return, including after
+the last typed character.
 
 Dictation doesn't open/activate another window. Keep the intended text field
 focused while speaking and sending. Native target applications must accept Quartz
@@ -109,8 +113,8 @@ removes existing momentum and reduces requested velocity. It never reverses the
 pointer. Closing releases the brake and restores speed through the existing head
 acceleration/filter. Head response settings remain separate.
 
-**Live curves → Eye gesture timing** adjusts the plain-mode right-eye Return minimum
-and both-eye hold. The Return minimum is hidden in wink mode because wink recognition
+**Live curves → Eye gesture timing** adjusts the plain-mode right-eye right-click minimum
+and both-eye hold. The right-click minimum is hidden in wink mode because wink recognition
 already qualifies the action. Old saved drag delay values remain compatible but
 are no longer applied or shown. **Require calibrated wink for eye actions** selects wink vs
 plain anatomical input for solo actions; both-eye dictation always uses anatomical
@@ -137,7 +141,7 @@ observations. `left_presses`/`left_releases` count gesture requests;
 Processing tests cover braking, gestures, missing input, reopening, migration and
 saved curves. Integration tests inject synthetic camera-compatible measurements,
 a fake speech service and the actual compiled dry-run driver to verify character
-ordering, cancellation, click/Return separation and watchdog drag release. Native
+ordering, cancellation, right-click routing, text-before-Return ordering and watchdog drag release. Native
 Tk tests cover mapping/curve/setup controls. Socket lifecycle tests cover background
 bundle launching, cancellation/EOF and stale-result rejection. These checks do not use a real camera,
 microphone or live OS input and do not establish human accuracy.

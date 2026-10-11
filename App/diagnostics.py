@@ -68,7 +68,7 @@ def pointer_status(source, lab):
                 "Waiting to start: release eye actions and center head inputs." if target or head_only else
                 "Waiting to start: release eye actions and center inputs.")
     speech=snap.get('dictation',{})
-    if speech.get('state') in ('starting','listening','captured','finalizing','sending'):
+    if speech.get('state') in ('starting','listening','captured','finalizing','sending','submitting'):
         return 'Pointer paused for dictation: '+speech.get('state','')
     if diag.get('resume_head_neutral'):
         return 'Return your head to its resting center to resume pointer movement after dictation.'

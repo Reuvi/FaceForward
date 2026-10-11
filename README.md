@@ -1,4 +1,4 @@
-**Presentation mode:** head X/Y moves the pointer; opening your mouth adds resistance. Left eye clicks or holds to drag, right eye presses Return, and both eyes toggle local speech-to-text. Plain open/closed eyes are the default. [Build, permissions and controls](docs/PRESENTATION_GUIDE.md).
+**Presentation mode:** head X/Y moves the pointer; opening your mouth adds resistance. Left eye clicks or holds to drag, right eye right-clicks, and both eyes toggle local speech-to-text that submits with Return after typing. Plain open/closed eyes are the default. [Build, permissions and controls](docs/PRESENTATION_GUIDE.md).
 
 # Face-controlled accessibility interface
 

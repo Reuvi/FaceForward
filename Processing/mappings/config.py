@@ -161,7 +161,7 @@ class Mapping:
             raise ValueError("Invalid presentation settings")
         if self.presentation.enabled and (self.input_mode != "head-mouse" or not self.head_wink_clicks
                                           or self.button_bindings != ("left_click", "none", "none")):
-            raise ValueError("Presentation uses head mouse, enabled eyes and fixed click/Enter/brake gestures")
+            raise ValueError("Presentation uses head mouse, enabled eyes and fixed left/right click/brake gestures")
 
     def to_dict(self):
         return {"format": "input_mapping_v9", "id": self.id, "name": self.name,

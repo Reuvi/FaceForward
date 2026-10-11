@@ -24,15 +24,15 @@ class PresentationTests(unittest.TestCase):
     def hold(self, count=30, **values):
         return [self.feed(**values) for _ in range(count)]
 
-    def test_left_down_on_closure_up_on_open_enter_on_reopen(self):
+    def test_left_down_on_closure_up_on_open_right_click_on_reopen(self):
         self.assertTrue(self.core.enabled)
         snaps=self.hold(10,left='closed')
         self.assertTrue(all(s['presentation']['drag_left'] for s in snaps))
         self.assertFalse(any(s['left_click'] for s in snaps))
         self.assertFalse(self.feed()['presentation']['drag_left'])
         self.hold(10,right='closed')
-        self.assertTrue(self.feed()['presentation']['enter'])
-        self.assertFalse(self.feed()['presentation']['enter'])
+        self.assertTrue(self.feed()['right_click'])
+        self.assertFalse(self.feed()['right_click'])
         snap=self.feed(openness=1)
         self.assertFalse(any(snap['keys'].values()))
         self.assertEqual(snap['right_click'],0)
@@ -45,7 +45,7 @@ class PresentationTests(unittest.TestCase):
         snaps+=self.hold(3,right='closed')+[self.feed()]
         self.assertTrue(self.core.dictating)
         self.assertEqual(self.core.dictation_toggle,1)
-        self.assertFalse(any(s['left_click'] or s['presentation']['enter'] for s in snaps))
+        self.assertFalse(any(s['left_click'] or s['right_click'] for s in snaps))
         self.hold(40,left='closed',right='closed')
         self.assertEqual(self.core.dictation_toggle,2)
         self.assertFalse(self.core.dictating)
@@ -67,18 +67,18 @@ class PresentationTests(unittest.TestCase):
         self.hold(30,left='closed',right='closed')
         self.assertEqual(self.core.dictation_toggle,2)
 
-    def test_unknown_during_right_action_never_replays_return(self):
+    def test_unknown_during_right_action_never_replays_right_click(self):
         self.hold(10,right='closed');self.feed(right='unknown')
-        self.assertFalse(self.feed()['presentation']['enter'])
+        self.assertFalse(self.feed()['right_click'])
         self.feed(right='unknown')
         self.hold(10,right='closed')
-        self.assertTrue(self.feed()['presentation']['enter'])
+        self.assertTrue(self.feed()['right_click'])
 
-    def test_interrupted_chord_cannot_turn_into_a_solo_return(self):
+    def test_interrupted_chord_cannot_turn_into_a_solo_right_click(self):
         self.hold(10,left='closed',right='closed')
         self.feed(left='unknown',right='closed')
         snaps=self.hold(10,right='closed')+[self.feed()]
-        self.assertFalse(any(s['presentation']['enter'] for s in snaps))
+        self.assertFalse(any(s['right_click'] for s in snaps))
         self.assertEqual(self.core.dictation_toggle,0)
 
     def test_drag_releases_on_reopen_unknown_stop_and_stale(self):
@@ -146,7 +146,7 @@ class PresentationTests(unittest.TestCase):
         self.assertFalse(snap['presentation']['drag_left'])
         self.assertFalse(snap['left_click'])
         self.feed(right='wink')
-        self.assertTrue(self.feed()['presentation']['enter'])
+        self.assertTrue(self.feed()['right_click'])
 
     def test_unknown_wink_with_known_geometry_releases_without_repress(self):
         self.wink_mode()
@@ -177,7 +177,7 @@ class PresentationTests(unittest.TestCase):
         snaps=self.hold(30,left='closed',right='closed')
         snaps+=self.hold(3,right='wink')+[self.feed()]
         self.assertEqual(self.core.dictation_toggle,1)
-        self.assertFalse(any(s['left_click'] or s['presentation']['enter'] for s in snaps))
+        self.assertFalse(any(s['left_click'] or s['right_click'] for s in snaps))
 
     def test_capture_counts_keep_brief_action_and_blockers_visible_between_ticks(self):
         self.wink_mode()

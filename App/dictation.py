@@ -102,7 +102,7 @@ class MacSpeechProvider:
 
 class DictationController:
     """Called under Lab's lock; nonblocking start/poll and one character per tick."""
-    BUSY = ('starting','listening','captured','finalizing','sending')
+    BUSY = ('starting','listening','captured','finalizing','sending','submitting')
 
     def __init__(self, provider=None, *, allow_capture=None, cue=None):
         self.provider = provider or MacSpeechProvider()
@@ -158,7 +158,7 @@ class DictationController:
             self.fail('Dictation stopped: '+str(exc), processor)
         snap['dictation'] = dict(state=self.state, message=self.message, text=self.text,
                                  remaining=len(self.pending), sent=self.sent, listening=self.listening, error_code=self.error_code)
-        if self.state in ('finalizing','sending') and hasattr(processor, 'gestures'):
+        if self.state in ('finalizing','sending','submitting') and hasattr(processor, 'gestures'):
             processor.gestures.reset()  # Discard actions attempted while the text queue owns output.
         if self.state in self.BUSY or self.request_active:
             snap['pointer_x'] = snap['pointer_y'] = snap['scroll_y'] = .5
@@ -220,11 +220,12 @@ class DictationController:
                     self.message = event.get('message', 'Listening — close both eyes to finish')
                 if 'text' in event:self.text = event['text']
             elif state == 'final' and self.state == 'finalizing':
-                # Dictation never auto-submits forms. Newlines/tabs become spaces;
+                # The deliberate finish gesture submits after all text. Embedded
+                # newlines/tabs become spaces so they cannot submit prematurely;
                 # other controls, surrogates and invisible nonprinting text drop.
                 text = ''.join(' ' if c in '\r\n\t' else c for c in event.get('text',''))
                 text = ''.join(c for c in text if c.isprintable() and not 0xd800 <= ord(c) <= 0xdfff)
-                self.text = text[:10000]
+                self.text = text[:10000].strip()
                 self.pending = deque(self.text)
                 self.state = 'sending' if self.pending else 'idle'
                 self.message = 'Typing into the focused field…' if self.pending else 'No speech detected; nothing sent.'
@@ -237,12 +238,18 @@ class DictationController:
             self.fail('Dictation cancelled after two minutes without a finish gesture.', processor)
 
     def after_submit(self, output, snap, now):
-        if self.state != 'sending' or not snap['enabled'] or now < self.next_character:
+        if self.state not in ('sending','submitting') or not snap['enabled'] or now < self.next_character:
+            return
+        if self.state == 'submitting':
+            output.press_return()
+            self.state, self.message = 'idle', 'Text entered and Return sent.'
+            self.text = ''
             return
         output.type_character(self.pending[0])
         self.pending.popleft()
         self.sent += 1
         self.next_character = now+35
         if not self.pending:
-            self.state, self.message = 'idle', 'Text entered. Close and reopen your right eye to press Return.'
-            self.text = ''
+            # Wait for the next fresh output tick, keeping cancellation and the
+            # watchdog effective between the last character and submission.
+            self.state, self.message = 'submitting', 'Text entered — sending Return…'

@@ -62,7 +62,7 @@ def response_preview(state,channel):
             gestures.sample(closed if channel=='left' else False, closed if channel=='right' else False,t,config,
                             require_wink=mapping.require_wink)
             raw.append((t/1000,int(closed)))
-            out.append((t/1000,int((gestures.click or gestures.drag) if channel=='left' else gestures.enter)))
+            out.append((t/1000,int((gestures.click or gestures.drag) if channel=='left' else gestures.right_click)))
         return {'Eye closure':raw,'Command':out}
     if channel in ('left','right','mouth'):
         eye=EyeGate(None if channel=='mouth' else getattr(MouseConfig.from_dict(state['config']),channel+'_eye'))

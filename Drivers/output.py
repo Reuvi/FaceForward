@@ -268,16 +268,33 @@ class DriverOutput:
             finally:
                 raise DriverError(self.error) from exc
 
+    def _require_fresh_presentation(self, action):
+        if (not self.active or not self.presentation_active or self.last_source is None or
+                not 0 <= self.clock()-self.last_source[2] <= 250 or self.last_output is None or
+                not 0 <= self.clock()-self.last_output[2] <= 250):
+            raise DriverError(f"{action} output requires fresh enabled presentation input")
+
+    def press_return(self):
+        """One Return press/release after explicit dictation completion."""
+        try:
+            self._require_fresh_presentation("Return")
+            if not hasattr(self.lib, "fid_set_presentation"):
+                raise DriverError("Rebuild Drivers for Return output support")
+            self.check(self.lib.fid_set_presentation(self.handle, 1, 0))
+            self.check(self.lib.fid_set_presentation(self.handle, 0, 0))
+            self.collect()
+        except (ValueError, TypeError, OSError) as exc:
+            self.error = str(exc)
+            self.pause()
+            raise DriverError(self.error) from exc
+
     def type_character(self, character):
         """One Unicode scalar, gated by the most recently accepted fresh command."""
         try:
             if (not isinstance(character, str) or len(character) != 1 or not character.isprintable()
                     or 0xd800 <= ord(character) <= 0xdfff):
                 raise DriverError("Text output requires one printable Unicode scalar")
-            if (not self.active or not self.presentation_active or self.last_source is None or
-                    not 0 <= self.clock()-self.last_source[2] <= 250 or self.last_output is None or
-                    not 0 <= self.clock()-self.last_output[2] <= 250):
-                raise DriverError("Text output requires fresh enabled presentation input")
+            self._require_fresh_presentation("Text")
             if not hasattr(self.lib, "fid_type_character"):
                 raise DriverError("Rebuild Drivers for text output support")
             self.check(self.lib.fid_type_character(self.handle, ord(character)))
