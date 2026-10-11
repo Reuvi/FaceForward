@@ -146,6 +146,25 @@ class SimpleSignalsWindowTests(unittest.TestCase):
         self.ui.refresh_vision()
         self.assertIn('Synthetic driver permission failure',self.ui.pointer_detail.get())
 
+    def test_mouse_test_selector_settings_and_instructions(self):
+        self.session.lab.select_mapping('mouse-test')
+        self.ui.refresh();self.root.update()
+        panel=self.ui.mapping_page
+        self.assertEqual(panel.selector.get(),'Mouse test')
+        self.assertEqual(len(panel.table.get_children()),3)
+        self.assertIn('Eyes and pupils are ignored',panel.help_text.get())
+        panel.show_settings();self.root.update()
+        self.assertTrue(all(not group.winfo_ismapped() for group in panel.head_groups))
+        self.assertFalse(panel.binding_group.winfo_ismapped())
+        panel.adaptive.set(False);panel._apply()
+        self.assertFalse(self.session.lab.state()['mapping']['adaptive_pointer'])
+        self.assertEqual(self.session.lab.state()['mapping']['input_mode'],'head-mouse')
+        self.assertFalse(self.session.lab.processor.armed)
+        self.session.lab.select_mapping('gaming-keyboard-mouse-1')
+        self.ui.refresh();self.root.update()
+        self.assertTrue(all(group.winfo_ismapped() for group in panel.head_groups))
+        self.assertTrue(panel.binding_group.winfo_ismapped())
+
     def test_two_tabs_mapping_rows_and_pointer_settings_share_signals(self):
         from Vision.mouse_demo import mouse_demo_records
         from Processing.mappings.demo import gaming_demo_frame

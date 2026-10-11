@@ -1,5 +1,7 @@
 # Face-controlled accessibility interface
 
+Current update: **Mouse test** moves the pointer using only calibrated head X/Y. Gaming adds personal pupil visibility checks and adaptive smoothing. See [run instructions](App/README.md) and [quality evidence](docs/PUPIL_QUALITY_GUIDE.md).
+
 Current MVP: **eyes/winks, Head Y, Head X and pupils**. Tongue detection has been
 removed from the live app, calibration and graphs. Pupils control the pointer with
 personal directional calibration, head-angle compensation and an 11×11 matrix

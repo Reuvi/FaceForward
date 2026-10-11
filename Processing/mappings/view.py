@@ -45,9 +45,11 @@ class MappingPanel(ttk.Frame):
         settings.pack(fill="x")
         self.fields = {}
         self.edit_widgets = []
+        self.head_groups = []
         for column, axis in enumerate(("head_x", "head_y")):
             group = ttk.LabelFrame(settings, text="Head X · left / right" if axis == "head_x" else "Head Y · up / down", padding=8)
             group.grid(row=0, column=column, sticky="nsew", padx=(0, 9))
+            self.head_groups.append(group)
             settings.columnconfigure(column, weight=1)
             for row, (key, title) in enumerate((("activation", "Start threshold"), ("release", "Release threshold"),
                                                  ("smoothing_ms", "Smoothing ms"), ("confirmation_ms", "Confirm ms"))):
@@ -67,17 +69,22 @@ class MappingPanel(ttk.Frame):
             entry.grid(row=row, column=1, columnspan=3, sticky="ew", padx=5)
             self.edit_widgets.append(entry)
         self.bindings = {}
+        self.binding_group = ttk.Frame(group)
+        self.binding_group.grid(row=2, column=0, columnspan=4, sticky="ew")
         for i, direction in enumerate(DIRECTIONS):
-            row, col = 2+i//2, (i%2)*2
-            label(group, direction.title()).grid(row=row, column=col, sticky="w", pady=3)
+            row, col = i//2, (i%2)*2
+            label(self.binding_group, direction.title()).grid(row=row, column=col, sticky="w", pady=3)
             var = tk.StringVar()
             self.bindings[direction] = var
-            entry = ttk.Combobox(group, textvariable=var, state="readonly", values=KEYS+("none",), width=10)
+            entry = ttk.Combobox(self.binding_group, textvariable=var, state="readonly", values=KEYS+("none",), width=10)
             entry.grid(row=row, column=col+1, padx=5)
             self.edit_widgets.append(entry)
         self.pointer_fields = {}
+        self.adaptive = tk.BooleanVar(value=True)
+        self.adaptive_widget = ttk.Checkbutton(settings_parent, text="Adaptive pointer smoothing (1€)", variable=self.adaptive)
+        self.adaptive_widget.pack(anchor="w", pady=5)
         if compact:
-            pointer = ttk.LabelFrame(settings_parent, text="Pupil pointer response", padding=8)
+            pointer = ttk.LabelFrame(settings_parent, text="Pointer response", padding=8)
             pointer.pack(fill="x", pady=(10,0))
             for i, (key, title) in enumerate((("deadzone", "Dead zone"), ("hysteresis", "Activation margin"),
                     ("smoothing_ms", "Smoothing ms"), ("exponent", "Response curve"),
@@ -89,7 +96,8 @@ class MappingPanel(ttk.Frame):
                 ttk.Entry(pointer, textvariable=var, width=8).grid(row=row,column=col*2+1,padx=5)
         self.apply_button = desktop.button(settings_parent, "Apply settings — stops output", self.apply)
         self.apply_button.pack(anchor="w", pady=7)
-        label(settings_parent, "Head thresholds use the fraction of your calibrated range from neutral. Eyes use calibrated actions without a dwell timer." + ("" if compact else " Pointer curve/dead zone are in Transfer settings."),
+        self.help_text = tk.StringVar()
+        label(settings_parent, textvariable=self.help_text,
               foreground=MUTED, wraplength=1250).pack(anchor="w", pady=(0, 6))
         self.settings_notice = tk.StringVar()
         if compact:
@@ -156,6 +164,7 @@ class MappingPanel(ttk.Frame):
             self.lab.settings({"config":config})
             return
         data["name"], data["pointer_gain"] = self.name.get(), float(self.gain.get())
+        data["adaptive_pointer"] = self.adaptive.get()
         data["revision"] += 1
         for (axis, key), var in self.fields.items():
             data[axis][key] = float(var.get())
@@ -207,6 +216,14 @@ class MappingPanel(ttk.Frame):
             self.generation = state["generation"]
             self.selector.current(next(i for i, m in enumerate(self.mapping_choices) if m["id"] == state["mapping_id"]))
             mapping = state["mapping"]
+            head_only = bool(mapping and mapping.get("input_mode") == "head-mouse")
+            for group in (*self.head_groups, self.binding_group):
+                group.grid_remove() if head_only else group.grid()
+            self.adaptive_widget.configure(state="normal" if mapping else "disabled")
+            self.adaptive.set(mapping.get("adaptive_pointer", True) if mapping else False)
+            self.help_text.set("Head X + Head Y move the pointer together. Both head axes need calibration. Eyes and pupils are ignored; no clicks, keys or scroll."
+                               if head_only else "Head thresholds use the fraction of your calibrated range from neutral. Eyes use calibrated actions without a dwell timer."
+                               + ("" if self.compact else " Pointer curve/dead zone are in Transfer settings."))
             for widget in self.edit_widgets:
                 widget.configure(state="disabled" if mapping is None else "readonly" if isinstance(widget, ttk.Combobox) else "normal")
             self.apply_button.configure(state="disabled" if mapping is None and not self.compact else "normal")

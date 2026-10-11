@@ -12,8 +12,8 @@ from .engine import MouseProcessor
 from .mocks import SCENARIOS, raw_frame, scenario
 from .output import control_message
 from Processing.eye_samples import trace_fields
-from Processing.mappings.config import GAMING_ID, Mapping, read_mapping, write_mapping
-from Processing.mappings.engine import GamingProcessor
+from Processing.mappings.config import GAMING_ID, MOUSE_TEST_ID, Mapping, mouse_test_mapping, read_mapping, write_mapping
+from Processing.mappings.engine import GamingProcessor, HeadMouseProcessor
 
 
 def now_ms():
@@ -27,7 +27,7 @@ class Lab:
         self.locked_source = None
         self.locked_pointer_source = None
         self.mapping_id = "mouse"
-        self.mappings = {GAMING_ID: Mapping()}
+        self.mappings = {GAMING_ID: Mapping(), MOUSE_TEST_ID: mouse_test_mapping()}
         self.mouse_config = config or MouseConfig()
         self.commands = deque(maxlen=512)
         self.command_id = 0
@@ -241,7 +241,8 @@ class Lab:
                 self.processor = MouseProcessor(config, subject_id=runtime["subject_id"])
             else:
                 self.mappings[self.mapping_id] = mapping
-                self.processor = GamingProcessor(mapping, subject_id=runtime["subject_id"])
+                processor = HeadMouseProcessor if mapping.input_mode == "head-mouse" else GamingProcessor
+                self.processor = processor(mapping, subject_id=runtime["subject_id"])
             self.runtime = runtime
             self.trace.clear()
             self.generation += 1

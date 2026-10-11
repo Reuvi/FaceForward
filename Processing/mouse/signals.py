@@ -76,7 +76,7 @@ class Sample:
                 object.__setattr__(self, side + "_known", False)
 
 
-def decode(frame, config, subject_id):
+def decode(frame, config, subject_id, *, ignore_eyes=False):
     if not isinstance(frame, dict):
         raise ValueError("Frame must be an object")
     session = frame.get("session_id")
@@ -141,6 +141,10 @@ def decode(frame, config, subject_id):
                               pointer_sequence=origin["sequence"] if valid else None)
         if not valid:
             x = y = None  # A broken tongue channel must not discard eye/head input.
+    if ignore_eyes:
+        return Sample(session, sequence, timestamp, subject_id, None, None,
+                      (x, y) if x is not None and y is not None else None,
+                      measurement("head_y"), head_x=measurement("head_x"), **pointer_source)
     if "eye_intent" in frame:
         intent=frame["eye_intent"]
         if (not isinstance(intent,dict) or set(intent)!={"format","session_id","sequence","timestamp_ms","subject_id","left","right"}

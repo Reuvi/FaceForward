@@ -2,13 +2,13 @@
 
 The app now tracks **independent eyes/winks, Head Y, Head X and pupils**.
 Tongue detection has been retired: no tongue tab, calibration, graphs, mouth crop,
-model or background worker runs. Pupils are the mouse pointer input. The application
+model or background worker runs. Gaming uses pupils for the mouse pointer; Mouse test uses head X/Y. The application
 is local Python/Tk. Output is selectable: Preview, Driver dry run, or Live mouse +
 keyboard. Native output is explicitly enabled with the Camera source; Stop and
 closing App release it. [Build and live-output instructions](../docs/DRIVER_CONNECTION_GUIDE.md).
 The default is **gaming keyboard mouse mapping 1**: left/right eye actions →
 left/right mouse, head down/up/left/right → W/Space/Shift/S, pupils → pointer
-velocity. The previous **Mouse and scroll** mode remains selectable. See
+velocity. **Mouse test** combines calibrated head X/Y into pointer velocity and ignores every other input; it never clicks, types or scrolls. The previous **Mouse and scroll** mode remains selectable. See
 [the Processing runbook](../Processing/mappings/README.md) for tuning and saved mappings.
 
 ## Open and test
@@ -24,6 +24,9 @@ Vision/.venv/bin/python -m App --source detector-demo
 
 # Automatic gaming command exercise; no calibration required.
 Vision/.venv/bin/python -m App --source demo
+
+# Head-only mouse test (load/calibrate Head X and Head Y, then Start live control).
+Vision/.venv/bin/python -m App --source camera --output native --mapping mouse-test
 
 # Previous mouse/scroll exercise.
 Vision/.venv/bin/python -m App --source demo --mapping mouse
@@ -74,13 +77,17 @@ default is a labeled synthetic demo; choose **Camera** to open your camera.
    screen location you are looking at.
 7. **Mapping settings…** also changes pupil dead zone, activation margin,
    smoothing, response curve, acceleration and deceleration. Applying changes
-   stops output. Pointer input stays fixed to pupils. Detector setup remains
+   stops output. The pointer uses pupils in gaming or head X/Y in Mouse test. **Adaptive pointer smoothing (1€)** reduces stationary jitter and responds faster to deliberate motion; uncheck it to compare the fixed filter. In Mouse test, unused eye/key settings are hidden. Detector setup remains
    independent in Calibration.
 8. To control the OS, build Drivers and choose **Output → Live mouse + keyboard →
    Connect output** on Signals, then **Start live control**. Native eyes
    produce one complete click per activation (no dragging); head keys stay held
    until neutral/invalid. **Driver dry run** exercises the actual library without
    OS input. Any driver error stops output and remains visible in the UI.
+
+**Mouse test setup:** choose **Signals → Active mapping → Mouse test**, load a profile with both head fits (or complete **Calibration → 2 Head Y** and **3 Head X**), center your head and press **Start live control**. Eye and pupil calibration are unnecessary for this mapping. Both calibrated head inputs must be valid; raw yaw alone is insufficient. Changing mappings stops output.
+
+Pupils now use completed guided eye geometry as additional evidence for naturally narrow open eyes. Without it, generic checks still work. Raw coordinates and saved pupil/head fits are unchanged; closure, ambiguous iris evidence and missing input still stop motion. See [quality changes and measured software comparison](../docs/PUPIL_QUALITY_GUIDE.md).
 
 Unknown plots hold the last displayed position in a darker color. Actual unknown
 observations remain invalid. Unknown eye Processing samples hold the previous

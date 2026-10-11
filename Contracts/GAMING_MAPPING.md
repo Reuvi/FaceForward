@@ -1,5 +1,7 @@
 # Gaming signal processing and preview
 
+> Updated by [pupil quality and Mouse test](PUPIL_QUALITY_MOUSE_TEST.md): mapping JSON v2 adds head-only mode and adaptive pointer filtering; device_control_v1 is unchanged.
+
 **Driver connection update:** [DRIVER_CONNECTION.md](DRIVER_CONNECTION.md)
 supersedes the preview-only driver boundary below. Native output uses the existing
 driver's one-click-per-eye-activation behavior (no dragging); the mouse fields

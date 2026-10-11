@@ -1,5 +1,7 @@
 # Native detection lab: calibration, measurements, and test procedure
 
+> Pupil quality update: completed guided eye geometry can support naturally narrow open eyes; strong closure and uncertain iris evidence still reject. Coordinates and saved fits are unchanged. See [quality guide](../docs/PUPIL_QUALITY_GUIDE.md).
+
 > Latest pupil behavior: [personal endpoints and head-angle compensation](../docs/PUPIL_HEAD_CALIBRATION_GUIDE.md).
 > Run the pupil guide; fixed/no-calibration instructions below are historical.
 > Detector presets now save v12. Tongue remains retired.

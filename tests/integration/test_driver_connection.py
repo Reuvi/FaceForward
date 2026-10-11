@@ -35,7 +35,8 @@ class DriverConnectionTests(unittest.TestCase):
         base.update(sequence=self.sequence,timestamp_ms=self.now)
         frame = gaming_demo_frame(base,30)
         for key,value in values.items():
-            frame["faces"][0]["signals"][key]["value"] = value
+            frame["faces"][0]["signals"][key].update(value=value,valid=value is not None,
+                                                    confidence=1 if value is not None else 0)
         if "left_eye_open" in values:
             closed = values["left_eye_open"] == 0
             frame["eye_intent"]["left"].update(value=int(closed),state="wink" if closed else "open")
@@ -49,6 +50,36 @@ class DriverConnectionTests(unittest.TestCase):
         self.assertTrue(output["enabled"])
         self.session.stop()
         self.assertFalse(self.lab.state()["output"]["enabled"])
+
+    def test_head_mouse_reaches_driver_without_any_eye_key_or_scroll_event(self):
+        self.lab.select_mapping("mouse-test")
+        self.lab.action({"action":"arm"})
+        output = self.deliver(gaze_x=1,gaze_y=0,left_eye_open=0)
+        self.assertTrue(output["enabled"])
+        self.assertIsNone(output["error"])
+        for _ in range(20):
+            output = self.deliver(head_x=.8,head_y=.2,gaze_x=0,gaze_y=1,left_eye_open=0)
+        snap = self.lab.state()["snapshot"]
+        self.assertGreater(snap["pointer_x"],.5)
+        self.assertLess(snap["pointer_y"],.5)
+        self.assertGreater(output["event_counts"].get(1,0),0)
+        self.assertEqual(output["held_keys"],0)
+        self.assertTrue(all(e["type"] == 1 for e in self.lab.output.events))
+        self.lab.select_mapping(GAMING_ID)
+        self.assertFalse(self.lab.state()["output"]["enabled"])
+
+    def test_switch_to_head_mouse_releases_gaming_keys_and_ignores_unavailable_pupils(self):
+        for _ in range(12):self.deliver(head_y=.8)
+        self.assertNotEqual(self.lab.state()["output"]["held_keys"],0)
+        self.lab.select_mapping("mouse-test")
+        self.assertEqual(self.lab.state()["output"]["held_keys"],0)
+        self.lab.action({"action":"arm"})
+        self.assertTrue(self.deliver(gaze_x=None,gaze_y=None)["enabled"])
+        for _ in range(12):self.deliver(head_x=.8)
+        output=self.deliver(head_x=None)
+        self.assertIsNone(output["error"])
+        snap=self.lab.state()["snapshot"]
+        self.assertEqual((snap["pointer_x"],snap["pointer_y"]),(.5,.5))
 
     def test_centering_after_start_discards_pre_enable_interpolation(self):
         for mapping in (GAMING_ID, "mouse"):

@@ -5,7 +5,8 @@ import math
 import uuid
 
 from Processing.mouse.engine import AxisFilter, MouseProcessor
-from .config import DIRECTIONS, KEYS, Mapping
+from Processing.mouse.signals import decode
+from .config import DIRECTIONS, KEYS, Mapping, mouse_test_mapping
 
 
 class HeadGate:
@@ -78,7 +79,8 @@ class GamingProcessor(MouseProcessor):
         self.head_y = HeadGate(self.mapping.head_y)
         self.output_session_id = str(uuid.uuid4())
         super().__init__(self.mapping.response, subject_id)
-        self.pointer = AxisFilter(self.config.pointer, 2, gain=self.mapping.pointer_gain)
+        self.pointer = AxisFilter(self.config.pointer, 2, gain=self.mapping.pointer_gain,
+                                  adaptive=self.mapping.adaptive_pointer)
 
     def decode_sample(self, frame):
         sample = super().decode_sample(frame)
@@ -121,6 +123,7 @@ class GamingProcessor(MouseProcessor):
         diag = snap["diagnostics"]
         snap.update(keys=keys, scroll_y=.5, mapping_id=self.mapping.id,
                     mapping_name=self.mapping.name, mapping_revision=self.mapping.revision,
+                    pointer_input="head" if self.mapping.input_mode == "head-mouse" else "pupils",
                     output_session_id=self.output_session_id)
         diag.update(scroll_target=0, scroll_boost=0, interpolated_scroll=None,
                     head_x=self.head_diagnostic(self.head_x), head_y=self.head_diagnostic(self.head_y))
@@ -173,4 +176,34 @@ class GamingProcessor(MouseProcessor):
                          "filtered": filtered[index] if filtered is not None else None,
                          "threshold": f"Radius {self.config.pointer.deadzone+self.config.pointer.hysteresis:.2f} / {self.config.pointer.deadzone:.2f}",
                          "instruction": "Pointer: "+instruction})
+        return rows
+
+
+class HeadMouseProcessor(GamingProcessor):
+    """Head X/Y form one pointer vector; no eye, pupil, key or scroll actions."""
+
+    def __init__(self, mapping=None, subject_id="mock-person"):
+        mapping = mapping or mouse_test_mapping()
+        if mapping.input_mode != "head-mouse":
+            raise ValueError("Head mouse processor requires a head-mouse mapping")
+        super().__init__(mapping, subject_id)
+
+    def decode_sample(self, frame):
+        sample = decode(frame, self.config, self.subject_id, ignore_eyes=True)
+        point = ((sample.head_x, sample.scroll)
+                 if sample.head_x is not None and sample.scroll is not None else None)
+        return replace(sample, pointer=point, pointer_async=False,
+                       pointer_timestamp_ms=None, pointer_sequence=None,
+                       left_closed=False, right_closed=False,
+                       left_known=False, right_known=False)
+
+    def can_enable(self):
+        return self.pointer.valid and self.pointer.neutral()
+
+    def instructions(self, snap):
+        rows = super().instructions(snap)[-2:]
+        for row, axis in zip(rows, ("X", "Y")):
+            row.update(id="head_pointer_"+axis.lower(), input="Head "+axis)
+        rows.append(dict(id="ignored", input="Other inputs", raw=None, filtered=None,
+                         threshold="Ignored", instruction="No clicks, keys or scroll"))
         return rows

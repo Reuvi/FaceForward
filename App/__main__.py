@@ -18,8 +18,8 @@ def main():
     parser.add_argument("--camera-id", type=int, default=0)
     parser.add_argument("--fps", type=float, default=30)
     parser.add_argument("--config", type=Path, help="Processing JSON settings")
-    parser.add_argument("--mapping", choices=("mouse", "gaming-keyboard-mouse-1"), default="gaming-keyboard-mouse-1",
-                        help="initial mapping; both remain selectable on Signals")
+    parser.add_argument("--mapping", choices=("mouse", "gaming-keyboard-mouse-1", "mouse-test"), default="gaming-keyboard-mouse-1",
+                        help="initial mapping; mappings remain selectable on Signals")
     parser.add_argument("--output", choices=("preview", "dry-run", "native"), default="preview",
                         help="native sends real OS input and requires the camera source")
     parser.add_argument("--driver-library", type=Path, help="compiled face_input_driver library (default Drivers/build)")

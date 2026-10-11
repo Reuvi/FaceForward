@@ -1,4 +1,4 @@
-# gaming keyboard mouse mapping 1
+# Named mouse and keyboard mappings
 
 The middle phase is implemented: current Vision measurements feed independent
 filters and action gates, then readable keyboard/mouse commands. App can connect
@@ -20,6 +20,12 @@ A and D are available for edited bindings but inactive in the built-in mapping.
 Scroll stays neutral. Head keys are held states. The existing driver's mouse
 behavior is one complete click per activation; a sustained eye action does not
 repeat clicks or drag. The raw command button fields remain activation levels.
+
+## Mouse test
+
+Select **Mouse test** on Signals, or pass `--mapping mouse-test`. Calibrated head X/Y form one pointer vector: turn left/right and nod up/down; both can move together diagonally. All eyes, pupils, buttons, keyboard actions and scroll are ignored. Both head axes must be valid. Center your head and explicitly Start; either missing axis stops the pointer immediately. Face loss/staleness and Stop require another Start.
+
+Copies retain this head-only mode. Pointer settings and gain apply; keyboard bindings and key thresholds are hidden. The driver connection and permissions are identical to gaming mode.
 
 ## Try it
 
@@ -69,6 +75,8 @@ Pupils use the existing radial dead zone: start above .19 signed displacement,
 release at .16 with default settings. **Signals → Mapping settings…** exposes the response
 curve, smoothing and acceleration limits; standalone **Transfer settings** also
 exposes interpolation (50 ms by default) and other developer settings.
+Gaming and Mouse test default to adaptive **1€** velocity smoothing, followed by acceleration/deceleration limits. It uses a shared two-axis speed estimate and the Smoothing ms setting; raw inputs and neutral-start checks remain unchanged. Uncheck **Adaptive pointer smoothing (1€)** to use the earlier fixed filter. Unknown input resets history immediately. Mouse test defaults to zero interpolation delay; imported face-profile response settings retain their values. See [method, benchmark and limitations](../../docs/PUPIL_QUALITY_GUIDE.md).
+
 **Mapping settings… → Pointer gain** scales only the motion beyond the dead zone
 (.1–4×, capped at full velocity). A gain increase cannot amplify neutral jitter
 past the threshold. Jump boost is disabled by default in gaming mode. These
@@ -91,10 +99,10 @@ In **Mapping settings…**, choose **Copy as…**, give the copy a name, change 
 independent filter settings, then **Apply settings**. Bindings support
 W/A/S/D/Space/left Shift/none. Multiple directions assigned to the same key are
 combined as a held state. Pointer and independent mouse-button bindings remain
-fixed in this first mapping family. Apply increments the mapping revision and
+fixed within each mapping family. Mouse test always has all key bindings set to none. Apply increments the mapping revision and
 requires a new Start preview.
 
-**Export mapping / Import mapping** uses strict `input_mapping_v1` JSON, including
+**Export mapping / Import mapping** writes strict `input_mapping_v2` JSON (v1 remains readable), including input mode and adaptive-filter selection alongside
 name, stable ID, revision, response settings, pointer gain, head thresholds and
 bindings. Import validates the whole file before replacing/selecting it. Files
 contain no detector fits, observations or armed state. Export uses an atomic

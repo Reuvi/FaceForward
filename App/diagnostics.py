@@ -10,6 +10,8 @@ import time
 def pointer_status(source, lab):
     snap, config = lab["snapshot"], lab["config"]
     diag, detector = snap["diagnostics"], source.get("detector") or {}
+    head_only = snap.get("pointer_input") == "head"
+    input_name = "Head X/Y" if head_only else "Pupil"
     if lab["output"].get("error"):
         return "Pointer stopped: " + lab["output"]["error"]
     if source.get("error"):
@@ -20,6 +22,15 @@ def pointer_status(source, lab):
             return "Pointer unavailable: waiting for a fresh camera/input sample."
         signals = next((f["signals"] for f in (source.get("frame") or {}).get("faces", [])
                         if f["subject_id"] == lab["runtime"]["subject_id"]), {})
+        if head_only:
+            details = []
+            for key, name, reason_key in (("head_x", "Head X", "head_x"), ("head_y", "Head Y", "head")):
+                signal = signals.get(key, {})
+                if not signal.get("valid"):
+                    details.append(name+": "+detector.get("reasons", {}).get(reason_key, "calibrate this head axis"))
+                elif signal.get("confidence", 0) < config["min_confidence"]:
+                    details.append(name+": confidence below threshold")
+            return "Pointer unavailable: " + ("; ".join(details) or "waiting for fresh calibrated Head X and Head Y.")
         pupils = [signals.get(key, {}) for key in ("gaze_x", "gaze_y")]
         if all(p.get("valid") for p in pupils):
             quality = min(p.get("confidence", 0) for p in pupils)
@@ -31,13 +42,13 @@ def pointer_status(source, lab):
                    if not eye.get("valid") and eye.get("reason")]
         return "Pointer unavailable: " + reason + (" · " + "; ".join(details) if details else "")
     if not snap["armed"]:
-        return "Pupil input available. Output is stopped; press Start when ready."
+        return input_name + " input available. Output is stopped; press Start when ready."
     if not snap["enabled"]:
         pending = []
         radius = diag.get("pointer_radius")
         if radius is not None and radius > config["pointer"]["deadzone"]:
-            pending.append("pupils")
-        for key, name in (("head_x", "Head X"), ("head_y", "Head Y")):
+            pending.append("Head X/Y" if head_only else "pupils")
+        for key, name in (() if head_only else (("head_x", "Head X"), ("head_y", "Head Y"))):
             if not diag.get(key, {}).get("neutral", True):
                 pending.append(name)
         return ("Waiting to start: center " + ", ".join(pending) + "." if pending else
@@ -105,7 +116,7 @@ class DiagnosticLog:
         diag, detector = snap["diagnostics"], source.get("detector") or {}
         reasons = detector.get("reasons", {})
         state = (snap["armed"], snap["enabled"], snap["status"], output.get("error"),
-                 source.get("error"), reasons.get("pupil"), diag["raw_pointer"] is not None)
+                 source.get("error"), reasons.get("pupil"), diag["raw_pointer"] is not None, lab["mapping_id"])
         now = time.monotonic()
         if state == self.last_state and now < self.next_sample:
             return
@@ -117,14 +128,18 @@ class DiagnosticLog:
                      "detector_capture":(source.get("frame") or {}).get("sequence"),
                      "armed":snap["armed"], "enabled":snap["enabled"], "status":snap["status"],
                      "pointer_status":pointer_status(source, lab), "pupil_reason":reasons.get("pupil"),
+                     "mapping_id":lab["mapping_id"], "pointer_input":snap.get("pointer_input", "pupils"),
                      "pupils":{key:signals.get(key) for key in ("gaze_x", "gaze_y")},
-                     "pupil_eyes":{side:{key:eye.get(key) for key in ("valid","reason","lid_gap","blink")}
+                     "pupil_eyes":{side:{key:eye.get(key) for key in ("valid","reason","lid_gap","blink","aperture_source")}
                                    for side, eye in detector.get("pupil", {}).get("eyes", {}).items()},
-                     "processed_pupils":diag["raw_pointer"], "radius":diag.get("pointer_radius"),
+                     "processed_pupils":diag["raw_pointer"] if snap.get("pointer_input") != "head" else None,
+                     "pointer_input_values":diag["raw_pointer"], "radius":diag.get("pointer_radius"),
+                     "head_reasons":{k:reasons.get(k) for k in ("head_x", "head")},
                      "head_x":diag.get("head_x"), "head_y":diag.get("head_y"),
                      "pointer_demand":[snap["pointer_x"],snap["pointer_y"]],
                      "pointer_filter":lab["config"]["pointer"], "min_confidence":lab["config"]["min_confidence"],
                      "pointer_gain":(lab.get("mapping") or {}).get("pointer_gain",1),
+                     "adaptive_pointer":(lab.get("mapping") or {}).get("adaptive_pointer", False),
                      "pointer_speed":lab["runtime"]["pointer_speed"],
                      "camera_error":source.get("error"), "driver_mode":output["mode"],
                      "driver_error":output.get("error"), "driver_events":output.get("event_counts",{})})

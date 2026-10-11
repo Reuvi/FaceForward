@@ -1,5 +1,12 @@
 # Agent working agreement
 
+**Current pupil / Mouse test update:** read `Contracts/PUPIL_QUALITY_MOUSE_TEST.md`.
+Gaming retains calibrated pupils, with personal open-eye evidence and adaptive
+velocity smoothing. The built-in Mouse test mapping uses calibrated head X/Y only,
+ignoring eyes/pupils/keys/clicks/scroll. Mapping files are v2 (v1 readable); detector
+v12 and combined profile v3 remain unchanged. This supersedes pupil-only App
+pointer instructions for the explicitly selected Mouse test mapping.
+
 **Current driver connection:** read `Contracts/DRIVER_CONNECTION.md` and
 `docs/DRIVER_CONNECTION_GUIDE.md`. App connects the merged ABI v3 driver through
 public Python bindings and an injected Processing sink. Native output is an

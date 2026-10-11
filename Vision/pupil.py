@@ -84,7 +84,7 @@ def pose_angles(rotation):
     )
 
 
-def measure(observation, features):
+def measure(observation, features, eye_calibrations=None):
     result = PupilReading(pose=pose_angles(observation.rotation))
     points = observation.points
     if len(points) < 478:
@@ -97,6 +97,12 @@ def measure(observation, features):
         blink = observation.expressions.get("eyeBlink" + side.title(), 0)
         look_down = observation.expressions.get("eyeLookDown" + side.title())
         look_up = observation.expressions.get("eyeLookUp" + side.title())
+        calibration = (eye_calibrations or {}).get(side)
+        # Only completed guided geometry has separated open/closed regions.
+        # Use positive same-eye evidence; never require an eye fit for pupils.
+        personal_open = bool(calibration is not None and calibration.open_limit is not None
+                             and finite_number(f.value) and f.value >= calibration.open_limit
+                             and f.value > calibration.closed_limit)
         entry = {
             "xy": None,
             "valid": False,
@@ -106,14 +112,15 @@ def measure(observation, features):
             "look_down": look_down,
             "look_up": look_up,
             "down_supported": False,
+            "aperture_source": "personal open geometry" if personal_open else "generic geometry",
         }
         result.eyes[side] = entry
         if (
             not f.quality
             or f.value is None
-            or f.value < 0.10
+            or f.value < (0.04 if personal_open else 0.10)
             or not finite_number(blink)
-            or not 0 <= blink < 0.4
+            or not 0 <= blink < (0.8 if personal_open else 0.4)
         ):
             continue
         center = tuple(sum(points[i][axis] for i in ring) / 4 for axis in (0, 1))
@@ -145,15 +152,14 @@ def measure(observation, features):
             and look_down - look_up >= 0.1
         )
         entry["down_supported"] = down_supported
-        if f.value < 0.16 and not down_supported:
+        if f.value < 0.16 and not down_supported and not personal_open:
             entry["reason"] = "Narrow eye without supported downward iris direction"
             continue
         entry.update(
             xy=xy,
             valid=True,
-            reason="Supported down-looking iris"
-            if f.value < 0.16
-            else "Visible open-eye iris",
+            reason="Personally calibrated open-eye iris" if personal_open else
+                   "Supported down-looking iris" if f.value < 0.16 else "Visible open-eye iris",
         )
         qualities.append(f.quality)
     if not all(v["valid"] for v in result.eyes.values()):

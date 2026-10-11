@@ -1,5 +1,7 @@
 # Head-compensated pupil calibration (detector preset v12)
 
+> [Pupil quality update](PUPIL_QUALITY_MOUSE_TEST.md) adds optional same-eye guided open geometry as aperture evidence. No eye fit is required, and pupil coordinate/calibration identities remain unchanged.
+
 The user's latest decision supersedes fixed/no-calibration pupil requirements in
 DIRECT_PUPILS, PUPIL_MATRIX and TONGUE_RETIREMENT. Tongue remains retired. The
 11×11 matrix and continuous gaze_x/gaze_y share the calibrated pupil output.

@@ -470,7 +470,7 @@ class DetectorWorkbench:
             observation = self.observations[self.selected]
             self.features = analyze_features(captured.bgr, observation, self.config)
             self.wink_vectors = measure_winks(observation,self.features)
-            self.pupil = measure_pupils(observation, self.features)
+            self.pupil = measure_pupils(observation, self.features, self.eyes)
             self._collect_frame(frame["timestamp_ms"])
             self._guide_movement(frame["timestamp_ms"])
             self._guide_pupils(frame["timestamp_ms"])

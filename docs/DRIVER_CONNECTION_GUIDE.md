@@ -161,3 +161,7 @@ through DriverOutput, and +68 pixels through the corrected Processing → driver
 path. No clicks/keys were requested; both tests ended paused with held-key mask 0.
 This verifies the tested launch context, not every app/game or real-person accuracy.
 Automated regression tests still use the compiled driver's dry-run backend.
+
+## Head-only Mouse test
+
+Restart App, choose **Active mapping → Mouse test**, load/calibrate both Head X and Head Y, and center your head before **Start live control**. Or launch with `Vision/.venv/bin/python -m App --source camera --output native --mapping mouse-test`. No eye/pupil calibration is needed. Head X/Y combine into relative pointer velocity, including diagonals; clicks, keys and scroll are always released. Unknown head axes stop movement immediately. Switching mappings disarms output.

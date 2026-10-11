@@ -10,6 +10,7 @@ import tempfile
 from Processing.mouse.config import MouseConfig, number
 
 GAMING_ID = "gaming-keyboard-mouse-1"
+MOUSE_TEST_ID = "mouse-test"
 KEYS = ("w", "a", "s", "d", "space", "left_shift")
 DIRECTIONS = ("down", "up", "left", "right")
 DEFAULT_BINDINGS = ("w", "space", "left_shift", "s")
@@ -46,6 +47,8 @@ class Mapping:
     head_x: HeadConfig = field(default_factory=HeadConfig)
     head_y: HeadConfig = field(default_factory=HeadConfig)
     bindings: tuple = DEFAULT_BINDINGS
+    input_mode: str = "gaming"
+    adaptive_pointer: bool = True
 
     def __post_init__(self):
         if not isinstance(self.id, str) or not re.fullmatch(r"[a-z][a-z0-9-]{0,63}", self.id) or self.id == "mouse":
@@ -61,26 +64,45 @@ class Mapping:
             raise ValueError("Both head axes need independent settings")
         if type(self.bindings) is not tuple or len(self.bindings) != 4 or any(v not in KEYS + ("none",) for v in self.bindings):
             raise ValueError("Head bindings must use supported keys or none")
+        if self.input_mode not in ("gaming", "head-mouse"):
+            raise ValueError("Unknown mapping input mode")
+        if self.input_mode == "head-mouse" and self.bindings != ("none",) * 4:
+            raise ValueError("Head mouse mappings cannot assign keyboard actions")
+        if type(self.adaptive_pointer) is not bool:
+            raise ValueError("Adaptive pointer must be boolean")
 
     def to_dict(self):
-        return {"format": "input_mapping_v1", "id": self.id, "name": self.name,
+        return {"format": "input_mapping_v2", "id": self.id, "name": self.name,
                 "revision": self.revision, "response": self.response.to_dict(),
                 "pointer_gain": self.pointer_gain, "head_x": asdict(self.head_x),
-                "head_y": asdict(self.head_y), "bindings": dict(zip(DIRECTIONS, self.bindings))}
+                "head_y": asdict(self.head_y), "bindings": dict(zip(DIRECTIONS, self.bindings)),
+                "input_mode": self.input_mode, "adaptive_pointer": self.adaptive_pointer}
 
     @classmethod
     def from_dict(cls, data):
         fields = {"format", "id", "name", "revision", "response", "pointer_gain", "head_x", "head_y", "bindings"}
-        if not isinstance(data, dict) or set(data) != fields or data["format"] != "input_mapping_v1":
-            raise ValueError("Expected an input_mapping_v1 file")
+        if not isinstance(data, dict):
+            raise ValueError("Expected an input_mapping_v1 or input_mapping_v2 file")
+        version = data.get("format")
+        if version == "input_mapping_v2":
+            fields |= {"input_mode", "adaptive_pointer"}
+        if set(data) != fields or version not in ("input_mapping_v1", "input_mapping_v2"):
+            raise ValueError("Expected an input_mapping_v1 or input_mapping_v2 file")
         if not isinstance(data["bindings"], dict) or set(data["bindings"]) != set(DIRECTIONS):
             raise ValueError("Mapping needs down/up/left/right bindings")
         try:
             return cls(data["id"], data["name"], data["revision"], MouseConfig.from_dict(data["response"]),
                        data["pointer_gain"], HeadConfig(**data["head_x"]), HeadConfig(**data["head_y"]),
-                       tuple(data["bindings"][k] for k in DIRECTIONS))
+                       tuple(data["bindings"][k] for k in DIRECTIONS),
+                       data.get("input_mode", "gaming"), data.get("adaptive_pointer", True))
         except TypeError as exc:
             raise ValueError("Malformed mapping settings") from exc
+
+
+def mouse_test_mapping():
+    return Mapping(id=MOUSE_TEST_ID, name="Mouse test", input_mode="head-mouse",
+                   bindings=("none",) * 4,
+                   response=replace(gaming_response(), interpolation_ms=0))
 
 
 def read_mapping(path):

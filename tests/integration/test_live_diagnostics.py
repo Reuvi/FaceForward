@@ -38,6 +38,23 @@ class LiveDiagnosticsTests(unittest.TestCase):
         self.assertIn("Head angle outside",pointer_status(source,lab))
         self.assertNotIn("dead zone",pointer_status(source,lab))
 
+    def test_head_mouse_status_and_logs_name_head_input_instead_of_pupils(self):
+        self.lab.select_mapping("mouse-test")
+        source,lab=self.feed(None)
+        self.assertIn("Head X/Y input available",pointer_status(source,lab))
+        source['frame']['faces'][0]['signals']['head_x'].update(value=None,valid=False,confidence=0)
+        lab['snapshot']['diagnostics']['raw_pointer']=None
+        source['detector']={'reasons':{'head_x':'Run guided horizontal head calibration'}}
+        self.assertIn('Head X: Run guided horizontal',pointer_status(source,lab))
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'head.jsonl'
+            log=DiagnosticLog(path);log.record(source,lab);log.close()
+            row=json.loads(path.read_text().splitlines()[1])
+            self.assertEqual(row['mapping_id'],'mouse-test')
+            self.assertEqual(row['pointer_input'],'head')
+            self.assertIsNone(row['processed_pupils'])
+            self.assertIn('head_x',row['head_reasons'])
+
     def test_confidence_gate_and_staleness_have_distinct_messages(self):
         source,lab = self.feed(confidence=.2)
         self.assertIn("confidence 0.20 is below 0.50",pointer_status(source,lab))

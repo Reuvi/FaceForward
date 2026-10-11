@@ -156,6 +156,20 @@ class JoystickIntegration(unittest.TestCase):
         self.assertIsNotNone(self.core.pupil_guide)
         self.assertFalse(self.session.lab.processor.armed)
 
+    def test_guided_personal_eye_geometry_improves_narrow_pupil_availability(self):
+        from Vision.calibration import EyeCalibration
+        raw=self.feed(left_ratio=.12,right_ratio=.12,pupil_x=.75)
+        self.assertFalse(raw['faces'][0]['signals']['gaze_x']['valid'])
+        fit=EyeCalibration.fit_guided([.04]*12,[[.12]*12,[.25]*12],min_separation=.015)
+        self.core.eyes={side:fit for side in ('left','right')}
+        frame=self.feed(left_ratio=.12,right_ratio=.12,pupil_x=.75)
+        self.assertAlmostEqual(frame['faces'][0]['signals']['gaze_x']['value'],.75)
+        self.assertTrue(frame['pupil_matrix']['valid'])
+        self.assertEqual(self.core.pupil.eyes['left']['aperture_source'],'personal open geometry')
+        frame=self.feed(left_closed=True)
+        self.assertFalse(frame['pupil_matrix']['valid'])
+        self.assertIsNone(frame['faces'][0]['signals']['gaze_x']['value'])
+
     def test_legacy_sensitivity_is_validated_then_discarded_without_losing_fits(self):
         self.core.head=AxisCalibration(-12,0,12,endpoint_tolerance=.05)
         self.core.head_x=AxisCalibration(-15,0,20,endpoint_tolerance=.05)

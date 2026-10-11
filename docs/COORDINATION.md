@@ -1,5 +1,40 @@
 # Main chat and agent coordination hub
 
+
+## Pupil quality and Mouse test handoff
+
+- Lane / task: Reuvi integration, `codex/integration/pupil-quality-mouse-test`.
+  Base `201dcf4`; isolated worktree `reuvi-integration-pupil-quality-mouse-test`.
+  Explicit user assignment spans Vision pupil quality, Processing mappings/filter,
+  App selection/diagnostics, related tests and shared docs. Contract first:
+  `b85f128`, [PUPIL_QUALITY_MOUSE_TEST.md](../Contracts/PUPIL_QUALITY_MOUSE_TEST.md).
+- Behavior: optional completed same-eye guided open geometry supports narrow open
+  pupils without changing coordinates or stored fits. Strong closure, image/iris
+  failures and binocular disagreement still invalidate. Gaming uses a coupled
+  1€ velocity filter; the earlier fixed filter remains selectable. Mouse test
+  combines calibrated head X/Y and ignores all eyes/pupils/keys/clicks/scroll.
+  Both axes must be valid; invalid input neutralizes immediately. Mapping changes,
+  stale input, Stop and source loss retain explicit rearming and driver release.
+- Interfaces: new mapping JSON v2 fields `input_mode` and `adaptive_pointer`;
+  strict v1 migration supported. SignalFrame/device_control_v1, detector v12,
+  combined profile v3 and driver ABI v3 unchanged. Diagnostics identify selected
+  pointer input and head rejection reasons. Personal data remains untracked.
+- Verification: 109 Processing tests passed; 138 integration tests passed with
+  Tk enabled and the compiled driver in dry-run; Vision ran 158 tests, 156 passed,
+  two optional skips, with the local model smoke enabled. Both 490-frame demos
+  accepted 490 frames and ended disabled with no held inputs or driver error.
+  Mouse test emitted 509 movement events and no other event types; gaming emitted
+  movement, 3 left/3 right clicks and 4 key downs/4 key ups covering W/Space/Shift/S.
+  Synthetic adaptive comparison: velocity noise std .004048→.003265; 90% step
+  response 210→90 ms. The 10k-tick base Processing benchmark measured mean 47.18µs,
+  p95 65.83µs. Ruff F, compilation, whitespace and integration scope checks passed.
+- Remaining evidence: real-person pupil availability/accuracy and adaptive tuning
+  require a live trial. No camera recording, new model, dependency or OS driver
+  implementation change. Saved `best3.json` already contains guided eye geometry
+  and both head fits (local metadata checked read-only). Restart App for new code;
+  select Mouse test, load/calibrate both head axes, center head, Start live control.
+
+
 ## Current quick wink / tongue reset task
 
 Claim: Reuvi integration, `work/reuvi/integration/quick-winks-tongue-reset`, base

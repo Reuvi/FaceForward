@@ -7,6 +7,7 @@ import math
 from .config import MouseConfig
 from .signals import decode, finite, SubjectMissing
 from Processing.eye_samples import eye_sample, is_fresh_sample
+from .adaptive import OneEuro
 
 
 def length(vector):
@@ -65,12 +66,16 @@ class EyeGate:
 class AxisFilter:
     """Buffered interpolation → radial dead zone → curve → boost → limited velocity."""
 
-    def __init__(self, config, dimensions, *, gain=1):
+    def __init__(self, config, dimensions, *, gain=1, adaptive=False):
         self.config = config
         self.gain = gain
         self.dimensions = dimensions
         self.history = deque(maxlen=512)
         self.valid = False
+        # Smoothing ms remains the user tuning scale. At rest use twice that
+        # time constant; speed raises the cutoff automatically during movement.
+        self.adaptive = (OneEuro(dimensions, 1000 / (4*math.pi*config.smoothing_ms))
+                         if adaptive and config.smoothing_ms else None)
         self.reset_motion()
 
     def reset_motion(self):
@@ -79,6 +84,8 @@ class AxisFilter:
         self.position = None
         self.active = False
         self.boost = 0.0
+        if self.adaptive:
+            self.adaptive.reset(self.velocity)
 
     def clear(self):
         self.history.clear()
@@ -157,7 +164,8 @@ class AxisFilter:
             strength = min(1.0, strength * self.gain * (1 + self.boost))
         self.target = tuple(v / magnitude * strength if magnitude else 0.0 for v in signed)
         alpha = 1.0 if config.smoothing_ms == 0 else -math.expm1(-dt * 1000.0 / config.smoothing_ms)
-        desired = tuple(v + alpha * (t - v) for v, t in zip(self.velocity, self.target))
+        desired = (self.adaptive.step(self.target, dt) if self.adaptive else
+                   tuple(v + alpha * (t - v) for v, t in zip(self.velocity, self.target)))
         delta = tuple(d - v for d, v in zip(desired, self.velocity))
         rate = config.deceleration if length(desired) < length(self.velocity) else config.acceleration
         scale = min(1.0, rate * dt / length(delta)) if length(delta) else 1.0
